@@ -1,0 +1,30 @@
+# ===== 原始数据：永不入库 =====
+data/raw/
+data/reference/
+*.xlsx
+*.csv
+!config/*.csv
+
+# ===== 中间产物：只保留白名单 =====
+data/interim/*
+!data/interim/segments.parquet
+!data/interim/baseline_summary.csv
+!data/interim/scenario_results.csv
+
+# ===== 数据库与输出 =====
+db/
+outputs/figures/
+outputs/tables/
+
+# ===== Python 常规 =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.env
+.streamlit/secrets.toml
+*.log
+.idea/
+.vscode/
+.DS_Store

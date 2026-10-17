@@ -5,11 +5,10 @@ data/reference/
 *.csv
 !config/*.csv
 
-# ===== 中间产物：只保留白名单 =====
-data/interim/*
-!data/interim/segments.parquet
-!data/interim/baseline_summary.csv
-!data/interim/scenario_results.csv
+# ===== 代码生成物：不传 GitHub =====
+# 新的流水线会把结果存在这里，队友拉代码后自己跑一遍 pipeline 就有了
+data/processed/
+data/interim/  # 顺便把旧的也直接全忽略掉
 
 # ===== 数据库与输出 =====
 db/

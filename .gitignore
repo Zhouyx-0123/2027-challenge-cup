@@ -5,21 +5,24 @@ data/reference/
 *.csv
 !config/*.csv
 
-# ===== 流水线产出：只有演示结果表入库 =====
-# data/processed/ 整体忽略；但下面三个结果表是前端演示的静态数据，刻意随仓库入库
-# （clone 后无需原始数据即可启动前端；由 preprocess 内置演示样本产出）
+# ===== 流水线产出：只有三个结果表入库 =====
 data/processed/*
 !data/processed/wide_data.parquet
 !data/processed/baseline_carbon.parquet
 !data/processed/final_report.parquet
 
-# 旧的中间产物目录：整体忽略
-data/interim/
-
-# ===== 数据库与输出 =====
-db/
+# ===== 离线包与产物 =====
+wheels/
 outputs/figures/
 outputs/tables/
+db/
+data/interim/
+
+# ===== 临时文件 =====
+_tmp*
+.dsh-office-*/
+~$*
+*.tmp
 
 # ===== Python 常规 =====
 __pycache__/

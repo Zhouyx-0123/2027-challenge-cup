@@ -5,10 +5,16 @@ data/reference/
 *.csv
 !config/*.csv
 
-# ===== 代码生成物：不传 GitHub =====
-# 新的流水线会把结果存在这里，队友拉代码后自己跑一遍 pipeline 就有了
-data/processed/
-data/interim/  # 顺便把旧的也直接全忽略掉
+# ===== 流水线产出：只有演示结果表入库 =====
+# data/processed/ 整体忽略；但下面三个结果表是前端演示的静态数据，刻意随仓库入库
+# （clone 后无需原始数据即可启动前端；由 preprocess 内置演示样本产出）
+data/processed/*
+!data/processed/wide_data.parquet
+!data/processed/baseline_carbon.parquet
+!data/processed/final_report.parquet
+
+# 旧的中间产物目录：整体忽略
+data/interim/
 
 # ===== 数据库与输出 =====
 db/

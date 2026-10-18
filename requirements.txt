@@ -1,1 +1,4 @@
+# 核心流水线（python -m src.pipeline）与前端（streamlit run app/app.py）所需
 streamlit
+pandas
+pyarrow

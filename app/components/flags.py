@@ -95,11 +95,15 @@ def flagged_table(
             color = YELLOW
         else:
             color = ""
-        css = ("background-color: " + color) if color else ""
+        # 字色一起写死：暗色主题下白字压在浅色底上会看不见
+        css = ("background-color: " + color + "; color: #111111") if color else ""
         return [css] * len(row)
 
     styler = disp.style.apply(_row_style, axis=1)
-    st.dataframe(styler, use_container_width=True, height=height)
+    kwargs = {"use_container_width": True}
+    if height:
+        kwargs["height"] = height
+    st.dataframe(styler, **kwargs)
     if len(df) > max_rows:
         st.caption("仅显示前 " + str(max_rows) + " 行，共 " + str(len(df)) + " 行")
     flag_legend()

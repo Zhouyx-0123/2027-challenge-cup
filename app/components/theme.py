@@ -1,0 +1,109 @@
+"""视觉系统：暗色指挥中心风格。所有页面共用，页面里不写内联样式。"""
+
+from __future__ import annotations
+
+from typing import Iterable, Optional
+
+import streamlit as st
+
+CSS = """
+<style>
+:root {
+  --bg: #0B0F14;
+  --panel: rgba(19, 26, 35, 0.72);
+  --line: rgba(255, 255, 255, 0.08);
+  --accent: #2DD4A7;
+  --accent-2: #F5C86B;
+  --text: #E6EDF3;
+  --muted: #8A97A6;
+}
+.stApp {
+  background:
+    radial-gradient(1100px 520px at 12% -8%, rgba(45,212,167,0.10), transparent 60%),
+    radial-gradient(900px 500px at 92% 4%, rgba(245,200,107,0.07), transparent 55%),
+    #0B0F14;
+}
+header[data-testid="stHeader"] { background: transparent; }
+footer, #MainMenu { visibility: hidden; }
+.block-container { padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1500px; }
+
+h1, h2, h3 { letter-spacing: -0.01em; }
+p, li, span, label { color: var(--text); }
+
+/* 指标卡 */
+div[data-testid="stMetric"] {
+  background: linear-gradient(160deg, rgba(45,212,167,0.10), rgba(45,212,167,0.015));
+  border: 1px solid rgba(45,212,167,0.18);
+  border-radius: 14px;
+  padding: 14px 18px 12px 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+div[data-testid="stMetricLabel"] p { font-size: 12px !important; color: var(--muted) !important; letter-spacing: .06em; }
+div[data-testid="stMetricValue"] { font-size: 30px; font-variant-numeric: tabular-nums; }
+
+/* 表格 */
+div[data-testid="stDataFrame"] { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+
+/* 章节标题 */
+.cm-sec { display:flex; align-items:center; gap:10px; margin: 22px 0 6px 0; }
+.cm-sec .bar { width:4px; height:18px; background: var(--accent); border-radius:2px; }
+.cm-sec .t { font-size:17px; font-weight:700; letter-spacing:.01em; }
+.cm-sec .d { color: var(--muted); font-size:12.5px; margin-left:6px; }
+
+/* 顶部 hero */
+.cm-hero {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 20px;
+  padding: 26px 30px 22px 30px; margin-bottom: 18px;
+  background: linear-gradient(135deg, rgba(45,212,167,0.14), rgba(11,15,20,0.2) 45%, rgba(245,200,107,0.08));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 18px 50px rgba(0,0,0,0.45);
+}
+.cm-hero .k { color: var(--accent); font-size: 12px; letter-spacing: .22em; text-transform: uppercase; }
+.cm-hero h1 { font-size: 34px; margin: 8px 0 6px 0; line-height: 1.15; }
+.cm-hero p { color: var(--muted); margin: 0; font-size: 14.5px; }
+.cm-chip { display:inline-block; margin: 12px 8px 0 0; padding: 4px 11px; border-radius: 999px;
+  font-size: 12px; color: var(--text); border: 1px solid rgba(45,212,167,0.35);
+  background: rgba(45,212,167,0.10); }
+
+/* 结论带 */
+.cm-conclusion { background: rgba(31,58,95,0.12); border-left: 4px solid #1F3A5F;
+  padding: 10px 14px; margin-top: 10px; font-size: 14px; color: var(--text); }
+</style>
+"""
+
+
+def inject() -> None:
+    """注入全局样式。每个页面在 setup() 之后调用一次，重复调用无副作用。"""
+    if st.session_state.get("_cm_css_injected"):
+        return
+    st.markdown(CSS, unsafe_allow_html=True)
+    st.session_state["_cm_css_injected"] = True
+
+
+def hero(title: str, subtitle: str, kicker: str = "CARBON LEDGER", badges: Optional[Iterable[str]] = None) -> None:
+    chips = "".join("<span class='cm-chip'>" + str(b) + "</span>" for b in (badges or []))
+    st.markdown(
+        "<div class='cm-hero'>"
+        + "<div class='k'>" + kicker + "</div>"
+        + "<h1>" + title + "</h1>"
+        + "<p>" + subtitle + "</p>"
+        + chips
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def section(title: str, desc: str = "") -> None:
+    st.markdown(
+        "<div class='cm-sec'><span class='bar'></span><span class='t'>"
+        + title
+        + "</span><span class='d'>" + desc + "</span></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def conclusion(text: str) -> None:
+    st.markdown(
+        "<div class='cm-conclusion'><b>本页结论</b>　" + text + "</div>",
+        unsafe_allow_html=True,
+    )

@@ -26,7 +26,15 @@ if seg.empty:
     layout.empty_state(["baseline_carbon.parquet"])
     st.stop()
 
-kg = pd.to_numeric(seg.get("kg_co2"), errors="coerce")
+missing = services.column_ok(seg, services.CORE_COLUMNS)
+if missing:
+    st.warning("结果表还没有按契约落盘，这一页先停在数据检查。")
+    st.markdown("缺少字段：" + "、".join("[" + c + "]" for c in missing))
+    st.caption("当前文件里的字段：" + "、".join([str(c) for c in seg.columns]))
+    layout.conclusion("数据契约没落地之前，页面不编数字——这是硬规矩。")
+    st.stop()
+
+kg = pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0.0)
 total = float(kg.sum()) or 1.0
 
 # ---- 指标卡 ----

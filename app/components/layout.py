@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional
 
 import streamlit as st
 
+from . import theme
+
 ACCENT = "#1F3A5F"
 SOFT = "#F4F7FA"
 
@@ -18,6 +20,7 @@ def setup(title: str, icon: str = "📦") -> None:
         layout="wide",
         initial_sidebar_state="expanded",
     )
+    theme.inject()
 
 
 def page_header(title: str, question: Optional[str] = None, badge: Optional[str] = None) -> None:
@@ -55,24 +58,12 @@ def kpi_row(items: List[Dict[str, Any]], per_row: int = 4) -> None:
 
 
 def section(title: str, desc: Optional[str] = None) -> None:
-    st.markdown("### " + title)
-    if desc:
-        st.caption(desc)
+    theme.section(title, desc or "")
 
 
 def conclusion(text: str) -> None:
     """页脚结论带。每页必须有一句，答辩照着念。"""
-    st.markdown(
-        "<div style='background:"
-        + SOFT
-        + ";border-left:4px solid "
-        + ACCENT
-        + ";padding:10px 14px;margin-top:10px;font-size:14px'>"
-        + "<b>本页结论</b>　"
-        + text
-        + "</div>",
-        unsafe_allow_html=True,
-    )
+    theme.conclusion(text)
 
 
 def empty_state(need: List[str]) -> None:

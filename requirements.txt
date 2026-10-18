@@ -1,5 +1,7 @@
-# 核心流水线（python -m src.pipeline）与前端（streamlit run app/app.py）所需
-streamlit
-pandas
-pyarrow
-openpyxl
+streamlit>=1.38.0
+pandas>=2.0.0
+numpy>=1.24.0
+openpyxl>=3.1.0
+pyarrow>=14.0.0
+plotly>=5.20.0
+pyyaml>=6.0

@@ -38,6 +38,9 @@ SEGMENT_COLUMNS: List[str] = [
     "flag_dup", "flag_anomaly", "flag_basis",
 ]
 
+# 页面能不能出数，只看这四列在不在（缺任何一列，页面停在数据检查，不编数字）
+CORE_COLUMNS: List[str] = ["waybill_no", "od_pair", "dist_km", "kg_co2"]
+
 SCENARIO_COLUMNS: List[str] = [
     "scenario", "emission_t", "reduction_pct", "capex_wan",
     "opex_save_wan", "payback_years", "unit_cost_yuan_t", "meets_target",
@@ -67,6 +70,11 @@ def column_ok(df: pd.DataFrame, cols: List[str]) -> List[str]:
 def available() -> Dict[str, bool]:
     """哪些结果文件已经存在。"""
     return {k: (PROCESSED / f).exists() for k, f in RESULT_FILES.items()}
+
+
+def is_mock() -> bool:
+    """结果表是不是演示数据（tools/make_mock_results.py 生成）。"""
+    return (PROCESSED / "_mock.flag").exists()
 
 
 @st.cache_data(show_spinner=False)

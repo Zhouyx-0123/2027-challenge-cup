@@ -18,6 +18,9 @@ outputs/tables/
 db/
 data/interim/
 
+# ===== 负责人个人文档（不入库，团队看 docs/17）=====
+docs/19_负责人执行方案.*
+
 # ===== 临时文件 =====
 _tmp*
 .dsh-office-*/

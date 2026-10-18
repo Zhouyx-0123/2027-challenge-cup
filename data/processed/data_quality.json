@@ -1,0 +1,27 @@
+{
+  "source": "real",
+  "generated_at": "2026-10-18T21:38:08",
+  "rows_raw": 36329,
+  "rows_wide": 36329,
+  "rows_dedup": 33214,
+  "dup_rows": 3115,
+  "anomaly_rows": 1357,
+  "basis_rows": 1936,
+  "estimated_rows": 1,
+  "fill_dist": 0,
+  "fill_vehicle": 0,
+  "fill_load": 0,
+  "fill_invoice": 0,
+  "fill_duration": 1,
+  "valid_speed_rows": 33213,
+  "avg_speed": 49.5127,
+  "total_km": 4690435.81,
+  "match_rate": 1.0,
+  "vehicle_match_rate": 1.0,
+  "order_match_rate": 1.0,
+  "notes": [
+    "读取 副本（平均数据）命题2数据附件1-2023年的订单数据和运单数据.xlsx / 命题2数据附件2-运输车辆的核心信息.xlsx（订单 12098 行，运单 36329 行，车型表 75 条；订单直连率 100.0%）",
+    "真实附件：订单直连率 100.0%，车型匹配率 100.0%；去重键 = 运单 + 车牌 + 里程 + 封/解车时间。",
+    "时间戳异常 1 行已填补并打标（不删除、不中断）。"
+  ]
+}

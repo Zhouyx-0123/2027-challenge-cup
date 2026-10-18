@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-10-18T21:38:05",
+  "source": "real",
+  "mode": "auto",
+  "stages": [
+    {
+      "key": "preprocess",
+      "name": "① 数据层 preprocess.py",
+      "status": "ok",
+      "seconds": 3.136,
+      "error": ""
+    },
+    {
+      "key": "optimizer",
+      "name": "② 引擎层 optimizer.py",
+      "status": "ok",
+      "seconds": 0.128,
+      "error": ""
+    },
+    {
+      "key": "evaluator",
+      "name": "③ 分析层 evaluator.py",
+      "status": "ok",
+      "seconds": 0.069,
+      "error": ""
+    },
+    {
+      "key": "reports",
+      "name": "④ 报表段（G3 台账 + G4 披露）",
+      "status": "ok",
+      "seconds": 0.048,
+      "error": ""
+    }
+  ],
+  "exit_code": 1,
+  "gate_passed": false,
+  "gate_counts": {
+    "pass": 20,
+    "fail": 2,
+    "skip": 0
+  },
+  "total_seconds": 3.434
+}

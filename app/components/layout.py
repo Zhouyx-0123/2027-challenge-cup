@@ -1,4 +1,4 @@
-"""版式组件：页头、指标卡、结论带、空状态、全局参数。"""
+"""版式组件（A1）：页头、指标卡、结论带、空状态、全局参数。"""
 
 from __future__ import annotations
 
@@ -66,6 +66,24 @@ def conclusion(text: str) -> None:
     theme.conclusion(text)
 
 
+def demo_note(reason: str = "") -> None:
+    theme.demo_note(reason)
+
+
+def source_badge(source: str) -> str:
+    return "实测数据" if source == "real" else "演示数据"
+
+
+def gate_badge(gate: Optional[Dict[str, Any]]) -> str:
+    if not gate:
+        return "闸门未运行"
+    if gate.get("mode") == "error":
+        return "闸门：流水线中断"
+    if gate.get("passed"):
+        return "闸门通过" if gate.get("mode") == "real" else "闸门通过（演示）"
+    return "闸门未通过"
+
+
 def empty_state(need: List[str]) -> None:
     """缺表时的空状态：不报错，告诉对方跑什么。"""
     st.warning("这张表还没生成——先运行  python -m src.pipeline")
@@ -73,7 +91,8 @@ def empty_state(need: List[str]) -> None:
         st.caption("缺少：" + " / ".join(need))
 
 
-def sidebar_params() -> Dict[str, Any]:
+def sidebar_params(source_name: str = "unknown",
+                   gate: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """全局参数：λ 与成本口径。全站只有这一处，其他页面读 session_state。"""
     with st.sidebar:
         st.markdown("### 全局参数")
@@ -92,7 +111,14 @@ def sidebar_params() -> Dict[str, Any]:
             help="赛题口径＝购置+能耗+维护−补贴；延展口径＝排放量 × λ。",
         )
         st.markdown("---")
-        st.caption("数据源：data/processed（只读）")
+        st.caption("数据源：" + source_badge(source_name))
+        if gate is not None:
+            st.caption(gate_badge(gate))
+        if st.button("刷新结果表", use_container_width=True,
+                     help="只清缓存、重新读表；不会调用任何算法。"):
+            st.cache_data.clear()
+            st.rerun()
+        st.caption("只读 data/processed；页面不调用核心算法")
     st.session_state["lam"] = lam
     st.session_state["basis"] = basis
     return {"lam": lam, "basis": basis}

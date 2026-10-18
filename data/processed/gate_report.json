@@ -1,0 +1,187 @@
+{
+  "generated_at": "2026-10-18T21:38:08",
+  "source": "real",
+  "mode": "real",
+  "passed": false,
+  "targets": [
+    {
+      "id": "segments",
+      "label": "独立路段数",
+      "stage": "preprocess",
+      "expected": 33214.0,
+      "actual": 33214.0,
+      "tol": 0.0,
+      "unit": "段",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "total_km",
+      "label": "总里程",
+      "stage": "preprocess",
+      "expected": 4690435.81,
+      "actual": 4690435.81,
+      "tol": 0.01,
+      "unit": "km",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "valid_speed_rows",
+      "label": "有效速度样本",
+      "stage": "preprocess",
+      "expected": 33213.0,
+      "actual": 33213.0,
+      "tol": 0.0,
+      "unit": "条",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "avg_speed",
+      "label": "门到门均速",
+      "stage": "preprocess",
+      "expected": 49.57,
+      "actual": 49.512733417637676,
+      "tol": 0.01,
+      "unit": "km/h",
+      "status": "FAIL",
+      "note": "差 -0.057 km/h；数据版本/去重口径差异，待确认"
+    },
+    {
+      "id": "e0_kg",
+      "label": "基准碳排 E₀",
+      "stage": "optimizer",
+      "expected": 4502042.41,
+      "actual": 4504645.194592228,
+      "tol": 0.01,
+      "unit": "kg",
+      "status": "FAIL",
+      "note": "差 +2603 kg（+0.058%）；GVW 映射 provisional，待杨按文献表 8 定稿"
+    },
+    {
+      "id": "er30_vsp2",
+      "label": "30 t / VSP=2 排放率",
+      "stage": "optimizer",
+      "expected": 14.67,
+      "actual": 14.666,
+      "tol": 0.01,
+      "unit": "g/s",
+      "status": "PASS",
+      "note": "因子表自测，与数据无关"
+    },
+    {
+      "id": "vsp3_dev_pct",
+      "label": "VSP=3 平行校验偏差",
+      "stage": "optimizer",
+      "expected": 12.68,
+      "actual": 12.68,
+      "tol": 0.01,
+      "unit": "%",
+      "status": "PASS",
+      "note": "因子表自测，与数据无关"
+    },
+    {
+      "id": "main_reduction_pct",
+      "label": "主方案减排率",
+      "stage": "evaluator",
+      "expected": 77.4,
+      "actual": 77.4,
+      "tol": 0.1,
+      "unit": "%",
+      "status": "PASS",
+      "note": "方案表为静态标定（答辩稿表 19–21），闸门只校验它没被改动"
+    }
+  ],
+  "structural": [
+    {
+      "id": "wide_rows",
+      "label": "宽表非空",
+      "status": "PASS",
+      "detail": "宽表 36329 行"
+    },
+    {
+      "id": "wide_cols",
+      "label": "宽表字段契约",
+      "status": "PASS",
+      "detail": "契约齐全"
+    },
+    {
+      "id": "seg_rows",
+      "label": "段表非空",
+      "status": "PASS",
+      "detail": "段表 33214 行"
+    },
+    {
+      "id": "seg_cols",
+      "label": "段表字段契约",
+      "status": "PASS",
+      "detail": "契约齐全"
+    },
+    {
+      "id": "dedup",
+      "label": "去重口径一致",
+      "status": "PASS",
+      "detail": "宽表 36329 − 段表 33214 = 重复 3115；质量报告 3115 / 33214"
+    },
+    {
+      "id": "finite",
+      "label": "碳排/里程无空值",
+      "status": "PASS",
+      "detail": "NaN 0｜负碳 0｜零里程 0"
+    },
+    {
+      "id": "kpi_total",
+      "label": "E₀ 与 kpi 同源",
+      "status": "PASS",
+      "detail": "段表 4504645.19 kg vs kpi 4504645.19 kg"
+    },
+    {
+      "id": "ledger_fields",
+      "label": "台账六字段",
+      "status": "PASS",
+      "detail": "字段 9 个｜3 行"
+    },
+    {
+      "id": "ledger_total",
+      "label": "台账总碳 = 首页总碳",
+      "status": "PASS",
+      "detail": "台账基准 4504645.20 kg vs 第 1 页 4504645.19 kg"
+    },
+    {
+      "id": "disclosure_six",
+      "label": "披露六要素",
+      "status": "PASS",
+      "detail": "命中 6 / 6"
+    },
+    {
+      "id": "schemes",
+      "label": "方案表可对账",
+      "status": "PASS",
+      "detail": "减排 0.0–77.4%｜回本 0.0–9.6 年"
+    },
+    {
+      "id": "hotspots",
+      "label": "四维热点齐全",
+      "status": "PASS",
+      "detail": "维度：月份、线路、车型、里程段"
+    },
+    {
+      "id": "od_band",
+      "label": "同线带宽非空",
+      "status": "PASS",
+      "detail": "可比较 OD 355 条"
+    },
+    {
+      "id": "source",
+      "label": "数据来源标记",
+      "status": "PASS",
+      "detail": "source = real"
+    }
+  ],
+  "counts": {
+    "pass": 20,
+    "fail": 2,
+    "skip": 0
+  }
+}

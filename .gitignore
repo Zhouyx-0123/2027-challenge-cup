@@ -10,6 +10,16 @@ data/processed/*
 !data/processed/wide_data.parquet
 !data/processed/baseline_carbon.parquet
 !data/processed/final_report.parquet
+!data/processed/hotspots.parquet
+!data/processed/od_band.parquet
+!data/processed/ledger.parquet
+!data/processed/disclosure.json
+!data/processed/kpi.json
+!data/processed/data_quality.json
+!data/processed/gate_report.json
+!data/processed/run_log.json
+!data/processed/_source.json
+!data/processed/_mock.flag
 
 # ===== 离线包与产物 =====
 wheels/

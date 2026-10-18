@@ -68,6 +68,40 @@ div[data-testid="stDataFrame"] { border: 1px solid var(--line); border-radius: 1
 /* 结论带 */
 .cm-conclusion { background: rgba(31,58,95,0.12); border-left: 4px solid #1F3A5F;
   padding: 10px 14px; margin-top: 10px; font-size: 14px; color: var(--text); }
+
+/* FLAG 图例 */
+.cm-flagbar { display:flex; gap:10px; flex-wrap:wrap; margin: 4px 0 10px 0; }
+.cm-flag { display:inline-flex; align-items:center; gap:7px; padding: 5px 11px;
+  border:1px solid var(--line); border-radius: 999px; font-size:12px; color: var(--muted);
+  background: rgba(255,255,255,0.02); }
+.cm-flag .dot { width:9px; height:9px; border-radius:3px; display:inline-block; }
+.cm-flag .est { border:2px solid #F5C86B; background: transparent; }
+
+/* 估算值黄框表（HTML 版，保证边框一定能看见） */
+.cm-est-wrap { border:1px solid rgba(245,200,107,0.28); border-radius:14px;
+  padding: 12px 14px 6px 14px; margin: 6px 0 12px 0;
+  background: linear-gradient(180deg, rgba(245,200,107,0.06), rgba(245,200,107,0.01)); }
+.cm-est-head { font-size:13px; color:#F5C86B; font-weight:700; letter-spacing:.02em; }
+.cm-est-head span { color: var(--muted); font-weight:400; margin-left:8px; }
+.cm-est-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:12.5px; }
+.cm-est-table th { text-align:left; color: var(--muted); font-weight:600;
+  padding: 7px 9px; border-bottom:1px solid var(--line); }
+.cm-est-table td { padding: 7px 9px; border-bottom:1px solid rgba(255,255,255,0.05);
+  color: var(--text); vertical-align: top; }
+.cm-est-table tr.est td { border:2px solid #F5C86B; background: rgba(245,200,107,0.10); }
+.cm-est-table td.reason { color:#FFE7A3; }
+.cm-est-foot { color: var(--muted); font-size: 11.5px; margin: 8px 0 4px 0; }
+
+/* 演示数据提示条 */
+.cm-demo { border:1px solid rgba(245,200,107,0.35); background: rgba(245,200,107,0.08);
+  border-radius: 12px; padding: 10px 14px; margin: 0 0 14px 0; font-size: 13px;
+  color: var(--text); }
+.cm-demo b { color:#F5C86B; }
+
+/* 闸门条目 */
+.cm-gate-ok { color:#2DD4A7; font-weight:700; }
+.cm-gate-fail { color:#FF7A7A; font-weight:700; }
+.cm-gate-skip { color: var(--muted); font-weight:700; }
 </style>
 """
 
@@ -105,5 +139,16 @@ def section(title: str, desc: str = "") -> None:
 def conclusion(text: str) -> None:
     st.markdown(
         "<div class='cm-conclusion'><b>本页结论</b>　" + text + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def demo_note(reason: str = "") -> None:
+    """演示数据提示条：不遮挡内容，但必须一眼看见。"""
+    tail = ("　<span style='color:#8A97A6'>" + reason + "</span>") if reason else ""
+    st.markdown(
+        "<div class='cm-demo'><b>演示数据</b>　当前结果表由内置合成样本生成，"
+        "用于前端联调与答辩兜底，不代表真数据口径。真数据放入 <code>data/raw/</code> 后"
+        "重跑 <code>python -m src.pipeline</code> 自动切换。" + tail + "</div>",
         unsafe_allow_html=True,
     )

@@ -49,6 +49,26 @@ def bar(df: pd.DataFrame, x: str, y: str, title: Optional[str] = None, height: i
                     config={"displayModeBar": False})
 
 
+def hist(df: pd.DataFrame, x: str, title: Optional[str] = None, bins: int = 30,
+         height: int = 300, x_label: Optional[str] = None) -> None:
+    """直方图：速度分布、偏差分布这类“看形状”的图用它。"""
+    if df is None or df.empty or x not in df.columns:
+        st.caption("暂无数据")
+        return
+    data = pd.to_numeric(df[x], errors="coerce").dropna()
+    if data.empty:
+        st.caption("暂无数据")
+        return
+    fig = px.histogram(data, nbins=bins, color_discrete_sequence=[ACCENT])
+    fig.update_traces(marker_line_width=0)
+    fig.update_layout(bargap=0.06)
+    if x_label:
+        fig.update_xaxes(title_text=x_label)
+    fig.update_yaxes(title_text="段数")
+    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+                    config={"displayModeBar": False})
+
+
 def hbar(df: pd.DataFrame, y: str, x: str, title: Optional[str] = None, height: int = 340) -> None:
     """横向条形：排行类图表用它，标签好读。"""
     if df is None or df.empty or x not in df.columns or y not in df.columns:

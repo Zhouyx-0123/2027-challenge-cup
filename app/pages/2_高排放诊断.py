@@ -11,109 +11,119 @@ import pandas as pd
 import streamlit as st
 
 import services
-from components import layout, charts, flags
+from components import layout, charts, theme
 
 layout.setup("2 高排放诊断")
-layout.page_header(
-    "2 高排放诊断",
-    "排放集中在哪？同一条线路上，换一种车能差多少？",
-    badge="四维 + 同线带宽",
-)
-layout.sidebar_params()
+src = services.source()
+gate = services.gate()
+layout.sidebar_params(services.source_name(), gate)
 
 seg = services.segments()
 if seg.empty:
     layout.empty_state(["baseline_carbon.parquet"])
     st.stop()
 
-missing = services.column_ok(seg, services.CORE_COLUMNS)
-if missing:
-    st.warning("结果表还没有按契约落盘，这一页先停在数据检查。")
-    st.markdown("缺少字段：" + "、".join("[" + c + "]" for c in missing))
-    st.caption("当前文件里的字段：" + "、".join([str(c) for c in seg.columns]))
-    layout.conclusion("数据契约没落地之前，页面不编数字——这是硬规矩。")
-    st.stop()
+mock = services.is_mock()
+theme.hero(
+    "高排放诊断：空间在哪",
+    "四维热点告诉你排放集中在哪；同线带宽告诉你同一条线换车能差多少。",
+    kicker="02 / DIAGNOSIS",
+    badges=[layout.source_badge(services.source_name()), layout.gate_badge(gate),
+            "四维热点", "同线带宽"],
+)
+if mock:
+    layout.demo_note(str(src.get("reason", "")))
 
+k = services.kpis()
 kg = pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0.0)
 total = float(kg.sum()) or 1.0
-
-# ---- 指标卡 ----
 heavy_share = None
 if "vclass" in seg.columns:
     vc = pd.to_numeric(seg["vclass"], errors="coerce")
     heavy_share = float(kg[vc == 3].sum()) / total
-
 longhaul_share = None
 if "dist_km" in seg.columns:
     dist = pd.to_numeric(seg["dist_km"], errors="coerce")
     longhaul_share = float(kg[dist > 500].sum()) / total
-
-od_ratio_median = None
-od_pairs = 0
-if {"od_pair", "factor_gkm"}.issubset(seg.columns):
-    g = seg.groupby("od_pair")
-    band = g.agg(n=("factor_gkm", "size"),
-                 nt=("vehicle_type", "nunique"),
-                 fmin=("factor_gkm", "min"),
-                 fmax=("factor_gkm", "max"))
-    band = band[(band["n"] >= 3) & (band["nt"] >= 2) & (band["fmin"] > 0)]
-    if not band.empty:
-        band["ratio"] = band["fmax"] / band["fmin"]
-        od_ratio_median = float(band["ratio"].median())
-        od_pairs = int(len(band))
+band = services.od_band()
+ratio_median = k.get("od_ratio_median")
+if ratio_median is None and not band.empty and "ratio" in band.columns:
+    ratio_median = float(pd.to_numeric(band["ratio"], errors="coerce").median())
+od_pairs = k.get("od_pairs") or (len(band) if not band.empty else 0)
+coverage = k.get("od_coverage_pct")
 
 layout.kpi_row([
     {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—"),
      "help": "重型车是电动化瓶颈"},
-    {"label": "超长途（>500km）碳占比", "value": (("%.1f%%" % (100 * longhaul_share)) if longhaul_share is not None else "—")},
-    {"label": "同线碳强度差（中位）", "value": (("%.2f×" % od_ratio_median) if od_ratio_median else "—"),
+    {"label": "超长途（>500km）碳占比",
+     "value": (("%.1f%%" % (100 * longhaul_share)) if longhaul_share is not None else "—")},
+    {"label": "同线碳强度差（中位）", "value": (("%.2f×" % ratio_median) if ratio_median else "—"),
      "help": "同一 OD 上不同车型的最大/最小因子比"},
     {"label": "可比较线路数", "value": services.fmt(od_pairs)},
-])
+    {"label": "碳排覆盖率", "value": (("%.1f%%" % coverage) if coverage is not None else "—"),
+     "help": "可比较线路覆盖的碳排占基准碳排比例"},
+], per_row=5)
 
 st.markdown("---")
-tab1, tab2, tab3 = st.tabs(["车型维度", "线路维度", "同线带宽"])
+st.caption("可比较线路 = 该 OD 至少 3 段、至少 2 种车型；倍数 = 最高因子 / 最低因子。"
+           "结果表由 evaluator.py 预先生成，本页只读不重算。"
+           "当前因子表为 provisional：同线因子比与蓝图 1.50× 的差异来自 75 车型因子档位，"
+           "待杨按文献表 8 定稿后复核。")
 
-with tab1:
-    if "vehicle_type" in seg.columns:
-        agg = (seg.assign(kg=kg)
-                  .groupby("vehicle_type", as_index=False)["kg"].sum()
-                  .sort_values("kg", ascending=False).head(12))
-        agg["emission_t"] = agg["kg"] / 1000.0
-        charts.bar(agg, "vehicle_type", "emission_t", "TOP12 车型碳排放（t）", height=380)
-        st.dataframe(agg[["vehicle_type", "emission_t"]], use_container_width=True, hide_index=True)
-    else:
-        st.caption("宽表还没有 vehicle_type 列")
+tabs = st.tabs(["车型维度", "线路维度", "月份维度", "里程段维度"])
+DIMS = [
+    ("车型", "vehicle_type", "TOP 车型碳排放（t）"),
+    ("线路", "od_pair", "TOP 线路碳排放（t）"),
+    ("月份", "month", "月份碳排放（t）"),
+    ("里程段", "dist_bin", "里程段碳排放（t）"),
+]
 
-with tab2:
-    if "od_pair" in seg.columns:
-        agg = (seg.assign(kg=kg)
-                  .groupby("od_pair", as_index=False).agg(kg=("kg", "sum"), n=("kg", "size"))
-                  .sort_values("kg", ascending=False).head(15))
-        agg["emission_t"] = agg["kg"] / 1000.0
-        st.dataframe(agg[["od_pair", "n", "emission_t"]].rename(
-            columns={"od_pair": "线路", "n": "段数", "emission_t": "碳排放(t)"}),
-            use_container_width=True, hide_index=True)
-    else:
-        st.caption("宽表还没有 od_pair 列")
-
-with tab3:
-    band_all = services.od_band()
-    if not band_all.empty:
-        st.dataframe(band_all.head(50), use_container_width=True, hide_index=True)
-    elif od_pairs:
-        show = band.reset_index().sort_values("ratio", ascending=False).head(50)
-        show = show.rename(columns={"od_pair": "线路", "n": "段数", "nt": "车型数",
-                                    "fmin": "最低因子", "fmax": "最高因子", "ratio": "倍数"})
+for tab, (dim, _key, title) in zip(tabs, DIMS):
+    with tab:
+        hot = services.hotspots(dim)
+        if hot.empty:
+            st.info("热点表还没有这一维——先运行 python -m src.pipeline")
+            continue
+        hot = hot.copy()
+        if dim == "月份":
+            hot["_sort"] = pd.to_numeric(hot["value"], errors="coerce")
+            hot = hot.sort_values("_sort")
+            hot = hot.drop(columns=["_sort"])
+        else:
+            hot["_sort"] = pd.to_numeric(hot["metric_t"], errors="coerce")
+            hot = hot.sort_values("_sort", ascending=False).drop(columns=["_sort"])
+        top = hot.head(12)
+        charts.hbar(top, "value", "metric_t", title=title, height=380)
+        show = top[["value", "metric_t", "share_pct", "n"]].rename(columns={
+            "value": "类别", "metric_t": "碳排放(t)", "share_pct": "占比(%)", "n": "段数"})
         st.dataframe(show, use_container_width=True, hide_index=True)
-    else:
-        st.info("需要 od_pair 与 factor_gkm 两列；等 optimizer 产出 baseline_carbon.parquet 后自动出现")
 
+# ---------------- 同线带宽 ----------------
 st.markdown("---")
-layout.section("怎么读这张页", "同一条线路上换个车型，碳强度中位差 1.5 倍——**企业自己试线试不出来，因为它试的是走哪条路，不是派什么车**。")
+layout.section("同线带宽", "同一 OD、不同车型的碳强度倍数——这是“换车”而不是“选路”的空间")
+if band.empty:
+    st.info("同线带宽表未生成：需要 od_band.parquet（先运行 python -m src.pipeline）。")
+else:
+    show = band.copy()
+    show["od_pair"] = show["od_pair"].astype(str)
+    top = show.sort_values("ratio", ascending=False).head(15)
+    charts.hbar(top, "od_pair", "ratio", title="同线碳强度差 TOP15（倍）", height=420)
+    cols = [c for c in ["od_pair", "n", "nt", "fmin", "fmax", "ratio", "kg_t", "coverage_pct"]
+            if c in show.columns]
+    table = show[cols].rename(columns={
+        "od_pair": "线路", "n": "段数", "nt": "车型数", "fmin": "最低因子(g/km)",
+        "fmax": "最高因子(g/km)", "ratio": "倍数", "kg_t": "碳排(t)", "coverage_pct": "覆盖率(%)",
+    })
+    st.dataframe(table.head(50), use_container_width=True, hide_index=True)
+    st.caption("倍数高不代表一定能换：还要过续航、14 小时驾驶窗口、补能与运力匹配四道约束（第 3 页）。"
+               "这里的倍数是结构性带宽，不是可立即兑现的减排量。")
 
 layout.conclusion(
-    "减排空间不在选路（只有 0.07%），在同线配车：同一 OD 上最高与最低碳强度中位差 "
-    + (("%.2f 倍" % od_ratio_median) if od_ratio_median else "待算")
-    + "。"
+    "减排空间不在选路，在同线配车：同一 OD 上最高与最低碳强度中位差 "
+    + (("%.2f 倍" % ratio_median) if ratio_median else "待算")
+    + "，覆盖 " + (("%.1f%%" % coverage) if coverage is not None else "—")
+    + " 的基准碳排。"
 )
+if mock:
+    st.caption("演示数据提示：真数据口径的同线带宽中位目标为 1.50×（docs/17 §1.4），"
+               "接真数据后以闸门与 docs/18 复核为准。")

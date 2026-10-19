@@ -92,8 +92,12 @@ def empty_state(need: List[str]) -> None:
 
 
 def sidebar_params(source_name: str = "unknown",
-                   gate: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """全局参数：λ 与成本口径。全站只有这一处，其他页面读 session_state。"""
+                   gate: Optional[Dict[str, Any]] = None,
+                   current: str = "") -> Dict[str, Any]:
+    """全局参数：λ 与成本口径。全站只有这一处，其他页面读 session_state。
+
+    current 是页面 3–5 的导航参数；当前布局不强制高亮，保留接口以兼容。
+    """
     with st.sidebar:
         st.markdown("### 全局参数")
         lam = st.number_input(

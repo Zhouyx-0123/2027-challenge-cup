@@ -120,6 +120,27 @@ def scenarios() -> pd.DataFrame:
     return _read_parquet(RESULT_FILES["scenarios"])
 
 
+# ---------------- 运营约束（O6 契约式读取，可选） ----------------
+# 规则文本见 docs/20 §7：C1 续航衰减 / C2 14h 窗口 / C3 运力匹配 / C4 补能可达 / C5 冬季山区。
+# O6 未接表前，页面 3 只展示规则框架；约束结论列写进结果表后，页面按约定自动渲染。
+CONSTRAINT_COLUMNS = [
+    "constraint_status", "constraint_note",
+    "c1_range_ok", "c2_window_ok", "c3_capacity_ok", "c4_charging_ok", "c5_winter_ok",
+]
+
+
+def constraint_contract() -> Dict[str, Any]:
+    """探测结果表里的约束结论列。返回 {available, columns, rows}。"""
+    df = scenarios()
+    if df.empty or "scenario" not in df.columns:
+        return {"available": False, "columns": [], "rows": []}
+    cols = [c for c in CONSTRAINT_COLUMNS if c in df.columns]
+    if not cols:
+        return {"available": False, "columns": [], "rows": []}
+    rows = df[["scenario"] + cols].to_dict(orient="records")
+    return {"available": True, "columns": cols, "rows": rows}
+
+
 def hotspots(dim: str | None = None) -> pd.DataFrame:
     df = _read_parquet(RESULT_FILES["hotspots"])
     if dim and _has(df, "dimension"):

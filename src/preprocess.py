@@ -639,7 +639,8 @@ def _load_raw() -> Tuple[pd.DataFrame, str, str]:
 
 def _make_demo_raw() -> pd.DataFrame:
     rng = np.random.default_rng(DEMO_SEED)
-    names = list(CITY)
+    # 演示只用最初 30 个枢纽城市；CITY 后来补的收货城市只服务真实地图。
+    names = list(CITY)[:30]
     coords = np.array([CITY[n] for n in names], dtype=float)
     weights = np.array(
         [14, 8, 9, 7, 6, 4, 3, 3, 2, 3, 2, 3, 3, 2, 2, 2, 2, 2,

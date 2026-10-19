@@ -65,10 +65,10 @@ layout.kpi_row([
 ], per_row=5)
 
 st.markdown("---")
-st.caption("可比较线路 = 该 OD 至少 3 段、至少 2 种车型；倍数 = 最高因子 / 最低因子。"
-           "结果表由 evaluator.py 预先生成，本页只读不重算。"
-           "当前因子表为 provisional：同线因子比与蓝图 1.50× 的差异来自 75 车型因子档位，"
-           "待杨按文献表 8 定稿后复核。")
+st.caption("可比较线路 = 同一 起点网点→终点网点 至少 3 段、至少 2 种车型；"
+           "倍数 = 最高因子 / 最低因子。结果表由 evaluator.py 预先生成，本页只读不重算。"
+           "当前 %d 条可比较 OD、中位 %.2f×、覆盖 %.1f%% 碳排。"
+           % (od_pairs, ratio_median or 0, coverage or 0))
 
 tabs = st.tabs(["车型维度", "线路维度", "月份维度", "里程段维度"])
 DIMS = [

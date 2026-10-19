@@ -134,10 +134,78 @@ REAL_GVW_RULES: List[Tuple[str, float, str, str]] = [
     ("面包", 3.0, "载质量", "小型面包车：按 3 t 总质量"),
 ]
 
+# 2027 基准沿用 2026《2023年基准碳排放计算结果.xlsx》的车型→核定载重/类别映射（62 类）。
+# 这张表是 E₀ 4,502,042.41 的对拍基准；新车型若无映射，再走 REAL_GVW_RULES 兜底。
+VEHICLE_LOAD_CLASS_MAP: Dict[str, Tuple[float, int]] = {
+    "小型面包车": (1.0, 1),
+    "金杯车": (1.5, 1),
+    "依维柯": (2.0, 1),
+    "大通": (2.0, 1),
+    "(新能源)4.2米厢式货车": (4.5, 1),
+    "4.2m冷藏箱式尾板车": (4.5, 1),
+    "4.2米冷藏厢式车": (4.5, 1),
+    "4.2米厢式货车": (4.5, 1),
+    "4.2米厢式货车(共营)": (4.5, 1),
+    "4.2米厢式货车尾板车": (4.5, 1),
+    "4.2米高栏": (4.5, 1),
+    "5.2米厢式货车": (6.0, 1),
+    "5.8米厢式货车": (8.0, 1),
+    "6.8米厢式货车": (10.0, 2),
+    "6.8米高栏": (10.0, 2),
+    "7.2米厢式货车": (12.0, 2),
+    "7.6米冷藏厢式车": (12.0, 2),
+    "7.6米厢式货车": (12.0, 2),
+    "7.6米厢式货车(共营)": (12.0, 2),
+    "7.6米厢式货车尾板车": (12.0, 2),
+    "9.6m冷藏箱式尾板车": (18.0, 2),
+    "9.6米冷藏厢式车": (18.0, 2),
+    "9.6米厢式货车": (18.0, 2),
+    "9.6米厢式货车(共建)": (18.0, 2),
+    "9.6米厢式货车(共营)": (18.0, 2),
+    "9.6米厢式货车尾板车": (18.0, 2),
+    "9.6米厢式货车（60m³固定班次）": (18.0, 2),
+    "9.6米厢式货车（60m³）": (18.0, 2),
+    "9.6米板车": (18.0, 2),
+    "9.6米重型自卸货车": (18.0, 2),
+    "9.6米飞翼厢式货车": (18.0, 2),
+    "9.6米高栏": (18.0, 2),
+    "12.5米厢式货车": (25.0, 2),
+    "12.5米重型集装箱半挂车": (30.0, 3),
+    "13米厢式货车": (30.0, 3),
+    "13米槽罐车": (30.0, 3),
+    "牵引车头": (30.0, 3),
+    "13.5米厢式货车": (32.0, 3),
+    "13米板车": (32.0, 3),
+    "13米高栏": (32.0, 3),
+    "13米高栏车": (32.0, 3),
+    "13.5米重型集装箱半挂车": (35.0, 3),
+    "13.75米板车": (35.0, 3),
+    "14.5米厢式货车": (35.0, 3),
+    "15米冷藏半挂车": (35.0, 3),
+    "15米冷藏厢式货车": (35.0, 3),
+    "14.5米重型集装箱半挂车": (38.0, 3),
+    "16.5米厢式货车": (38.0, 3),
+    "16米厢式货车": (38.0, 3),
+    "16.5米重型集装箱半挂车": (40.0, 3),
+    "16.5米重型集装箱半挂车（130m³固定班次）": (40.0, 3),
+    "16.5米重型集装箱半挂车（130m³）": (40.0, 3),
+    "17.5米冷藏厢式货车": (45.0, 3),
+    "17.5米厢式货车": (45.0, 3),
+    "17.5米板车": (45.0, 3),
+    "17.5米重型集装箱半挂车": (45.0, 3),
+    "17.5米重型集装箱半挂车(共建)": (45.0, 3),
+    "17.5米重型集装箱车(150m³)": (45.0, 3),
+    "17.5米重型集装箱车(180m³)": (45.0, 3),
+    "17.5米高栏": (45.0, 3),
+    "17.5米高栏/板车": (45.0, 3),
+    "21米重型集装箱半挂车": (49.0, 3),
+}
+
+
 WIDE_COLUMNS: List[str] = [
     "waybill_no", "order_no", "plate", "vehicle_type", "vtype_code", "vclass", "fuel_type",
     "load_t", "load_raw_t", "mass_basis", "basis_note",
-    "origin", "dest", "od_pair", "od_key",
+    "origin", "dest", "od_pair", "od_key", "od_site",
     "origin_lat", "origin_lon", "dest_lat", "dest_lon",
     "dist_km", "dist_source", "month",
     "depart_ts", "arrive_ts", "duration_h", "speed_kmh",
@@ -420,15 +488,26 @@ def _load_competition_workbooks() -> Tuple[pd.DataFrame, str, str]:
 
     gvw: List[float] = []
     basis: List[str] = []
+    vcls: List[int] = []
     for vtype, raw_load in zip(w["vehicle_type"].astype(str), w["load_raw_t"]):
-        g, b, _note = _gvw_for_type(vtype, raw_load)
-        gvw.append(g)
+        profile = VEHICLE_LOAD_CLASS_MAP.get(str(vtype))
+        if profile is not None:
+            load, cls = profile
+            if "7.6" in str(vtype) and "冷藏" not in str(vtype):
+                b = "整车总质量"
+            elif "牵引" in str(vtype):
+                b = "准牵引总质量"
+            else:
+                b = "载质量"
+        else:
+            load, b, _note = _gvw_for_type(vtype, raw_load)
+            cls = 1 if load <= 5 else (2 if load <= 20 else 3)
+        gvw.append(load)
         basis.append(b)
+        vcls.append(cls)
     w["load_t"] = gvw
     w["mass_basis"] = basis
-    w["vclass"] = np.select(
-        [w["load_t"] <= 5, w["load_t"] <= 20, w["load_t"] > 20],
-        [1, 2, 3], default=2).astype(int)
+    w["vclass"] = vcls
     w["vehicle_known"] = w["load_raw_t"].notna().astype(int)
     w["fuel_type"] = w["fuel_type"].fillna("柴油").replace({"": "柴油"})
 
@@ -699,6 +778,11 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     a = np.minimum(work["origin"].astype(str), work["dest"].astype(str))
     b = np.maximum(work["origin"].astype(str), work["dest"].astype(str))
     work["od_key"] = np.where((work["origin"] != "") & (work["dest"] != ""), a + "|" + b, "")
+    # 同线带宽用“起点网点→终点网点”（3000+ 条），比城市级 OD 细；缺网点时退回城市 OD
+    work["od_site"] = np.where(
+        (work["dep_site"] != "") & (work["arr_site"] != ""),
+        work["dep_site"].astype(str) + "|" + work["arr_site"].astype(str),
+        work["od_key"])
 
     # ---- 里程：原值 → 同线历史均值 → 绕行系数 → 全样本兜底 ----
     raw_dist = work["dist_km"].copy()
@@ -969,7 +1053,7 @@ def _minimal_wide() -> pd.DataFrame:
             "vclass": 1, "fuel_type": "柴油", "load_t": 4.5, "load_raw_t": 4.5,
             "mass_basis": "载质量",
             "basis_note": "", "origin": o, "dest": d, "od_pair": o + "|" + d,
-            "od_key": "|".join(sorted([o, d])),
+            "od_key": "|".join(sorted([o, d])), "od_site": "|".join(sorted([o, d])),
             "origin_lat": CITY[o][0], "origin_lon": CITY[o][1],
             "dest_lat": CITY[d][0], "dest_lon": CITY[d][1],
             "dist_km": 180.0 + i * 40, "dist_source": "global_median", "month": 1 + i,

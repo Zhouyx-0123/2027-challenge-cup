@@ -39,7 +39,7 @@ RESULT_FILES: Dict[str, str] = {
 # ---- 冻结的列名：只增不改 ----
 SEGMENT_COLUMNS: List[str] = [
     "waybill_no", "plate", "vehicle_type", "vclass", "load_t", "load_raw_t",
-    "mass_basis", "origin", "dest", "od_pair", "dist_km", "month",
+    "mass_basis", "origin", "dest", "od_pair", "od_site", "dist_km", "month",
     "factor_gkm", "er_gs", "kg_co2", "kg_co2_phys", "delta_pct", "speed_kmh",
     "vtype_code", "dep_site", "arr_site",
     "cargo_weight_kg", "cargo_volume_cm3", "cargo_pieces", "complete_ts",

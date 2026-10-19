@@ -132,18 +132,31 @@ def build_hotspots(seg: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_od_band(seg: pd.DataFrame) -> pd.DataFrame:
-    key = "od_key" if "od_key" in seg.columns else "od_pair"
-    g = (seg.groupby(key, dropna=False, as_index=False)
-            .agg(n=("factor_gkm", "size"),
-                 nt=("vehicle_type", "nunique"),
-                 fmin=("factor_gkm", "min"),
-                 fmax=("factor_gkm", "max"),
-                 kg=("kg_co2", "sum"),
-                 od_pair=("od_pair", "first")))
+    # 同线带宽的“线”= 起点网点 → 终点网点（310 条可比较 OD，蓝图 1.50× 的口径）；
+    # 网点缺失时才退回城市级 od_key。城市级会把 4.2m 与 17.5m 大量配在一起，
+    # 中位倍数被拉到 4.0×，与蓝图的 1.50× 不是同一个口径。
+    if "od_site" in seg.columns:
+        key = "od_site"
+    elif "od_key" in seg.columns:
+        key = "od_key"
+    else:
+        key = "od_pair"
+    agg = {
+        "n": ("factor_gkm", "size"),
+        "nt": ("vehicle_type", "nunique"),
+        "fmin": ("factor_gkm", "min"),
+        "fmax": ("factor_gkm", "max"),
+        "kg": ("kg_co2", "sum"),
+        "od_pair": ("od_pair", "first"),
+    }
+    if "dep_site" in seg.columns and "arr_site" in seg.columns:
+        agg["dep_site"] = ("dep_site", "first")
+        agg["arr_site"] = ("arr_site", "first")
+    g = seg.groupby(key, dropna=False, as_index=False).agg(**agg)
     g = g[(g["n"] >= 3) & (g["nt"] >= 2) & (g["fmin"] > 0)].copy()
     if g.empty:
         return pd.DataFrame(columns=[
-            "od_key", "od_pair", "n", "nt", "fmin", "fmax", "ratio",
+            "od_site", "od_pair", "n", "nt", "fmin", "fmax", "ratio",
             "kg_t", "coverage_pct"])
 
     total_kg = float(seg["kg_co2"].sum()) or 1.0
@@ -151,7 +164,14 @@ def build_od_band(seg: pd.DataFrame) -> pd.DataFrame:
     g["kg_t"] = g["kg"] / 1000.0
     g["coverage_pct"] = g["kg"] / total_kg * 100.0
     g = g.rename(columns={"kg": "kg_raw"})
-    g = g[[key, "od_pair", "n", "nt", "fmin", "fmax", "ratio", "kg_t", "coverage_pct"]]
+    g = g.rename(columns={key: "od_site"})
+    if "dep_site" in g.columns and "arr_site" in g.columns:
+        site_pair = (g["dep_site"].astype(str) + " → " + g["arr_site"].astype(str))
+        g["od_pair"] = np.where(
+            (g["dep_site"].astype(str) != "") & (g["arr_site"].astype(str) != ""),
+            site_pair, g["od_pair"].astype(str))
+        g = g.drop(columns=["dep_site", "arr_site"])
+    g = g[["od_site", "od_pair", "n", "nt", "fmin", "fmax", "ratio", "kg_t", "coverage_pct"]]
     g = g.sort_values("ratio", ascending=False).reset_index(drop=True)
     for col in ("fmin", "fmax", "ratio", "kg_t", "coverage_pct"):
         g[col] = g[col].round(4)

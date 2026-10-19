@@ -62,6 +62,24 @@ if sc.empty or "scenario" not in sc.columns:
 e0_t = float(k.get("e0_t") or 0.0)
 main_row = sc[sc["is_main"] == True].iloc[0] if (sc["is_main"] == True).any() else sc.iloc[-1]
 
+# ---- 口径与决策资格（曾广增量） ----
+cards.panel_head("口径与决策资格", "先看这批方案能不能用，再看回本；λ 只是展示旋钮", "evaluator 增量")
+mode_raw = str(main_row.get("calculation_mode", "legacy_calibration"))
+param_raw = str(main_row.get("parameter_status", "unverified_legacy_totals"))
+oper_raw = str(main_row.get("operational_status", "pending"))
+eligible = bool(main_row.get("decision_eligible", False))
+boundary = str(main_row.get("boundary", "未逐方案核实"))
+cards.chips([
+    "calculation_mode = " + mode_raw,
+    "parameter_status = " + param_raw,
+    "decision_eligible = " + str(eligible),
+    "operational_status = " + oper_raw,
+    "λ = 展示口径",
+], tones=["warn", "warn", "bad", "skip", "info"])
+cards.note("当前方案表是历史标定（legacy_calibration），参数未核验、运营约束待 O6 校验；"
+           "4,809 万 / 77.4% / 9.6 年只作静态对标。边界：" + boundary + "。"
+           "λ 只进入“年度节省/回本年限”的展示换算，不改变碳排结果。")
+
 
 # ---- 展示口径换算（非业务重算）：λ 只进入“年节省”与“回本年限” ----
 def annual_save_wan(row, lam_value: float) -> float:

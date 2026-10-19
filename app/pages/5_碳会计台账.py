@@ -59,6 +59,30 @@ if led.empty or "scheme" not in led.columns:
 e0_t = float(k.get("e0_t") or 0.0)
 annual_factor = float(disc.get("annual_factor") or 0.0)
 
+# ---- 数据可追溯（DA 增量） ----
+seg = services.segments()
+q = services.quality() or {}
+trace_rate = None
+if "source_waybill_row" in seg.columns:
+    trace = pd.to_numeric(seg["source_waybill_row"], errors="coerce")
+    trace_rate = float((trace > 0).mean() * 100.0)
+order_rate = 100.0 * float(q.get("order_match_rate", q.get("match_rate", 1.0)) or 0.0)
+vehicle_rate = 100.0 * float(q.get("vehicle_match_rate", 1.0) or 0.0)
+
+cards.panel_head("数据可追溯", "台账每个数都能回到 33,214 段中的具体一行", "DA · docs/07")
+cards.stats([
+    {"label": "台账行", "value": services.fmt(len(led)), "tone": "mint", "sub": "三行结论账"},
+    {"label": "源行号可回查", "value": (("%.1f%%" % trace_rate) if trace_rate is not None else "—"),
+     "tone": "mint", "sub": "source_waybill_row"},
+    {"label": "估算 / 代理", "value": "%s 段" % services.fmt(q.get("estimated_rows")),
+     "tone": "coral", "sub": "全表 %s 行（含重复）" % services.fmt(q.get("estimated_rows_wide"))},
+    {"label": "订单 / 车型匹配", "value": "%.0f%% / %.0f%%" % (order_rate, vehicle_rate),
+     "tone": "mint", "sub": "order_match_rate / vehicle_match_rate"},
+], cols=4)
+cards.note("DA 增量：61 字段数据字典、source_waybill_row、%s 段（全表 %s 行）估算/代理标记。"
+           "台账与披露只读结果表，不在前端补账。"
+           % (services.fmt(q.get("estimated_rows")), services.fmt(q.get("estimated_rows_wide"))))
+
 # ================= A · 台账六字段 =================
 st.markdown("")
 layout.section("台账六字段", "只挂结论：基准一行、主推一行、保守边界一行")

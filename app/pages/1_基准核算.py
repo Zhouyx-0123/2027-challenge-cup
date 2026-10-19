@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 
 import services
-from components import layout, charts, flags, mapview, theme
+from components import cards, layout, charts, flags, mapview, theme
 
 layout.setup("1 基准核算")
 src = services.source()
@@ -161,6 +161,44 @@ layout.section("数据健康", "四类标记：灰底=重复，黄底=异常/口
 counts = services.flag_counts()
 st.dataframe(flags.flag_summary(None, counts), use_container_width=True, hide_index=True)
 flags.flag_legend()
+
+# ---- 数据层审计（DA 增量：61 字段数据字典 + 逐行可追溯 + 重复组冲突） ----
+q = services.quality() or {}
+
+def _fmtq(key: str) -> str:
+    value = q.get(key)
+    return services.fmt(value) if value is not None else "—"
+
+trace_rate = None
+if "source_waybill_row" in seg.columns:
+    trace = pd.to_numeric(seg["source_waybill_row"], errors="coerce")
+    trace_rate = float((trace > 0).mean() * 100.0)
+
+cards.panel_head("数据层审计", "61 字段数据字典 + 逐行可追溯 + 重复组冲突标记", "DA · docs/07")
+cards.stats([
+    {"label": "源行号可回查", "value": (("%.1f%%" % trace_rate) if trace_rate is not None else "—"),
+     "tone": "mint", "sub": "source_waybill_row"},
+    {"label": "重复组冲突", "value": "%s / %s" % (
+        _fmtq("vehicle_name_conflict_groups"), _fmtq("emission_factor_input_conflict_groups")),
+     "tone": "amber", "sub": "车型 / 因子输入"},
+    {"label": "估算 / 代理", "value": "%s 段" % _fmtq("estimated_rows"),
+     "tone": "coral", "sub": "全表 %s 行（含重复）" % _fmtq("estimated_rows_wide")},
+    {"label": "订单 / 车型匹配", "value": "%.0f%% / %.0f%%" % (
+        100.0 * float(q.get("order_match_rate", q.get("match_rate", 1.0)) or 0.0),
+        100.0 * float(q.get("vehicle_match_rate", 1.0) or 0.0)),
+     "tone": "mint", "sub": "order_match_rate / vehicle_match_rate"},
+], cols=4)
+cards.chips([
+    "订单号代理 %s" % _fmtq("order_no_fallback_rows"),
+    "包裹数缺失 %s" % _fmtq("cargo_pieces_missing_rows"),
+    "网点前缀兜底 %s" % _fmtq("origin_site_fallback_rows"),
+    "负时长 %s" % _fmtq("negative_duration_rows"),
+], tones=["skip", "skip", "warn", "warn"])
+cards.note("DA 本轮把订单号代理、包裹数缺失、城市网点前缀兜底、异常时长兜底都写进 estimate_note；"
+           "%s 段是去重后的代表行，%s 行是含重复的全表标记。"
+           "重复组中 %s 组因子输入冲突，当前保留代表行，不等于冲突已解决——答辩时要主动说明。"
+           % (_fmtq("estimated_rows"), _fmtq("estimated_rows_wide"),
+              _fmtq("emission_factor_input_conflict_groups")))
 
 est_rows = view[view["flag_estimated"] == 1] if "flag_estimated" in view.columns else view.iloc[0:0]
 if not est_rows.empty:

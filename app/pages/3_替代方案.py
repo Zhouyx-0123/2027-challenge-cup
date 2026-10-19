@@ -69,6 +69,36 @@ e0_t = float(k.get("e0_t") or 0.0)
 if not e0_t and "e0_t" in sc.columns:
     e0_t = float(sc["e0_t"].iloc[0])
 
+# ================= 0 · 评估器口径（曾广增量） =================
+st.markdown("")
+layout.section("评估器口径", "曾广增量：先看这批方案能不能作为决策依据，再看减排与投资")
+
+def _eval_field(row, key: str, default: str = "—") -> str:
+    value = row.get(key, default) if hasattr(row, "get") else default
+    return "—" if value is None else str(value)
+
+mode_raw = _eval_field(main_row, "calculation_mode", "legacy_calibration")
+param_raw = _eval_field(main_row, "parameter_status", "unverified_legacy_totals")
+oper_raw = _eval_field(main_row, "operational_status", "pending")
+eligible = bool(main_row.get("decision_eligible", False)) if hasattr(main_row, "get") else False
+boundary = _eval_field(main_row, "boundary", "未逐方案核实")
+
+mode_label = {"legacy_calibration": "历史标定（legacy）",
+              "parameterized": "参数化"}.get(mode_raw, mode_raw)
+param_label = {"unverified_legacy_totals": "未核验历史总量",
+               "caller_supplied_unreviewed": "调用方参数（未复核）"}.get(param_raw, param_raw)
+oper_label = {"pending": "待 O6 校验", "pass": "已通过", "fail": "未通过"}.get(oper_raw, oper_raw)
+
+cards.stats([
+    {"label": "计算模式", "value": mode_label, "tone": "amber", "sub": "calculation_mode"},
+    {"label": "参数状态", "value": param_label, "tone": "amber", "sub": "parameter_status"},
+    {"label": "决策资格", "value": ("可用" if eligible else "不可用"), "tone": ("mint" if eligible else "bad"),
+     "sub": "decision_eligible = " + str(eligible)},
+    {"label": "运营约束", "value": oper_label, "tone": "skip", "sub": "operational_status"},
+], cols=4)
+cards.note("边界：" + boundary + "。4,809 万 / 77.4% / 9.6 年是历史标定，"
+           "未经底稿复核或 O6 约束校验；本页只做静态对标，不把它当最终决策。")
+
 # ================= A · 方案总览 =================
 st.markdown("")
 layout.section("方案总览", "同一份数据、同一本账：减排率按 E₀ 等比缩放，投资为静态标定")

@@ -52,6 +52,9 @@ CORE_COLUMNS: List[str] = ["waybill_no", "od_pair", "dist_km", "kg_co2"]
 SCENARIO_COLUMNS: List[str] = [
     "scenario", "emission_t", "reduction_pct", "capex_wan",
     "opex_save_wan", "payback_years", "unit_cost_yuan_t", "meets_target",
+    # 曾广 evaluator 增量：口径/资格元数据；旧结果表缺这些列时页面仍可跑
+    "data_source", "e0_t", "calculation_mode", "parameter_status",
+    "operational_status", "decision_eligible", "boundary",
 ]
 
 LEDGER_COLUMNS: List[str] = [

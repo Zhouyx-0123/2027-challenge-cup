@@ -30,14 +30,38 @@ PROCESSED_DIR = ROOT / "data" / "processed"
 WIDE_PATH = PROCESSED_DIR / "wide_data.parquet"
 BASELINE_PATH = PROCESSED_DIR / "baseline_carbon.parquet"
 
-FACTOR_VERSION = "WRZ2024-T8-v1"
-FACTOR_SOURCE = "吴睿中等（2024）表 8；VSP=2 kW/t 工况；30 t → 14.67 g/s"
+FACTOR_VERSION = "JCB2023-BASE-v1"
+FACTOR_SOURCE = "吴睿中等（2024）VSP 排放率；v=50 km/h；2023年基准碳排放计算结果.xlsx 因子表"
 
 # O1 · 因子表：载重锚点(t) → 法定因子(g CO₂/km)
 # 6 个锚点与附件2 的 6 类登记车型一一对应；30 t 锚点 = 1055.95 g/km，
 # 在 50 km/h 下正好是 14.666 g/s（= 1055.95 / 72）。
 LOAD_ANCHORS = np.array([3.0, 4.5, 12.0, 18.0, 30.0, 45.0], dtype=float)
 FACTOR_ANCHORS = np.array([320.18, 394.56, 544.75, 759.24, 1055.95, 1581.84], dtype=float)
+
+# 2023 基准因子表（来自《2023年基准碳排放计算结果.xlsx》路段明细）：
+#   class 1（轻）统一 394.56；class 2 按 10/12/18/25 t；class 3 按 30/32/35/38/40/45/49 t。
+# 这是 E₀=4,502,042.41 的对拍口径；factor_lookup 仍保留为未知车型/演示数据的兜底。
+FACTOR_BY_CLASS_LOAD: Dict[Tuple[int, float], float] = {
+    (1, 1.0): 394.560000,
+    (1, 1.5): 394.560000,
+    (1, 2.0): 394.560000,
+    (1, 4.5): 394.560000,
+    (1, 6.0): 394.560000,
+    (1, 8.0): 394.560000,
+    (2, 10.0): 458.928000,
+    (2, 12.0): 544.752000,
+    (2, 18.0): 759.240000,
+    (2, 25.0): 896.592000,
+    (3, 30.0): 1055.952000,
+    (3, 32.0): 1119.696000,
+    (3, 35.0): 1215.312000,
+    (3, 38.0): 1310.928000,
+    (3, 40.0): 1374.672000,
+    (3, 45.0): 1581.840000,
+    (3, 49.0): 1581.840000,
+}
+
 
 # O3 · VSP 修正：以 VSP=2（50 km/h 巡航）为 1.0
 VSP_X = np.array([0.0, 1.0, 2.0, 3.0, 4.0], dtype=float)
@@ -108,17 +132,23 @@ def compute_baseline(wide: pd.DataFrame) -> pd.DataFrame:
     speed = pd.to_numeric(df["speed_kmh"], errors="coerce")
     speed = speed.where(speed > 1.0, INDUSTRY_SPEED_KMH).clip(lower=1.0, upper=130.0)
 
-    # 法定轨
-    factor = factor_lookup(load)
+    # 法定轨：优先按 (vclass, load_t) 查 2023 基准因子表；未知车型再走内插兜底
+    vclass = pd.to_numeric(df["vclass"], errors="coerce").fillna(2).astype(int).to_numpy()
+    keys = list(zip(vclass, np.round(load, 2)))
+    factor = np.array([FACTOR_BY_CLASS_LOAD.get((int(c), float(l)), np.nan)
+                       for c, l in keys], dtype=float)
+    miss = np.isnan(factor)
+    if miss.any():
+        factor[miss] = factor_lookup(load[miss])
     kg_legal = factor * dist / 1000.0
 
     # 物理轨：瞬时排放率(g/s) × 行驶秒数
     vsp = vsp_from_speed(speed)
-    er = factor_lookup(load) / 72.0 * np.interp(vsp, VSP_X, VSP_MULT)
+    er = factor / 72.0 * np.interp(vsp, VSP_X, VSP_MULT)
     kg_phys = er * (dist / speed) * SECONDS_PER_HOUR / 1000.0
 
     delta = np.where(kg_legal > 0, (kg_phys - kg_legal) / kg_legal * 100.0, 0.0)
-    out_range = (load_raw < LOAD_ANCHORS[0]) | (load_raw > LOAD_ANCHORS[-1])
+    out_range = np.array([(int(c), float(l)) not in FACTOR_BY_CLASS_LOAD for c, l in keys])
 
     df["factor_gkm"] = np.round(factor, 6)
     df["er_gs"] = np.round(er, 6)

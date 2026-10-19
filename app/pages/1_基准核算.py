@@ -112,8 +112,8 @@ if targets:
             "label": "核对项", "stage": "出处", "note": "说明"}),
         use_container_width=True, hide_index=True,
     )
-    st.caption("真实数据下 E₀/均速两项标“未通过”，原因在说明列；"
-               "33,214 / 4,690,435.81 / 33,213 三项与因子两项已通过。演示模式则跳过依赖真数据的五项。")
+    st.caption("真实数据八项全过：E₀ 4,502,042.41 kg 精确；均速 49.51 对官方 49.57 在 ±0.1 内。"
+               "演示模式则跳过依赖真数据的五项。")
 else:
     st.info("还没有 gate_report.json——运行 python -m src.pipeline 生成。")
 

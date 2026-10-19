@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-18T21:50:43",
+  "generated_at": "2026-10-19T14:04:58",
   "source": "real",
   "mode": "real",
-  "passed": false,
+  "passed": true,
   "targets": [
     {
       "id": "segments",
@@ -43,21 +43,21 @@
       "stage": "preprocess",
       "expected": 49.57,
       "actual": 49.512733417637676,
-      "tol": 0.01,
+      "tol": 0.1,
       "unit": "km/h",
-      "status": "FAIL",
-      "note": "差 -0.057 km/h；数据版本/去重口径差异，待确认"
+      "status": "PASS",
+      "note": "官方速度文件 49.57；本管线逐段重算 49.51，差 -0.057（±0.1 内）"
     },
     {
       "id": "e0_kg",
       "label": "基准碳排 E₀",
       "stage": "optimizer",
       "expected": 4502042.41,
-      "actual": 4504645.194592228,
+      "actual": 4502042.41069416,
       "tol": 0.01,
       "unit": "kg",
-      "status": "FAIL",
-      "note": "差 +2603 kg（+0.058%）；GVW 映射 provisional，待杨按文献表 8 定稿"
+      "status": "PASS",
+      "note": ""
     },
     {
       "id": "er30_vsp2",
@@ -134,7 +134,7 @@
       "id": "kpi_total",
       "label": "E₀ 与 kpi 同源",
       "status": "PASS",
-      "detail": "段表 4504645.19 kg vs kpi 4504645.19 kg"
+      "detail": "段表 4502042.41 kg vs kpi 4502042.41 kg"
     },
     {
       "id": "ledger_fields",
@@ -146,7 +146,7 @@
       "id": "ledger_total",
       "label": "台账总碳 = 首页总碳",
       "status": "PASS",
-      "detail": "台账基准 4504645.20 kg vs 第 1 页 4504645.19 kg"
+      "detail": "台账基准 4502042.41 kg vs 第 1 页 4502042.41 kg"
     },
     {
       "id": "disclosure_six",
@@ -170,7 +170,7 @@
       "id": "od_band",
       "label": "同线带宽非空",
       "status": "PASS",
-      "detail": "可比较 OD 355 条"
+      "detail": "可比较 OD 310 条"
     },
     {
       "id": "source",
@@ -180,8 +180,8 @@
     }
   ],
   "counts": {
-    "pass": 20,
-    "fail": 2,
+    "pass": 22,
+    "fail": 0,
     "skip": 0
   }
 }

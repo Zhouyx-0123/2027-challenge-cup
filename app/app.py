@@ -58,25 +58,22 @@ layout.kpi_row([
 
 # ---------------- 五页导航 ----------------
 st.markdown("")
-layout.section("五页导航", "一个页面回答一个问题；1–2 页由 PM 完成，3–5 页待杨盛文接表")
+layout.section("五页导航", "五页已接通；3–5 页为合并版，待口径与视觉复核")
 
 c1, c2, c3 = st.columns(3)
 with c1:
     st.page_link("pages/1_基准核算.py", label="① 基准核算", icon="📊")
     st.caption("排了多少碳、跑多远、数据多脏")
     st.page_link("pages/2_高排放诊断.py", label="② 高排放诊断", icon="🔥")
-    st.caption("四维热点 + 同线带宽")
+    st.caption("四维热点 + 同线带宽 1.50×")
 with c2:
-    st.markdown("**③ 替代方案**")
+    st.page_link("pages/3_替代方案.py", label="③ 替代方案", icon="🚚")
     st.caption("这条线该派什么车，运营跑不跑通")
-    st.caption("杨盛文 · 结果表已就绪：services.scenarios()")
-    st.markdown("**④ 成本效益**")
+    st.page_link("pages/4_成本效益.py", label="④ 成本效益", icon="💰")
     st.caption("多花多少钱、几年回本、λ 一动推荐换不换")
-    st.caption("杨盛文 · 结果表已就绪：services.scenarios()")
 with c3:
-    st.markdown("**⑤ 碳会计台账**")
+    st.page_link("pages/5_碳会计台账.py", label="⑤ 碳会计台账", icon="📒")
     st.caption("怎么记、怎么披露、对接什么制度")
-    st.caption("杨盛文 · 结果表已就绪：services.ledger() / services.disclosure()")
     st.caption("台账与披露已在本页下方可查，不等页面。")
 
 # ---------------- 数据状态 ----------------

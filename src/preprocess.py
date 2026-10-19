@@ -204,7 +204,7 @@ VEHICLE_LOAD_CLASS_MAP: Dict[str, Tuple[float, int]] = {
 
 WIDE_COLUMNS: List[str] = [
     "waybill_no", "order_no", "plate", "vehicle_type", "vtype_code", "vclass", "fuel_type",
-    "load_t", "load_raw_t", "mass_basis", "basis_note",
+    "load_t", "load_raw_t", "mass_basis", "basis_note", "load_mapping_method", "flag_load_mapping_fallback",
     "origin", "dest", "od_pair", "od_key", "od_site",
     "origin_lat", "origin_lon", "dest_lat", "dest_lon",
     "dist_km", "dist_source", "month",
@@ -212,9 +212,14 @@ WIDE_COLUMNS: List[str] = [
     "dep_site", "arr_site",
     "invoice_no", "invoice_ok", "invoice_amount",
     "cargo_weight_kg", "cargo_volume_cm3", "cargo_pieces", "complete_ts",
-    "flag_dup", "flag_anomaly", "flag_basis", "flag_estimated", "estimate_note",
+    "flag_dup", "flag_anomaly", "flag_basis", "flag_vehicle_conflict", "flag_factor_conflict",
+    "flag_estimated", "estimate_note",
     "fill_dist", "fill_vehicle", "fill_load", "fill_invoice", "fill_duration",
     "data_source",
+    # 追溯/质量审计字段：只增不改既有列，便于定位原始 Excel 行和验证关联率。
+    "order_matched", "vehicle_matched", "source_waybill_row", "speed_method",
+    "order_no_fallback", "cargo_weight_missing", "cargo_volume_missing",
+    "cargo_pieces_missing", "origin_site_fallback", "dest_site_fallback",
 ]
 
 # 原始列名别名：真数据列名没冻结前，先尽量认；认不出就回退演示数据
@@ -398,22 +403,43 @@ def _load_competition_workbooks() -> Tuple[pd.DataFrame, str, str]:
     """
     files = [p for p in sorted(RAW_DIR.glob("*"))
              if p.suffix.lower() in (".xlsx", ".xls")]
-    f1 = next((p for p in files if "附件1" in p.name
-               or ("订单" in p.name and "运单" in p.name)), None)
+    f1_candidates = [p for p in files if "附件1" in p.name
+                     or ("订单" in p.name and "运单" in p.name)]
     f2 = next((p for p in files if "附件2" in p.name or "运输车辆" in p.name), None)
-    if not f1 or not f2:
+    if not f1_candidates or not f2:
         raise NoRawData("未找到附件1/附件2 两个工作簿")
 
-    book1 = pd.read_excel(f1, sheet_name=None)
+    # 若同时有原始附件（无“平均速度”列）和团队生成的平均速度副本，
+    # 明确优先选择包含真实速度列的附件，避免仅依赖文件名排序导致输入不确定。
+    candidates = []
+    for candidate in f1_candidates:
+        try:
+            candidate_book = pd.read_excel(candidate, sheet_name=None)
+            candidate_orders = next((df for df in candidate_book.values()
+                                     if _find_col(df, "订单号") and _find_col(df, "运单号")), None)
+            candidate_waybills = next((df for df in candidate_book.values()
+                                       if _find_col(df, "实际行驶里程") and _find_col(df, "运单号")), None)
+            if candidate_orders is None or candidate_waybills is None:
+                continue
+            candidate_speed_col = (_find_col(candidate_waybills, "平均速度")
+                                   or _find_col(candidate_waybills, "speed_kmh"))
+            score = (10 if candidate_speed_col else 0)
+            score += 2 if ("平均数据" in candidate.name or "副本" in candidate.name) else 0
+            # 稳定排序：分数优先；同分时按文件名顺序，确保每次选择一致。
+            candidates.append((score, candidate.name, candidate, candidate_book,
+                               candidate_orders, candidate_waybills, candidate_speed_col))
+        except Exception:
+            continue
+    if not candidates:
+        raise NoRawData("附件1 中未识别到同时包含订单号/运单号和里程的工作簿")
+    candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    _score, _name, f1, book1, orders, waybills, selected_speed_col = candidates[0]
+
     book2 = pd.read_excel(f2, sheet_name=None)
-    orders = next((df for df in book1.values()
-                   if _find_col(df, "订单号") and _find_col(df, "运单号")), None)
-    waybills = next((df for df in book1.values()
-                     if _find_col(df, "实际行驶里程") and _find_col(df, "运单号")), None)
     vehicles = next((df for df in book2.values()
                      if _find_col(df, "车型种类") and _find_col(df, "车辆载重")), None)
-    if orders is None or waybills is None or vehicles is None:
-        raise NoRawData("附件1/附件2 的 Sheet 结构未识别")
+    if vehicles is None:
+        raise NoRawData("附件2 的车型 Sheet 结构未识别")
 
     # ---- 订单：订单号 / 运单号 / 起终点城市 / 重量体积件数 ----
     oi = orders.index
@@ -430,15 +456,19 @@ def _load_competition_workbooks() -> Tuple[pd.DataFrame, str, str]:
     o = pd.DataFrame(index=oi)
     o["waybill_no"] = _as_str(orders[c_owb], oi)
     o["order_no"] = _as_str(orders[c_ono], oi) if c_ono else ""
+    o["order_no_fallback"] = o["order_no"].eq("").astype(int)
     o["origin"] = _clean_city(orders[c_origin], oi) if c_origin else ""
     o["dest"] = _clean_city(orders[c_dest], oi) if c_dest else ""
-    o["cargo_weight_kg"] = (pd.to_numeric(orders[c_weight], errors="coerce").fillna(0)
-                            if c_weight else 0.0)
-    o["cargo_volume_cm3"] = (pd.to_numeric(orders[c_volume], errors="coerce").fillna(0)
-                             if c_volume else 0.0)
-    o["cargo_pieces"] = (pd.to_numeric(orders[c_pieces], errors="coerce").fillna(0)
-                         if c_pieces else 0.0)
+    o["origin_site_fallback"] = o["origin"].eq("").astype(int)
+    o["dest_site_fallback"] = o["dest"].eq("").astype(int)
+    o["cargo_weight_kg"] = pd.to_numeric(orders[c_weight], errors="coerce") if c_weight else np.nan
+    o["cargo_volume_cm3"] = pd.to_numeric(orders[c_volume], errors="coerce") if c_volume else np.nan
+    o["cargo_pieces"] = pd.to_numeric(orders[c_pieces], errors="coerce") if c_pieces else np.nan
+    o["cargo_weight_missing"] = o["cargo_weight_kg"].isna().astype(int)
+    o["cargo_volume_missing"] = o["cargo_volume_cm3"].isna().astype(int)
+    o["cargo_pieces_missing"] = o["cargo_pieces"].isna().astype(int)
     o["complete_ts"] = _to_datetime(orders[c_complete] if c_complete else None, oi)
+    # 运单号只作为缺失订单号的追踪代理；原始缺失状态由 order_no_fallback 保留。
     o["order_no"] = o["order_no"].where(o["order_no"] != "", o["waybill_no"])
     o = o[o["waybill_no"] != ""].drop_duplicates("waybill_no", keep="first")
 
@@ -453,9 +483,12 @@ def _load_competition_workbooks() -> Tuple[pd.DataFrame, str, str]:
     c_arr = _find_col(waybills, "解封车时间") or _find_col(waybills, "arrival_time")
     c_dep_site = _find_col(waybills, "封车网点")
     c_arr_site = _find_col(waybills, "解封车网点")
-    c_speed = _find_col(waybills, "平均速度")
+    c_speed = (_find_col(waybills, "平均速度")
+               or _find_col(waybills, "speed_kmh")
+               or _find_col(waybills, "speed"))
 
     w = pd.DataFrame(index=wi)
+    w["source_waybill_row"] = pd.to_numeric(pd.Series(wi, index=wi), errors="coerce").fillna(-1).astype(int) + 2
     w["waybill_no"] = _as_str(waybills[c_wb], wi)
     w["plate"] = _as_str(waybills[c_plate], wi) if c_plate else ""
     w["vehicle_type"] = _as_str(waybills[c_vtype], wi) if c_vtype else "未知车型"
@@ -469,9 +502,11 @@ def _load_competition_workbooks() -> Tuple[pd.DataFrame, str, str]:
     w["speed_kmh"] = (pd.to_numeric(waybills[c_speed], errors="coerce")
                       if c_speed else np.nan)
 
-    # 订单 → 运单：本副本 waybill_number 集合 100% 一致，直接 join；
-    # 若某天换成桥接版本，再把附件2 Sheet1 的 eclp→tms 作为 fallback。
-    order_match = float(w["waybill_no"].isin(o["waybill_no"]).mean()) if len(w) else 0.0
+    # 订单 → 运单：本附件版本的 waybill_number 集合可直接匹配；
+    # 关联命中状态必须在回填 order_no 之前记录，不能用非空 order_no 反推匹配成功。
+    order_keys = set(o["waybill_no"].astype(str))
+    w["order_matched"] = w["waybill_no"].astype(str).isin(order_keys).astype(int)
+    order_match = float(w["order_matched"].mean()) if len(w) else 0.0
     w = w.merge(o, on="waybill_no", how="left")
 
     # ---- 75 车型表：燃油类型 + 登记载重 → 因子表总质量档位 ----
@@ -484,15 +519,19 @@ def _load_competition_workbooks() -> Tuple[pd.DataFrame, str, str]:
     v["fuel_type"] = _as_str(vehicles[c_fuel], vi) if c_fuel else "柴油"
     v["load_raw_t"] = pd.to_numeric(vehicles[c_load], errors="coerce") if c_load else np.nan
     v = v[(v["vehicle_type"] != "")].drop_duplicates("vehicle_type", keep="first")
+    vehicle_keys = set(v["vehicle_type"].astype(str))
+    w["vehicle_matched"] = w["vehicle_type"].astype(str).isin(vehicle_keys).astype(int)
     w = w.merge(v, on="vehicle_type", how="left")
 
     gvw: List[float] = []
     basis: List[str] = []
     vcls: List[int] = []
+    mapping_method: List[str] = []
     for vtype, raw_load in zip(w["vehicle_type"].astype(str), w["load_raw_t"]):
         profile = VEHICLE_LOAD_CLASS_MAP.get(str(vtype))
         if profile is not None:
             load, cls = profile
+            mapping_method.append("baseline_class_map")
             if "7.6" in str(vtype) and "冷藏" not in str(vtype):
                 b = "整车总质量"
             elif "牵引" in str(vtype):
@@ -502,16 +541,26 @@ def _load_competition_workbooks() -> Tuple[pd.DataFrame, str, str]:
         else:
             load, b, _note = _gvw_for_type(vtype, raw_load)
             cls = 1 if load <= 5 else (2 if load <= 20 else 3)
+            mapping_method.append("fallback_rule")
         gvw.append(load)
         basis.append(b)
         vcls.append(cls)
     w["load_t"] = gvw
     w["mass_basis"] = basis
     w["vclass"] = vcls
-    w["vehicle_known"] = w["load_raw_t"].notna().astype(int)
+    w["load_mapping_method"] = mapping_method
+    w["flag_load_mapping_fallback"] = (w["load_mapping_method"] != "baseline_class_map").astype(int)
+    # “车型已在 Sheet2 找到”与“载重字段非空”是两件事，不能把后者当车型匹配标志。
+    w["vehicle_known"] = w["vehicle_matched"].astype(int)
     w["fuel_type"] = w["fuel_type"].fillna("柴油").replace({"": "柴油"})
 
-    # 订单城市优先；订单缺城市时用网点名前缀兜底
+    # 订单城市优先；订单缺城市时用网点名前缀兜底。源城市缺失标志保留在宽表中。
+    for flag_col in ("order_no_fallback", "cargo_weight_missing", "cargo_volume_missing",
+                     "cargo_pieces_missing", "origin_site_fallback", "dest_site_fallback"):
+        if flag_col in w.columns:
+            w[flag_col] = pd.to_numeric(w[flag_col], errors="coerce").fillna(0).astype(int)
+        else:
+            w[flag_col] = 0
     city_names = sorted(CITY, key=len, reverse=True)
     for side, site_col in (("origin", "dep_site"), ("dest", "arr_site")):
         w[side] = w[side].fillna("").astype(str)
@@ -526,8 +575,11 @@ def _load_competition_workbooks() -> Tuple[pd.DataFrame, str, str]:
             w[col] = w[col].fillna(default)
     w["data_source"] = "real"
 
-    reason = ("读取 %s / %s（订单 %d 行，运单 %d 行，车型表 %d 条；订单直连率 %.1f%%）"
-              % (f1.name, f2.name, len(orders), len(waybills), len(v), order_match * 100))
+    speed_provenance = ("速度取自列“%s”" % selected_speed_col
+                        if selected_speed_col else "源文件无平均速度列，按里程/正时长反算速度")
+    reason = ("读取 %s / %s（订单 %d 行，运单 %d 行，车型表 %d 条；订单直连率 %.1f%%；%s）"
+              % (f1.name, f2.name, len(orders), len(waybills), len(v), order_match * 100,
+                 speed_provenance))
     return w.reset_index(drop=True), "real", reason
 
 
@@ -715,6 +767,110 @@ def _make_demo_raw() -> pd.DataFrame:
 # P2/P3/P4 · 清洗、关联、标记
 # ---------------------------------------------------------------------------
 
+def _segment_dedupe_key(frame: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
+    """返回段级去重键和键完整标志。
+
+    规则与 docs/21 一致：运单 + 车牌 + 里程(2 位小数) + 封/解车时间(秒)；
+    若时间不完整，退回起终点。缺运单号或车牌的记录不自动判重复，避免把不确定记录误合并。
+    """
+    idx = frame.index
+    waybill = _as_str(frame["waybill_no"] if "waybill_no" in frame.columns else None, idx)
+    plate = _as_str(frame["plate"] if "plate" in frame.columns else None, idx)
+    origin = _as_str(frame["origin"] if "origin" in frame.columns else None, idx)
+    dest = _as_str(frame["dest"] if "dest" in frame.columns else None, idx)
+    dist = _num_col(frame, "dist_km").round(2).astype(str)
+    depart = _to_datetime(frame["depart_ts"] if "depart_ts" in frame.columns else None, idx)
+    arrive = _to_datetime(frame["arrive_ts"] if "arrive_ts" in frame.columns else None, idx)
+    time_key = (depart.dt.strftime("%Y%m%d%H%M%S").fillna("")
+                + "|" + arrive.dt.strftime("%Y%m%d%H%M%S").fillna(""))
+    place_key = origin.astype(str) + "|" + dest.astype(str)
+    has_time = depart.notna() & arrive.notna()
+    row_key = pd.Series(np.where(has_time, time_key, place_key), index=idx).astype(str)
+    key = waybill.astype(str) + "|" + plate.astype(str) + "|" + dist + "|" + row_key
+    valid = waybill.ne("") & plate.ne("")
+    return key, valid
+
+
+def _duplicate_conflict_summary(wide: pd.DataFrame) -> Dict[str, int]:
+    """统计重复路段组的冲突类型；仅输出计数，不改写/挑选原始值。"""
+    key, valid = _segment_dedupe_key(wide)
+    frame = wide.loc[valid].copy()
+    if frame.empty:
+        return {
+            "duplicate_groups": 0,
+            "vehicle_name_conflict_groups": 0,
+            "vehicle_code_conflict_groups": 0,
+            "emission_factor_input_conflict_groups": 0,
+            "fuel_type_conflict_groups": 0,
+            "mass_basis_conflict_groups": 0,
+        }
+    frame["_segment_key"] = key.loc[valid].astype(str)
+    sizes = frame.groupby("_segment_key", dropna=False).size()
+    repeat_keys = sizes.index[sizes > 1]
+    rep = frame[frame["_segment_key"].isin(repeat_keys)]
+    if rep.empty:
+        return {
+            "duplicate_groups": 0,
+            "vehicle_name_conflict_groups": 0,
+            "vehicle_code_conflict_groups": 0,
+            "emission_factor_input_conflict_groups": 0,
+            "fuel_type_conflict_groups": 0,
+            "mass_basis_conflict_groups": 0,
+        }
+    grouped = rep.groupby("_segment_key", dropna=False)
+
+    def conflict_count(columns: List[str]) -> int:
+        available = [c for c in columns if c in rep.columns]
+        if not available:
+            return 0
+        unique = grouped[available].nunique(dropna=False)
+        return int(unique.gt(1).any(axis=1).sum())
+
+    return {
+        "duplicate_groups": int(len(repeat_keys)),
+        "vehicle_name_conflict_groups": conflict_count(["vehicle_type"]),
+        "vehicle_code_conflict_groups": conflict_count(["vtype_code"]),
+        # 当前 optimizer 的法定因子查表输入是 (vclass, load_t)；燃料类型单独统计，避免混口径。
+        "emission_factor_input_conflict_groups": conflict_count(["vclass", "load_t"]),
+        "fuel_type_conflict_groups": conflict_count(["fuel_type"]),
+        "mass_basis_conflict_groups": conflict_count(["mass_basis"]),
+    }
+
+def _duplicate_conflict_row_flags(frame: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
+    """逐行标记重复路段组中的车型描述冲突与排放因子输入冲突。
+
+    flag_vehicle_conflict：同一段级键组内车型名称/编码、燃料类型、载重口径或载重映射不一致。
+    flag_factor_conflict：当前排放因子查表输入 (vclass, load_t) 不一致。
+    组内所有行都会标记，包括基准去重时保留的代表行，避免冲突只停留在汇总报告中。
+    """
+    key, valid = _segment_dedupe_key(frame)
+    subset = frame.loc[valid].copy()
+    if subset.empty:
+        return (pd.Series(0, index=frame.index, dtype=int),
+                pd.Series(0, index=frame.index, dtype=int))
+    subset["_segment_key"] = key.loc[valid].astype(str)
+    grouped = subset.groupby("_segment_key", sort=False, dropna=False)
+    sizes = grouped.size()
+    repeated_keys = set(sizes[sizes > 1].index.astype(str))
+    vehicle_cols = [c for c in ("vehicle_type", "vtype_code", "fuel_type", "load_raw_t",
+                                "load_t", "mass_basis", "vclass") if c in subset.columns]
+    factor_cols = [c for c in ("vclass", "load_t") if c in subset.columns]
+
+    vehicle_keys: set[str] = set()
+    for col in vehicle_cols:
+        varying = grouped[col].nunique(dropna=False)
+        vehicle_keys.update(str(k) for k in varying[varying > 1].index if str(k) in repeated_keys)
+
+    factor_keys: set[str] = set()
+    for col in factor_cols:
+        varying = grouped[col].nunique(dropna=False)
+        factor_keys.update(str(k) for k in varying[varying > 1].index if str(k) in repeated_keys)
+
+    vehicle_flags = (valid & key.astype(str).isin(vehicle_keys)).astype(int)
+    factor_flags = (valid & key.astype(str).isin(factor_keys)).astype(int)
+    return vehicle_flags, factor_flags
+
+
 def _add_note(notes: pd.Series, mask: Any, text: str) -> pd.Series:
     try:
         m = pd.Series(mask, index=notes.index).fillna(False).astype(bool).to_numpy()
@@ -738,6 +894,14 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     work["vclass"] = _num_col(raw, "vclass")
     work["load_t"] = _num_col(raw, "load_t")
     work["load_raw_t"] = _num_col(raw, "load_raw_t")
+    if "load_mapping_method" in raw.columns:
+        work["load_mapping_method"] = _as_str(raw["load_mapping_method"], raw.index).replace({"": "unknown"})
+    else:
+        work["load_mapping_method"] = "not_provided"
+    if "flag_load_mapping_fallback" in raw.columns:
+        work["flag_load_mapping_fallback"] = pd.to_numeric(raw["flag_load_mapping_fallback"], errors="coerce").fillna(0).astype(int)
+    else:
+        work["flag_load_mapping_fallback"] = 0
     work["dist_km"] = _num_col(raw, "dist_km").where(lambda s: s > 0)
     work["month"] = _num_col(raw, "month")
     work["speed_kmh"] = _num_col(raw, "speed_kmh").where(lambda s: s > 0)
@@ -745,9 +909,24 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     work["invoice_amount"] = _num_col(raw, "invoice_amount").where(lambda s: s >= 0)
 
     work["vtype_code"] = _num_col(raw, "vtype_code")
+    work["source_waybill_row"] = _num_col(raw, "source_waybill_row").fillna(0).astype(int)
+    if "order_matched" in raw.columns:
+        work["order_matched"] = pd.to_numeric(raw["order_matched"], errors="coerce").fillna(0).astype(int)
+    else:
+        # 通用/演示输入没有专门匹配标志时，只做保守代理；竞赛附件路径会提供真实关联标志。
+        work["order_matched"] = (work["order_no"].astype(str).str.strip() != "").astype(int)
+    if "vehicle_matched" in raw.columns:
+        work["vehicle_matched"] = pd.to_numeric(raw["vehicle_matched"], errors="coerce").fillna(0).astype(int)
+    elif "vehicle_known" in raw.columns:
+        work["vehicle_matched"] = pd.to_numeric(raw["vehicle_known"], errors="coerce").fillna(0).astype(int)
+    else:
+        work["vehicle_matched"] = work["vehicle_type"].isin(VEHICLE_NAMES).astype(int)
     work["cargo_weight_kg"] = _num_col(raw, "cargo_weight_kg").fillna(0.0)
     work["cargo_volume_cm3"] = _num_col(raw, "cargo_volume_cm3").fillna(0.0)
     work["cargo_pieces"] = _num_col(raw, "cargo_pieces").fillna(0.0)
+    for flag_col in ("order_no_fallback", "cargo_weight_missing", "cargo_volume_missing",
+                     "cargo_pieces_missing", "origin_site_fallback", "dest_site_fallback"):
+        work[flag_col] = pd.to_numeric(raw[flag_col], errors="coerce").fillna(0).astype(int) if flag_col in raw.columns else 0
 
     work["depart_ts"] = _to_datetime(raw["depart_ts"] if "depart_ts" in raw.columns else None, raw.index)
     work["arrive_ts"] = _to_datetime(raw["arrive_ts"] if "arrive_ts" in raw.columns else None, raw.index)
@@ -809,11 +988,7 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     work["dist_source"] = dist_source
 
     # ---- 车型 / 载重：车型未知按载重推断；载重缺失按车型额定值/同类别中位 ----
-    if "vehicle_known" in raw.columns:
-        known_vehicle = pd.to_numeric(raw["vehicle_known"], errors="coerce").fillna(0).astype(bool)
-        known_vehicle.index = work.index
-    else:
-        known_vehicle = work["vehicle_type"].isin(VEHICLE_NAMES)
+    known_vehicle = work["vehicle_matched"].fillna(0).astype(bool)
 
     if "fuel_type" in raw.columns:
         work["fuel_type"] = _as_str(raw["fuel_type"], raw.index).replace({"": "柴油"})
@@ -867,6 +1042,7 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
         "")
 
     # ---- 时长 / 速度 ----
+    # 明确记录速度来源：原始速度列、里程/时长反算、行业均速假设或时间异常剔除。
     duration = (work["arrive_ts"] - work["depart_ts"]).dt.total_seconds() / 3600.0
     duration = duration.where(np.isfinite(duration))
     bad_time = (duration.notna() & (duration <= 0)) | (
@@ -875,26 +1051,41 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     bad_time = bad_time.fillna(False)
 
     speed = work["speed_kmh"].copy()
+    has_source_speed = speed.notna() & np.isfinite(speed) & (speed > 0)
+    speed_method = pd.Series("unavailable", index=work.index, dtype=object)
+    speed_method[has_source_speed] = "source_speed_column"
+
     calc_speed = work["dist_km"] / duration.where(duration > 0)
-    speed = speed.where(speed.notna(), calc_speed)
+    calc_speed_used = (~has_source_speed) & (~bad_time) & duration.gt(0) & calc_speed.notna() & (calc_speed > 0)
+    speed = speed.where(has_source_speed, calc_speed)
+    speed_method[calc_speed_used] = "distance_over_duration"
 
     duration = duration.where(duration > 0)
+    duration_from_speed = duration.isna() & speed.notna() & (speed > 0)
     duration = duration.fillna(work["dist_km"] / speed)
+    duration_defaulted = duration.isna()
     duration = duration.fillna(work["dist_km"] / INDUSTRY_SPEED_KMH)
 
-    # 负时长：速度不可信，保留 NaN（有效速度样本会少 1 条），时长按行业均速
+    # 负时长：速度不可信，保留 NaN（有效速度样本会少 1 条），时长按行业均速。
     speed = speed.mask(bad_time, np.nan)
     duration = duration.mask(bad_time, work["dist_km"] / INDUSTRY_SPEED_KMH)
+    speed_method[bad_time] = "invalid_time_excluded"
 
     speed_still_missing = speed.isna() & ~bad_time
     calc_speed2 = work["dist_km"] / duration
+    calculated_after_fill = speed_still_missing & ~duration_defaulted & calc_speed2.notna() & (calc_speed2 > 0)
     speed = speed.where(~speed_still_missing, calc_speed2)
+    speed_method[calculated_after_fill] = "distance_over_duration"
     no_speed_info = speed.isna() & ~bad_time
     speed = speed.where(~no_speed_info, INDUSTRY_SPEED_KMH)
+    speed_method[no_speed_info] = "industry_speed_50_assumption"
+    # duration_defaulted 但 speed 仍为空时，速度兜底来自行业均速而非真实测量。
     speed = speed.where(np.isfinite(speed) & (speed > 0))
+    speed_method[(speed.notna()) & (speed_method == "unavailable")] = "industry_speed_50_assumption"
 
     work["duration_h"] = duration.round(4)
     work["speed_kmh"] = speed.round(3)
+    work["speed_method"] = speed_method
     bad_speed = work["speed_kmh"].notna() & (
         (work["speed_kmh"] > 100) | (work["speed_kmh"] < 1))
     work["flag_anomaly"] = (bad_time | bad_speed).astype(int)
@@ -905,32 +1096,31 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     month = month.fillna(1.0).astype(int)
     work["month"] = month
 
-    # ---- 发票：匹配不上就用同类别历史均价估算 ----
+    # ---- 发票：只有原始输入确实包含发票字段时，才估算“未匹配发票”；
+    # 竞赛附件没有发票字段时必须保持 NaN / -1，不能凭空生成金额。
     invoice_source = "invoice_amount" in raw.columns or "invoice_ok" in raw.columns
-    if work["invoice_ok"].isna().all() and invoice_source:
-        work["invoice_ok"] = work["invoice_amount"].notna().astype(int)
-    if not invoice_source:
+    if invoice_source:
+        if work["invoice_ok"].isna().all():
+            work["invoice_ok"] = work["invoice_amount"].notna().astype(int)
+        work["invoice_ok"] = work["invoice_ok"].fillna(0).astype(int)
+        rate = work["invoice_amount"] / work["dist_km"]
+        rate_fill = rate.groupby(work["vclass"]).transform("median").fillna(5.0)
+        invoice_missing = work["invoice_amount"].isna() | (work["invoice_ok"] == 0)
+        work.loc[invoice_missing, "invoice_amount"] = (
+            work.loc[invoice_missing, "dist_km"] * rate_fill[invoice_missing]).round(2)
+    else:
         work["invoice_ok"] = -1
-    work["invoice_ok"] = work["invoice_ok"].fillna(0).astype(int)
-
-    rate = work["invoice_amount"] / work["dist_km"]
-    rate_fill = rate.groupby(work["vclass"]).transform("median").fillna(5.0)
-    invoice_missing = work["invoice_amount"].isna() | (work["invoice_ok"] == 0)
-    work.loc[invoice_missing, "invoice_amount"] = (
-        work.loc[invoice_missing, "dist_km"] * rate_fill[invoice_missing]).round(2)
+        work["invoice_amount"] = np.nan
 
     # ---- 重复行：保留在宽表，基准核算剔除 ----
     # 真实数据实测：运单+车牌+里程+封/解车时间 → 33,214 段 / 4,690,435.81 km；
     # 只用车牌+里程+起终点会多保留 33 行（4,690,751.88 km），对拍不过。
-    time_key = (work["depart_ts"].dt.strftime("%Y%m%d%H%M%S").fillna("")
-                + "|" + work["arrive_ts"].dt.strftime("%Y%m%d%H%M%S").fillna(""))
-    place_key = work["origin"].astype(str) + "|" + work["dest"].astype(str)
-    has_time = work["depart_ts"].notna() & work["arrive_ts"].notna()
-    row_key = pd.Series(np.where(has_time, time_key, place_key), index=work.index).astype(str)
-    key = (work["waybill_no"].astype(str) + "|" + work["plate"].astype(str) + "|"
-           + work["dist_km"].round(2).astype(str) + "|" + row_key)
-    valid_key = (work["waybill_no"] != "") | (work["plate"] != "")
-    dup = key.duplicated(keep="first") & valid_key
+    key, valid_key = _segment_dedupe_key(work)
+    vehicle_conflict_flags, factor_conflict_flags = _duplicate_conflict_row_flags(work)
+    work["flag_vehicle_conflict"] = vehicle_conflict_flags
+    work["flag_factor_conflict"] = factor_conflict_flags
+    dup = pd.Series(False, index=work.index)
+    dup.loc[valid_key] = key.loc[valid_key].duplicated(keep="first")
     work["flag_dup"] = dup.astype(int)
 
     # ---- 估算原因（只写真正被填补过的行）----
@@ -939,10 +1129,18 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     notes = _add_note(notes, work["dist_source"] == "haversine", "里程缺失→行业绕行系数估算")
     notes = _add_note(notes, work["dist_source"] == "global_median", "里程缺失→全样本中位数")
     notes = _add_note(notes, inferred_vehicle, "车型未匹配→按载重推断")
+    notes = _add_note(notes, work["flag_load_mapping_fallback"] == 1,
+                      "车型未命中62类基准映射→使用补充车型规则/目录载重兜底")
     notes = _add_note(notes, load_still_missing, "载重缺失→按同类别中位/行业均值填补")
     notes = _add_note(notes, work["invoice_ok"] == 0, "发票未匹配→按同类别历史均价估算")
     notes = _add_note(notes, bad_time, "时间戳异常→按行业均速 50 km/h 估算")
     notes = _add_note(notes, no_speed_info, "速度缺失→行业均速填补")
+    notes = _add_note(notes, work["order_no_fallback"] == 1, "源订单号缺失→以运单号作为追踪代理")
+    notes = _add_note(notes, work["cargo_weight_missing"] == 1, "订单重量缺失→数值列暂填 0，分析时须按缺失处理")
+    notes = _add_note(notes, work["cargo_volume_missing"] == 1, "订单体积缺失→数值列暂填 0，分析时须按缺失处理")
+    notes = _add_note(notes, work["cargo_pieces_missing"] == 1, "包裹数缺失→数值列暂填 0，分析时须按缺失处理")
+    notes = _add_note(notes, (work["origin_site_fallback"] == 1) | (work["dest_site_fallback"] == 1),
+                      "订单城市字段缺失→使用网点名称前缀尝试补齐")
     work["estimate_note"] = notes.str.rstrip("；")
     work["flag_estimated"] = (work["estimate_note"] != "").astype(int)
 
@@ -986,16 +1184,69 @@ def _write_json(path: Path, payload: Dict[str, Any]) -> None:
 
 
 def quality_report(wide: pd.DataFrame, raw_rows: int, source: str, reason: str) -> Dict[str, Any]:
-    unique = wide[wide["flag_dup"] == 0]
+    """生成可解释的关联率与数据质量统计。
+
+    关键定义：
+    - order_match_rate：订单运单号是否直接匹配到订单表；
+    - vehicle_match_rate：运单车型名称是否精确匹配附件2 Sheet2；
+    - match_rate：前两项同时命中的综合关联率；
+    - imputation_free_rate：未触发估算填补标记的独立路段比例。
+    旧版 match_rate 实际衡量距离/车型填补情况，名称含义不清，现保留字段但明确改为关联率。
+    """
+    unique = wide[pd.to_numeric(wide["flag_dup"], errors="coerce").fillna(0) == 0].copy()
     total = max(len(unique), 1)
-    valid_speed = unique["speed_kmh"].notna() & (unique["speed_kmh"] > 0)
-    avg_speed = float(unique.loc[valid_speed, "speed_kmh"].mean()) if valid_speed.any() else None
-    unmatched = (unique["fill_dist"] == 1) | (unique["fill_vehicle"] == 1)
-    match_rate = float(1.0 - unmatched.mean()) if len(unique) else None
-    vehicle_match_rate = float(1.0 - unique["fill_vehicle"].mean()) if len(unique) else None
-    order_match_rate = None
-    if source == "real" and len(unique):
-        order_match_rate = float((unique["order_no"].astype(str) != "").mean())
+    valid_speed = unique["speed_kmh"].notna() & (pd.to_numeric(unique["speed_kmh"], errors="coerce") > 0)
+    speed_num = pd.to_numeric(unique["speed_kmh"], errors="coerce")
+    avg_speed = float(speed_num.loc[valid_speed].mean()) if valid_speed.any() else None
+    avg_speed_1_100_mask = valid_speed & speed_num.between(1, 100)
+    avg_speed_1_100 = float(speed_num.loc[avg_speed_1_100_mask].mean()) if avg_speed_1_100_mask.any() else None
+
+    if "order_matched" in unique.columns:
+        order_matched = pd.to_numeric(unique["order_matched"], errors="coerce").fillna(0).eq(1)
+    else:
+        order_matched = unique["order_no"].astype(str).str.strip().ne("")
+    if "vehicle_matched" in unique.columns:
+        vehicle_matched = pd.to_numeric(unique["vehicle_matched"], errors="coerce").fillna(0).eq(1)
+    else:
+        vehicle_matched = pd.to_numeric(unique["fill_vehicle"], errors="coerce").fillna(0).eq(0)
+
+    order_match_rate = float(order_matched.mean()) if len(unique) else None
+    vehicle_match_rate = float(vehicle_matched.mean()) if len(unique) else None
+    association = order_matched & vehicle_matched
+    association_match_rate = float(association.mean()) if len(unique) else None
+    imputed = pd.to_numeric(unique["flag_estimated"], errors="coerce").fillna(0).eq(1)
+    imputation_free_rate = float(1.0 - imputed.mean()) if len(unique) else None
+    estimated_rows_wide = int(pd.to_numeric(wide["flag_estimated"], errors="coerce").fillna(0).eq(1).sum())
+
+    conflicts = _duplicate_conflict_summary(wide)
+    canonical_vehicle_conflict_rows = int(pd.to_numeric(unique.get("flag_vehicle_conflict", 0), errors="coerce")
+                                          .fillna(0).sum()) if "flag_vehicle_conflict" in unique.columns else 0
+    canonical_factor_conflict_rows = int(pd.to_numeric(unique.get("flag_factor_conflict", 0), errors="coerce")
+                                         .fillna(0).sum()) if "flag_factor_conflict" in unique.columns else 0
+    load_mapping_fallback_rows = int(pd.to_numeric(unique.get("flag_load_mapping_fallback", 0), errors="coerce")
+                                     .fillna(0).sum()) if "flag_load_mapping_fallback" in unique.columns else 0
+    load_mapping_fallback_raw_rows = int(pd.to_numeric(wide.get("flag_load_mapping_fallback", 0), errors="coerce")
+                                         .fillna(0).sum()) if "flag_load_mapping_fallback" in wide.columns else 0
+    load_mapping_fallback_duplicate_rows = int((
+        pd.to_numeric(wide.get("flag_load_mapping_fallback", 0), errors="coerce").fillna(0).eq(1)
+        & pd.to_numeric(wide.get("flag_dup", 0), errors="coerce").fillna(0).eq(1)
+    ).sum()) if "flag_load_mapping_fallback" in wide.columns else 0
+    load_mapping_fallback_types = (sorted(wide.loc[pd.to_numeric(wide["flag_load_mapping_fallback"], errors="coerce").fillna(0).eq(1),
+                                                       "vehicle_type"].astype(str).unique().tolist())
+                                   if "flag_load_mapping_fallback" in wide.columns and "vehicle_type" in wide.columns else [])
+    time_delta_h = (pd.to_datetime(unique["arrive_ts"], errors="coerce")
+                    - pd.to_datetime(unique["depart_ts"], errors="coerce")).dt.total_seconds() / 3600.0
+    time_pair_valid = pd.to_datetime(unique["arrive_ts"], errors="coerce").notna() & pd.to_datetime(unique["depart_ts"], errors="coerce").notna()
+    negative_duration_rows = int((time_pair_valid & (time_delta_h <= 0)).sum())
+    duration_over_24h_rows = int((time_pair_valid & (time_delta_h > 24)).sum())
+    duration_over_168h_rows = int((time_pair_valid & (time_delta_h > 168)).sum())
+    speed_outlier_rows = int((valid_speed & ((speed_num > 100) | (speed_num < 1))).sum())
+    incomplete_key_rows = int((
+        unique["waybill_no"].astype(str).str.strip().eq("")
+        | unique["plate"].astype(str).str.strip().eq("")
+    ).sum())
+    origin_still_missing_rows = int(unique["origin"].astype(str).str.strip().eq("").sum())
+    dest_still_missing_rows = int(unique["dest"].astype(str).str.strip().eq("").sum())
 
     notes: List[str] = []
     if source == "demo":
@@ -1003,40 +1254,98 @@ def quality_report(wide: pd.DataFrame, raw_rows: int, source: str, reason: str) 
         notes.append("演示数据为确定性合成样本（seed=%d），只用于前端联调与答辩兜底，不代表真实口径。" % DEMO_SEED)
     else:
         notes.append(reason)
-        notes.append("真实附件：订单直连率 %.1f%%，车型匹配率 %.1f%%；"
-                     "去重键 = 运单 + 车牌 + 里程 + 封/解车时间。"
-                     % ((order_match_rate or 0) * 100, (vehicle_match_rate or 0) * 100))
+        notes.append("关联率按明确标记统计：订单直连率 %.1f%%，Sheet2 车型名称匹配率 %.1f%%，两者同时命中 %.1f%%。"
+                     % ((order_match_rate or 0) * 100, (vehicle_match_rate or 0) * 100,
+                        (association_match_rate or 0) * 100))
+        notes.append("去重键 = 运单 + 车牌 + 里程(2 位小数) + 封/解车时间(秒)；时间不全时退回起终点。")
+    notes.append("综合关联率 match_rate 不再代指缺失填补比例；估算填补独立列出 imputation_free_rate。")
+    if origin_still_missing_rows or dest_still_missing_rows:
+        notes.append("城市字段经网点前缀尝试补齐后仍为空：起点 %d 行、终点 %d 行；需要后续地名映射或人工复核。"
+                     % (origin_still_missing_rows, dest_still_missing_rows))
+    if load_mapping_fallback_raw_rows:
+        notes.append("宽表中 %d 行、%d 种车型未命中 62 类基准车型映射；其中 %d 行因段级去重未进入基准表，当前代表行中仍使用补充规则的有 %d 行。车型/因子冲突另按行标记，不应只看目录匹配率。"
+                     % (load_mapping_fallback_raw_rows, len(load_mapping_fallback_types),
+                        load_mapping_fallback_duplicate_rows, load_mapping_fallback_rows))
+    if conflicts["duplicate_groups"]:
+        notes.append("重复路段 %d 组；车型名称冲突 %d 组、车型编码冲突 %d 组；当前排放因子输入(vclass/load_t)冲突 %d 组。"
+                     % (conflicts["duplicate_groups"], conflicts["vehicle_name_conflict_groups"],
+                        conflicts["vehicle_code_conflict_groups"], conflicts["emission_factor_input_conflict_groups"]))
+        notes.append("已逐行标记去重组中的车型冲突：保留代表行中 %d 行存在车型描述冲突，%d 行存在因子输入冲突；基准计算仍使用现行去重规则保留的代表行，相关结果须视为待复核。"
+                     % (canonical_vehicle_conflict_rows, canonical_factor_conflict_rows))
+    if negative_duration_rows:
+        notes.append("到达时间不晚于发车时间 %d 条：保留原始时间，速度不参与均值，按规则标记。" % negative_duration_rows)
+    if speed_outlier_rows:
+        notes.append("速度低于 1 或高于 100 km/h 的独立路段 %d 条：保留计碳，单独标记。" % speed_outlier_rows)
     for text, col in (
         ("里程缺失", "fill_dist"), ("车型未匹配", "fill_vehicle"),
         ("发票未匹配", "fill_invoice"), ("时间戳异常", "fill_duration"),
     ):
-        n = int(unique[col].sum())
+        n = int(pd.to_numeric(unique[col], errors="coerce").fillna(0).sum())
         if n:
-            notes.append("%s %d 行已填补并打标（不删除、不中断）。" % (text, n))
-    n_load = int(unique["fill_load"].sum())
+            notes.append("%s %d 行已填补并打标（不删除、不静默覆盖）。" % (text, n))
+    n_load = int(pd.to_numeric(unique["fill_load"], errors="coerce").fillna(0).sum())
     if n_load:
-        notes.append("载重字段缺失 %d 行：优先按车型登记表额定载重回填（是匹配、不黄框），"
-                     "登记表也没有时才用同类别中位并黄框。" % n_load)
+        notes.append("载重字段缺失 %d 行：优先按车型登记表额定载重回填（是匹配、不黄框），登记表也没有时才用同类别中位并黄框。" % n_load)
 
+    speed_method_counts: Dict[str, int] = {}
+    if "speed_method" in unique.columns:
+        speed_method_counts = {str(k): int(v) for k, v in unique["speed_method"].fillna("unknown").value_counts(dropna=False).items()}
+
+    order_unmatched = ~order_matched
+    vehicle_unmatched = ~vehicle_matched
     return {
         "source": source,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "rows_raw": int(raw_rows),
         "rows_wide": int(len(wide)),
         "rows_dedup": int(len(unique)),
-        "dup_rows": int((wide["flag_dup"] == 1).sum()),
-        "anomaly_rows": int(unique["flag_anomaly"].sum()),
-        "basis_rows": int(unique["flag_basis"].sum()),
-        "estimated_rows": int(unique["flag_estimated"].sum()),
-        "fill_dist": int(unique["fill_dist"].sum()),
-        "fill_vehicle": int(unique["fill_vehicle"].sum()),
-        "fill_load": int(unique["fill_load"].sum()),
-        "fill_invoice": int(unique["fill_invoice"].sum()),
-        "fill_duration": int(unique["fill_duration"].sum()),
+        "dup_rows": int((pd.to_numeric(wide["flag_dup"], errors="coerce").fillna(0) == 1).sum()),
+        "duplicate_groups": conflicts["duplicate_groups"],
+        "vehicle_name_conflict_groups": conflicts["vehicle_name_conflict_groups"],
+        "vehicle_code_conflict_groups": conflicts["vehicle_code_conflict_groups"],
+        "emission_factor_input_conflict_groups": conflicts["emission_factor_input_conflict_groups"],
+        "canonical_vehicle_conflict_rows": canonical_vehicle_conflict_rows,
+        "canonical_factor_conflict_rows": canonical_factor_conflict_rows,
+        "load_mapping_fallback_rows": load_mapping_fallback_rows,
+        "load_mapping_fallback_raw_rows": load_mapping_fallback_raw_rows,
+        "load_mapping_fallback_duplicate_rows": load_mapping_fallback_duplicate_rows,
+        "load_mapping_fallback_vehicle_types": load_mapping_fallback_types,
+        "fuel_type_conflict_groups": conflicts["fuel_type_conflict_groups"],
+        "mass_basis_conflict_groups": conflicts["mass_basis_conflict_groups"],
+        "anomaly_rows": int(pd.to_numeric(unique["flag_anomaly"], errors="coerce").fillna(0).sum()),
+        "speed_outlier_rows": speed_outlier_rows,
+        "negative_duration_rows": negative_duration_rows,
+        "duration_over_24h_rows": duration_over_24h_rows,
+        "duration_over_168h_rows": duration_over_168h_rows,
+        "incomplete_dedupe_key_rows": incomplete_key_rows,
+        "origin_still_missing_rows": origin_still_missing_rows,
+        "dest_still_missing_rows": dest_still_missing_rows,
+        "order_no_fallback_rows": int(pd.to_numeric(unique["order_no_fallback"], errors="coerce").fillna(0).sum()),
+        "cargo_weight_missing_rows": int(pd.to_numeric(unique["cargo_weight_missing"], errors="coerce").fillna(0).sum()),
+        "cargo_volume_missing_rows": int(pd.to_numeric(unique["cargo_volume_missing"], errors="coerce").fillna(0).sum()),
+        "cargo_pieces_missing_rows": int(pd.to_numeric(unique["cargo_pieces_missing"], errors="coerce").fillna(0).sum()),
+        "origin_site_fallback_rows": int(pd.to_numeric(unique["origin_site_fallback"], errors="coerce").fillna(0).sum()),
+        "dest_site_fallback_rows": int(pd.to_numeric(unique["dest_site_fallback"], errors="coerce").fillna(0).sum()),
+        "basis_rows": int(pd.to_numeric(unique["flag_basis"], errors="coerce").fillna(0).sum()),
+        "estimated_rows": int(pd.to_numeric(unique["flag_estimated"], errors="coerce").fillna(0).sum()),
+        "estimated_rows_wide": estimated_rows_wide,
+        "fill_dist": int(pd.to_numeric(unique["fill_dist"], errors="coerce").fillna(0).sum()),
+        "fill_vehicle": int(pd.to_numeric(unique["fill_vehicle"], errors="coerce").fillna(0).sum()),
+        "fill_load": int(pd.to_numeric(unique["fill_load"], errors="coerce").fillna(0).sum()),
+        "fill_invoice": int(pd.to_numeric(unique["fill_invoice"], errors="coerce").fillna(0).sum()),
+        "fill_duration": int(pd.to_numeric(unique["fill_duration"], errors="coerce").fillna(0).sum()),
         "valid_speed_rows": int(valid_speed.sum()),
         "avg_speed": None if avg_speed is None else round(avg_speed, 4),
-        "total_km": round(float(unique["dist_km"].sum()), 4),
-        "match_rate": None if match_rate is None else round(match_rate, 6),
+        "avg_speed_1_100": None if avg_speed_1_100 is None else round(avg_speed_1_100, 4),
+        "speed_method_counts": speed_method_counts,
+        "total_km": round(float(pd.to_numeric(unique["dist_km"], errors="coerce").fillna(0).sum()), 4),
+        "order_matched_rows": int(order_matched.sum()),
+        "order_unmatched_rows": int(order_unmatched.sum()),
+        "vehicle_matched_rows": int(vehicle_matched.sum()),
+        "vehicle_unmatched_rows": int(vehicle_unmatched.sum()),
+        "match_rate": None if association_match_rate is None else round(association_match_rate, 6),
+        "association_match_rate": None if association_match_rate is None else round(association_match_rate, 6),
+        "imputation_free_rate": None if imputation_free_rate is None else round(imputation_free_rate, 6),
         "vehicle_match_rate": None if vehicle_match_rate is None else round(vehicle_match_rate, 6),
         "order_match_rate": None if order_match_rate is None else round(order_match_rate, 6),
         "notes": notes,
@@ -1052,7 +1361,8 @@ def _minimal_wide() -> pd.DataFrame:
             "plate": "沪A000%d" % i, "vehicle_type": "4.2米厢式货车", "vtype_code": 4,
             "vclass": 1, "fuel_type": "柴油", "load_t": 4.5, "load_raw_t": 4.5,
             "mass_basis": "载质量",
-            "basis_note": "", "origin": o, "dest": d, "od_pair": o + "|" + d,
+            "basis_note": "", "load_mapping_method": "demo_vehicle_profile", "flag_load_mapping_fallback": 0,
+            "origin": o, "dest": d, "od_pair": o + "|" + d,
             "od_key": "|".join(sorted([o, d])), "od_site": "|".join(sorted([o, d])),
             "origin_lat": CITY[o][0], "origin_lon": CITY[o][1],
             "dest_lat": CITY[d][0], "dest_lon": CITY[d][1],
@@ -1064,9 +1374,14 @@ def _minimal_wide() -> pd.DataFrame:
             "invoice_no": "", "invoice_ok": 0, "invoice_amount": 900.0,
             "cargo_weight_kg": 0.0, "cargo_volume_cm3": 0.0, "cargo_pieces": 0.0,
             "complete_ts": pd.NaT,
-            "flag_dup": 0, "flag_anomaly": 0, "flag_basis": 0, "flag_estimated": 1,
+            "flag_dup": 0, "flag_anomaly": 0, "flag_basis": 0, "flag_vehicle_conflict": 0,
+            "flag_factor_conflict": 0, "flag_estimated": 1,
             "estimate_note": "演示兜底→行业均值", "fill_dist": 1, "fill_vehicle": 0,
             "fill_load": 0, "fill_invoice": 1, "fill_duration": 0, "data_source": "demo",
+            "order_matched": 1, "vehicle_matched": 1, "source_waybill_row": 0,
+            "speed_method": "industry_speed_50_assumption", "order_no_fallback": 0,
+            "cargo_weight_missing": 0, "cargo_volume_missing": 0, "cargo_pieces_missing": 0,
+            "origin_site_fallback": 0, "dest_site_fallback": 0,
         })
     return pd.DataFrame(rows)[WIDE_COLUMNS]
 
@@ -1126,9 +1441,66 @@ def build_wide_table() -> pd.DataFrame:
     return wide
 
 
+def self_test_quality_report() -> Dict[str, Any]:
+    """最小回归测试：关联率必须由显式匹配标志计算，冲突组必须可被识别。"""
+    toy = _minimal_wide().iloc[:3].copy().reset_index(drop=True)
+    toy["waybill_no"] = ["T-1", "T-2", "T-3"]
+    toy["plate"] = ["P-1", "P-2", "P-3"]
+    toy["order_no"] = ["T-1", "T-2", "T-3"]
+    toy["order_matched"] = [1, 0, 1]
+    toy["vehicle_matched"] = [1, 1, 0]
+    toy["flag_dup"] = [0, 0, 0]
+    report = quality_report(toy, 3, "real", "self-test")
+    assert report["order_match_rate"] == round(2 / 3, 6), report
+    assert report["vehicle_match_rate"] == round(2 / 3, 6), report
+    assert report["association_match_rate"] == round(1 / 3, 6), report
+
+    conflict = toy.iloc[:2].copy().reset_index(drop=True)
+    conflict["waybill_no"] = ["D-1", "D-1"]
+    conflict["plate"] = ["P-D", "P-D"]
+    conflict["origin"] = ["上海", "上海"]
+    conflict["dest"] = ["杭州", "杭州"]
+    conflict["dist_km"] = [100.0, 100.0]
+    conflict["depart_ts"] = pd.to_datetime(["2023-01-01 08:00:00", "2023-01-01 08:00:00"])
+    conflict["arrive_ts"] = pd.to_datetime(["2023-01-01 10:00:00", "2023-01-01 10:00:00"])
+    conflict["vehicle_type"] = ["车型 A", "车型 B"]
+    conflict["vclass"] = [1, 3]
+    conflict["load_t"] = [4.5, 30.0]
+    conflict["flag_dup"] = [0, 1]
+    conflict_report = _duplicate_conflict_summary(conflict)
+    assert conflict_report["duplicate_groups"] == 1, conflict_report
+    assert conflict_report["vehicle_name_conflict_groups"] == 1, conflict_report
+    assert conflict_report["emission_factor_input_conflict_groups"] == 1, conflict_report
+    vehicle_row_flags, factor_row_flags = _duplicate_conflict_row_flags(conflict)
+    assert int(vehicle_row_flags.sum()) == 2, vehicle_row_flags.tolist()
+    assert int(factor_row_flags.sum()) == 2, factor_row_flags.tolist()
+
+    invoice_free_raw = pd.DataFrame({
+        "waybill_no": ["INV-NA"], "order_no": ["O-INV-NA"], "plate": ["TEST"],
+        "vehicle_type": ["4.2米厢式货车"], "dist_km": [50.0],
+        "depart_ts": [pd.Timestamp("2023-01-01 08:00:00")],
+        "arrive_ts": [pd.Timestamp("2023-01-01 09:00:00")],
+        "vclass": [1], "load_t": [4.5], "fuel_type": ["柴油"],
+        "mass_basis": ["载质量"], "vehicle_known": [1],
+    })
+    invoice_free_raw["load_mapping_method"] = "fallback_rule"
+    invoice_free_raw["flag_load_mapping_fallback"] = 1
+    invoice_free_wide = clean_frame(invoice_free_raw, "real")
+    assert int(invoice_free_wide.loc[0, "flag_load_mapping_fallback"]) == 1
+    assert int(invoice_free_wide.loc[0, "flag_estimated"]) == 1
+    assert "62类基准映射" in invoice_free_wide.loc[0, "estimate_note"]
+    assert pd.isna(invoice_free_wide.loc[0, "invoice_amount"]), invoice_free_wide[["invoice_amount", "invoice_ok"]]
+    assert int(invoice_free_wide.loc[0, "invoice_ok"]) == -1
+    assert int(invoice_free_wide.loc[0, "fill_invoice"]) == 0
+    return {"association_metric_test": "PASS", "duplicate_conflict_test": "PASS",
+            "row_level_conflict_flag_test": "PASS", "load_mapping_fallback_flag_test": "PASS",
+            "no_invoice_source_test": "PASS"}
+
+
 if __name__ == "__main__":
     print("=" * 78)
     print("数据层 preprocess.py · 单跑自测")
+    print("质量指标自测：%s" % self_test_quality_report())
     print("=" * 78)
     build_wide_table()
     print("=" * 78)

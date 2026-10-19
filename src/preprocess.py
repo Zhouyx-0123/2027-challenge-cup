@@ -639,7 +639,8 @@ def _load_raw() -> Tuple[pd.DataFrame, str, str]:
 
 def _make_demo_raw() -> pd.DataFrame:
     rng = np.random.default_rng(DEMO_SEED)
-    # 演示只用最初 30 个枢纽城市；CITY 后来补的收货城市只服务真实地图。
+    # 演示只用最初的 30 个枢纽城市；CITY 后来补的收货城市只服务真实地图。
+    # 不能让 rng.choice 的 a/p 长度失配（否则无 raw 数据时演示回退直接 ValueError）。
     names = list(CITY)[:30]
     coords = np.array([CITY[n] for n in names], dtype=float)
     weights = np.array(

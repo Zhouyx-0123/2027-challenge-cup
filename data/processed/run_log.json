@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-19T21:43:05",
+  "generated_at": "2026-10-19T22:09:15",
   "source": "real",
   "mode": "auto",
   "stages": [
@@ -7,21 +7,21 @@
       "key": "preprocess",
       "name": "① 数据层 preprocess.py",
       "status": "ok",
-      "seconds": 3.925,
+      "seconds": 4.013,
       "error": ""
     },
     {
       "key": "optimizer",
       "name": "② 引擎层 optimizer.py",
       "status": "ok",
-      "seconds": 0.135,
+      "seconds": 0.139,
       "error": ""
     },
     {
       "key": "evaluator",
       "name": "③ 分析层 evaluator.py",
       "status": "ok",
-      "seconds": 0.11,
+      "seconds": 0.121,
       "error": ""
     },
     {
@@ -39,5 +39,5 @@
     "fail": 0,
     "skip": 0
   },
-  "total_seconds": 4.252
+  "total_seconds": 4.359
 }

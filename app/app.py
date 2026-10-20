@@ -77,6 +77,17 @@ with c3:
     st.page_link("pages/6_路线沙盘.py", label="⑥ 路线沙盘（预览）", icon="🗺️")
     st.caption("高德真路线 + 未来候选/权重模型；不计入五页主线")
 
+# ---------------- 情景演算工具（docs/20 §11） ----------------
+st.markdown("")
+layout.section("情景演算工具", "评委现场改参数、即时看结论；假设值黄框标注，不影响对拍口径")
+c4, c5 = st.columns(2)
+with c4:
+    st.page_link("pages/7_电动化测算.py", label="⑦ 电动化测算", icon="🔋")
+    st.caption("年节省、回本月份、NPV 四分解、双口径减碳（ChargeMath/FleetTCO 精华）")
+with c5:
+    st.page_link("pages/8_车队TCO沙盘.py", label="⑧ 车队 TCO 沙盘", icon="🧮")
+    st.caption("柴油/电动/CNG/HVO 同框架对比 + 行业吨公里法口径对照")
+
 # ---------------- 数据状态 ----------------
 st.markdown("")
 layout.section("数据状态", "前端只读结果表；缺表不报错，只提示")

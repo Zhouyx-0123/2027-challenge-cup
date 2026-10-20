@@ -1,0 +1,77 @@
+{
+  "version": "calc-factors-v1",
+  "updated": "2026-10-20",
+  "owner": "PM（周嬴鑫）统一维护；修改需在群里说明并 bump version",
+  "notes": "第 7/8 页情景演算的唯一口径来源（docs/20 §11）。因子是口径不是数据：改这里只重算情景，不动对拍宽表。价格类常量默认值与 src/optimizer.py 的展示口径常量一致，不在此重复维护。",
+  "co2_factors": {
+    "diesel_ttw_kg_per_l": {
+      "value": 2.63,
+      "source": "GB/T 2589 / IPACC 柴油燃烧 CO2 因子（尾气管排放）",
+      "basis": "ttw"
+    },
+    "diesel_wtt_kg_per_l": {
+      "value": 0.53,
+      "source": "EN 16258 附录 A 上游（生产+运输）分摊；与 TTW 相加得 WTW",
+      "basis": "wtt"
+    },
+    "grid_wtw_kg_per_kwh": {
+      "value": 0.5568,
+      "source": "生态环境部 2023 年度全国电力平均 CO2 排放因子（2025 年发布）；2022 年度为 0.5703，以最新公告为准",
+      "basis": "wtw"
+    },
+    "cng_ttw_kg_per_m3": {
+      "value": 2.16,
+      "source": "天然气燃烧 CO2 因子（压缩天然气，示意路线默认值）",
+      "basis": "ttw"
+    },
+    "cng_wtt_kg_per_m3": {
+      "value": 0.58,
+      "source": "EN 16258 上游分摊（示意路线默认值）",
+      "basis": "wtt"
+    },
+    "hvo_wtw_kg_per_l": {
+      "value": 0.62,
+      "source": "HVO 生物柴油全生命周期：生物源碳不计燃烧，仅上游（示意路线默认值）",
+      "basis": "wtw"
+    }
+  },
+  "vehicle_assumptions": {
+    "_label": "以下全部是假设值，页面上必须打黄框；曾广真实成本模型接入后在此替换",
+    "ice_price_yuan": {
+      "1": 120000,
+      "2": 260000,
+      "3": 480000
+    },
+    "bev_price_delta_yuan": {
+      "1": 80000,
+      "2": 180000,
+      "3": 600000
+    },
+    "maint_yuan_per_km": {
+      "ice": 1.5,
+      "bev": 0.9
+    },
+    "residual_rate": {
+      "ice": 0.2,
+      "bev": 0.15
+    },
+    "insurance_yuan_per_veh_year": 12000
+  },
+  "finance": {
+    "discount_rate": 0.06,
+    "horizon_years": 5
+  },
+  "energy_defaults": {
+    "_label": "电耗假设值（L/100km 油耗不用这里——默认取车队实测 fleet_stats.json）",
+    "bev_kwh_per_100km": {
+      "1": 55,
+      "2": 90,
+      "3": 135
+    }
+  },
+  "comparison_defaults": {
+    "_label": "EcoTransIT 式口径对照：行业吨公里默认强度（用户可改）",
+    "industry_g_per_tkm": 95.0,
+    "industry_source": "中国公路货运行业均值量级（gCO2/t·km），仅作对照，非本项目口径"
+  }
+}

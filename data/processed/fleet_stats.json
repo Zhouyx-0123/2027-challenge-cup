@@ -1,0 +1,45 @@
+{
+  "source": "real",
+  "generated_at": "2026-10-21T00:18:13",
+  "segments": 33214,
+  "total_km": 4690435.8,
+  "e0_kg": 4502042.4,
+  "plates": 5868,
+  "months": [
+    1,
+    2,
+    3,
+    11,
+    12
+  ],
+  "by_vclass": {
+    "1": {
+      "name": "轻型",
+      "segments": 18614,
+      "km": 880664.5,
+      "km_share_pct": 18.8,
+      "implied_l_per_100km": 15.0,
+      "avg_load_t": 4.48
+    },
+    "2": {
+      "name": "中型",
+      "segments": 12366,
+      "km": 1645259.3,
+      "km_share_pct": 35.1,
+      "implied_l_per_100km": 28.3,
+      "avg_load_t": 17.38
+    },
+    "3": {
+      "name": "重型",
+      "segments": 2234,
+      "km": 2164512.0,
+      "km_share_pct": 46.1,
+      "implied_l_per_100km": 51.4,
+      "avg_load_t": 38.08
+    }
+  },
+  "implied_g_per_tkm": 38.6,
+  "total_load_tkm": 116556557.6,
+  "diesel_ttw_kg_per_l": 2.63,
+  "note": "运单为抽样数据：不推导年均里程/车；该默认值见 config/calc_factors.json（假设值）"
+}

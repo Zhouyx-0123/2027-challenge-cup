@@ -27,6 +27,8 @@ data/processed/*
 !data/processed/run_log.json
 !data/processed/_source.json
 !data/processed/_mock.flag
+# 情景演算页（docs/20 §11）：车队真实统计入库，计算器默认值可复现
+!data/processed/fleet_stats.json
 # T7 路线情景：路线表与情景表入库（可复现），坐标缓存不入库（机器本地状态）
 !data/processed/route_od.parquet
 !data/processed/route_carbon.parquet

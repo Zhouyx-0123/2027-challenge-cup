@@ -5,11 +5,16 @@
 2. 缺文件、缺列、文件损坏一律返回空表 + 原因，不抛异常（答辩现场不能红屏）；
 3. 页面只能通过本模块取数，不允许直接 pd.read_parquet；
 4. 结果表由 python -m src.pipeline 预先生成，页面里没有一行业务公式。
+
+docs/20 §11 增补（情景演算页）：第 7/8 页是"用户输入→即时算"的演算页，
+与对拍链路隔离。全 app/ 只在本文件出现一次 ``from src import scenarios``
+（演算内核），页面仍只 import services——自证命令见 docs/20 §4。
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -19,6 +24,11 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
 PROCESSED = ROOT / "data" / "processed"
+if str(ROOT) not in sys.path:  # noqa: E402
+    sys.path.insert(0, str(ROOT))
+
+from src import scenarios as _kernel  # noqa: E402  ← 全 app/ 唯一一处（docs/20 §11）
+                                       # 别名：避免与本文件 scenarios()（结果表读取）撞名
 
 # ---- 结果文件清单（与 src/pipeline.py 输出一一对应）----
 RESULT_FILES: Dict[str, str] = {
@@ -34,6 +44,8 @@ RESULT_FILES: Dict[str, str] = {
     "gate": "gate_report.json",
     "run_log": "run_log.json",
     "source": "_source.json",
+    # 情景演算页（docs/20 §11）：车队真实统计，计算器默认值来源
+    "fleet_stats": "fleet_stats.json",
     # T7 · 路线情景（可选；缺失时页面自动回退离线模式）
     "routes": "route_od.parquet",
     "route_carbon": "route_carbon.parquet",
@@ -177,6 +189,35 @@ def gate() -> Dict[str, Any]:
 
 def run_log() -> Dict[str, Any]:
     return _read_json(RESULT_FILES["run_log"])
+
+
+def fleet_stats() -> Dict[str, Any]:
+    """车队真实统计 fleet_stats.json（第 7/8 页计算器默认值）。缺失返回 {}。"""
+    return _read_json(RESULT_FILES["fleet_stats"])
+
+
+# ---------------- 情景演算桥（docs/20 §11） ----------------
+# 全 app/ 唯一调用 src 的地方；页面只经此处，不直接 import src。
+# 演算结果绝不写回结果表，也不进 kpi/gate（对拍口径与情景推演分列）。
+
+def calc_factors() -> Dict[str, Any]:
+    """口径配置 config/calc_factors.json（计算器的假设值来源）。"""
+    return _kernel.load_factors()
+
+
+def calc_electrification(params: Dict[str, Any]) -> Dict[str, Any]:
+    """第 7 页：电动车队测算。逻辑在 src/scenarios.py，本函数只转发。"""
+    return _kernel.calc_electrification(params)
+
+
+def calc_fleet_tco(params: Dict[str, Any]) -> Dict[str, Any]:
+    """第 8 页：车队 TCO 多路线对比。逻辑在 src/scenarios.py，本函数只转发。"""
+    return _kernel.calc_fleet_tco(params)
+
+
+def tonne_km_comparison(our_g_per_tkm: float, **kwargs: Any) -> Dict[str, Any]:
+    """口径对照：行业吨公里法 vs 我们段级自底向上（EcoTransIT 式）。"""
+    return _kernel.tonne_km_comparison(our_g_per_tkm, **kwargs)
 
 
 def source() -> Dict[str, Any]:

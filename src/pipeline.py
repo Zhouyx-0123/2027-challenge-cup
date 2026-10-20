@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src import evaluator, optimizer, preprocess  # noqa: E402
+from src import evaluator, optimizer, preprocess, scenarios  # noqa: E402
 
 PROCESSED = ROOT / "data" / "processed"
 WIDE_PATH = PROCESSED / "wide_data.parquet"
@@ -46,6 +46,7 @@ GATE_PATH = PROCESSED / "gate_report.json"
 RUN_LOG_PATH = PROCESSED / "run_log.json"
 SOURCE_PATH = PROCESSED / "_source.json"
 MOCK_FLAG = PROCESSED / "_mock.flag"
+FLEET_STATS_PATH = PROCESSED / "fleet_stats.json"
 
 # T7 · 路线情景（可选段，docs/23 §6.3）
 ROUTE_PATH = PROCESSED / "route_od.parquet"
@@ -340,6 +341,63 @@ def build_kpi(seg: pd.DataFrame, wide: pd.DataFrame, schemes: pd.DataFrame,
         "od_coverage_pct": (band_kg / total_kg * 100.0) if total_kg > 0 else None,
         "main_reduction_pct": _num(main.iloc[0]["reduction_pct"]) if not main.empty else None,
         "factor_version": optimizer.FACTOR_VERSION,
+    }
+
+
+# ---------------------------------------------------------------------------
+# G3.5 · 车队真实统计（第 7/8 页计算器的默认值来源，docs/20 §11）
+# ---------------------------------------------------------------------------
+
+def build_fleet_stats(seg: pd.DataFrame, source: str) -> Dict[str, Any]:
+    """聚合段表得到车队真实统计，供情景演算页当默认值。
+
+    纪律：
+    - 只聚合已去重、已对拍的段表，不引入任何新口径；
+    - 运单是**抽样**数据（不是全年全车队），因此**不推导**"年均里程/车"这类
+      会造假精度的指标——该默认值在 config/calc_factors.json 标注为假设值；
+    - 本函数失败不得阻断主流程：调用方包 try，失败时写最小统计。
+    """
+    total_km = float(pd.to_numeric(seg["dist_km"], errors="coerce").fillna(0).sum())
+    total_kg = float(pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0).sum())
+    diesel_ttw = scenarios.load_factors()["co2_factors"]["diesel_ttw_kg_per_l"]["value"]
+    vclass = pd.to_numeric(seg["vclass"], errors="coerce") if "vclass" in seg.columns else pd.Series(dtype=float)
+    names = {1: "轻型", 2: "中型", 3: "重型"}
+    by_vclass: Dict[str, Any] = {}
+    for vc in (1, 2, 3):
+        sub = seg[vclass == vc] if len(vclass) else pd.DataFrame()
+        if sub.empty:
+            continue
+        km = float(pd.to_numeric(sub["dist_km"], errors="coerce").fillna(0).sum())
+        kg = float(pd.to_numeric(sub["kg_co2"], errors="coerce").fillna(0).sum())
+        load = pd.to_numeric(sub["load_t"], errors="coerce") if "load_t" in sub.columns else pd.Series(dtype=float)
+        by_vclass[str(vc)] = {
+            "name": names[vc],
+            "segments": int(len(sub)),
+            "km": round(km, 1),
+            "km_share_pct": round(100.0 * km / total_km, 1) if total_km > 0 else None,
+            "implied_l_per_100km": round(kg / diesel_ttw / km * 100.0, 1) if km > 0 and diesel_ttw > 0 else None,
+            "avg_load_t": round(float(load.mean()), 2) if load.notna().any() else None,
+        }
+    load_tkm = 0.0
+    if "load_t" in seg.columns:
+        load_tkm = float((pd.to_numeric(seg["dist_km"], errors="coerce").fillna(0)
+                          * pd.to_numeric(seg["load_t"], errors="coerce").fillna(0)).sum())
+    months = []
+    if "month" in seg.columns:
+        months = sorted(int(m) for m in pd.to_numeric(seg["month"], errors="coerce").dropna().unique())
+    return {
+        "source": source,
+        "generated_at": _now(),
+        "segments": int(len(seg)),
+        "total_km": round(total_km, 1),
+        "e0_kg": round(total_kg, 1),
+        "plates": int(seg["plate"].nunique()) if "plate" in seg.columns else None,
+        "months": months,
+        "by_vclass": by_vclass,
+        "implied_g_per_tkm": round(total_kg / load_tkm * 1000.0, 1) if load_tkm > 0 else None,
+        "total_load_tkm": round(load_tkm, 1),
+        "diesel_ttw_kg_per_l": diesel_ttw,
+        "note": "运单为抽样数据：不推导年均里程/车；该默认值见 config/calc_factors.json（假设值）",
     }
 
 
@@ -728,6 +786,14 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
         _write_json(KPI_PATH, kpi)
         _save_parquet(ledger, LEDGER_PATH)
         _write_json(DISCLOSURE_PATH, disclosure)
+        # 车队真实统计（计算器默认值）：失败不阻断主口径（降级纪律）
+        try:
+            fleet_stats = build_fleet_stats(seg, source)
+            _write_json(FLEET_STATS_PATH, fleet_stats)
+        except Exception:
+            traceback.print_exc()
+            _write_json(FLEET_STATS_PATH, {"source": source, "error": "fleet_stats 聚合失败",
+                                           "note": "第 7/8 页将退回口径配置假设值"})
         seconds = time.perf_counter() - t0
         print("      ✓ %.2f s｜台账 %d 行｜披露 %d 要素｜kpi %d 项"
               % (seconds, len(ledger), len(SIX_DISCLOSURE), len(kpi)))

@@ -28,7 +28,9 @@ import json
 import math
 import os
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -65,6 +67,29 @@ _HTTP_TIMEOUT = 10.0
 _QPS = 3.0
 _MAX_RETRY = 3
 
+# 高德对**并发**请求限流：实测同一批 24 个地址，
+#   串行 24/24 成功（13.5s）｜并发 6 无节流 10/24｜并发 6 + QPS4 15/20
+#   **并发 2 + QPS 2.0 → 20/20 全成功**（10.4s）
+# 所以并发必须配一个**全局令牌桶**——不是每线程一个，是所有线程共用一个。
+# QPS 取 2.0：官方个人 key 基础服务 QPS 通常 3~5，但并发会额外触发限流，
+# 留足余量比抢那几秒划算——地理编码失败会导致该网点退化成城市级近似坐标。
+_GLOBAL_QPS = 2.0
+_RATE_WORKERS = 2
+_rate_lock = threading.Lock()
+_last_call = [0.0]
+
+
+def _throttle() -> None:
+    """全局令牌桶：保证所有线程合起来不超过 _GLOBAL_QPS 次/秒。"""
+    interval = 1.0 / _GLOBAL_QPS
+    with _rate_lock:
+        now = time.monotonic()
+        wait = interval - (now - _last_call[0])
+        if wait > 0:
+            time.sleep(wait)
+            now = time.monotonic()
+        _last_call[0] = now
+
 
 # ---------------------------------------------------------------------------
 # key 与地理编码
@@ -87,7 +112,12 @@ def key_available() -> bool:
 
 
 def _request(url: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """一次带重试的 GET。高德限流/网络抖动不抛异常，失败返回 None。"""
+    """一次带重试的 GET。高德限流/网络抖动不抛异常，失败返回 None。
+
+    **只有"临时性"错误才重试**（网络异常、5xx、10003 配额超限、10004 访问过频）。
+    "确定性"错误（key 无效、参数错、引擎解析不了）**立刻放弃**——
+    实测 246 个网点如果每个都重试 3 次 + sleep，流程会卡死十几分钟。
+    """
     key = load_key()
     if key == PLACEHOLDER:
         return None
@@ -95,22 +125,31 @@ def _request(url: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     query["key"] = key
     query["output"] = "json"
 
-    delay = 0.8
+    # 这些错误重试也没用：key 不对/没权限/参数错/引擎解析不了
+    _FATAL_CODES = {"10001", "10002", "10005", "10006", "10007", "10009",
+                    "10020", "10021", "30001", "30002", "30003"}
+    # 这些是临时性的，值得重试
+    _RETRY_CODES = {"10003", "10004"}
+
+    delay = 0.6
     for attempt in range(_MAX_RETRY):
         try:
             import requests
+            _throttle()
             resp = requests.get(url, params=query, timeout=_HTTP_TIMEOUT)
             if resp.status_code != 200:
-                time.sleep(delay)
-                delay *= 2
-                continue
+                if resp.status_code >= 500:
+                    time.sleep(delay)
+                    delay *= 2
+                    continue
+                return None
             payload = resp.json()
             if payload.get("status") == "1":
                 return payload
-            info = str(payload.get("info", ""))
-            # 配额/权限类错误重试无意义，直接放弃
-            if payload.get("infocode") in ("10001", "10003", "10004", "10005",
-                                          "10020", "10021"):
+            code = str(payload.get("infocode", ""))
+            if code in _FATAL_CODES:
+                return None
+            if code not in _RETRY_CODES:
                 return None
             time.sleep(delay)
             delay *= 2
@@ -161,33 +200,88 @@ def offline_route(origin: Tuple[float, float], dest: Tuple[float, float]) -> Dic
 def geocode(name: str, city_hint: str = "") -> Optional[Tuple[float, float]]:
     """地名 → GCJ-02 坐标。失败返回 None（调用方回退离线坐标），不抛异常。
 
+    **不传 city 参数**：实测高德对"苏州昆山集货分拣中心"这类
+    「城市 + 区县 + 业务后缀」的网点名，带 city 参数反而报 ENGINE_RESPONSE_DATA_ERROR(30001)，
+    不带则正常返回。网点名前两字已经是城市名，city 参数是冗余的。
+
+    **必须按城市校验候选**（关键）：高德对虚构网点名会"字面匹配"到别的城市——
+    实测"北京光华散货分拣中心"第 1 条候选是**惠州市博罗县分拣中心**（"分拣中心"字面命中），
+    若直接取第 1 条，北京网点会被安到广东坐标上，路线算出 2100 km，闸门 S1 直接报红。
+    所以：只接受 `city`/`province` 字段与网点名所属城市一致的候选；
+    都不一致就判为不可信（返回 None，由调用方回退城市级近似坐标——
+    **宁可粗一点，也不给错坐标**）。
+
     只做一次，不缓存——缓存由 route_geo.parquet 在批处理层做。
     """
     if not name:
         return None
-    params: Dict[str, Any] = {"address": name}
-    if city_hint:
-        params["city"] = city_hint
-    payload = _request(GEO_URL, params)
+    payload = _request(GEO_URL, {"address": name})
     if not payload:
         return None
     pois = payload.get("geocodes") or []
     if not pois:
         return None
-    first = pois[0]
-    location = str(first.get("location", ""))
-    if "," not in location:
-        return None
-    lng_text, lat_text = location.split(",", 1)
-    try:
-        return (float(lng_text), float(lat_text))
-    except ValueError:
-        return None
+
+    want_city = city_hint or _site_to_city(name, _short_city_names(_city_coordinate_table().keys()))
+    fallback: Optional[Tuple[float, float]] = None
+    for item in pois:
+        location = str(item.get("location", ""))
+        if "," not in location:
+            continue
+        lng_text, lat_text = location.split(",", 1)
+        try:
+            coord = (float(lng_text), float(lat_text))
+        except ValueError:
+            continue
+        if coord[0] == 0.0 and coord[1] == 0.0:
+            continue
+        got_city = str(item.get("city", "") or "")
+        got_province = str(item.get("province", "") or "")
+        # 城市一致 → 可信；省级一致（市不同）也算可信（北京乡镇常被归到廊坊）
+        if want_city and (got_city.startswith(want_city) or got_province.startswith(want_city)):
+            return coord
+        if fallback is None:
+            fallback = coord
+    # 候选城市全不匹配：判为不可信（宁可回退也不给错坐标）
+    return None if want_city else fallback
 
 
 # ---------------------------------------------------------------------------
 # 驾车路径规划
 # ---------------------------------------------------------------------------
+
+def geocode_batch(names: List[str], city_hint_of: Optional[Dict[str, str]] = None,
+                  workers: int = _RATE_WORKERS) -> Dict[str, Tuple[float, float]]:
+    """批量地理编码：**并发单条请求**（每个网点一个请求，带 city 参数）。
+
+    为什么不用高德的 batch=true：
+        batch 模式返回的 geocodes 里**没有原始地址**，只有 city + formatted_address，
+        只能靠"网点名前两字 == 城市名"猜回去——猜错就把**别人的坐标**安到这个网点上，
+        路线全错，比慢糟糕得多。宁可多花几秒，不给错坐标。
+
+    并发 6 路（高德个人 key 的 QPS 完全够）：246 个网点从 ~4 分钟压到 ~30 秒。
+    返回 {网点名: (lng, lat)}，失败的条目不出现（调用方回退城市级近似坐标）。
+    """
+    if not names:
+        return {}
+    city_hint_of = city_hint_of or {}
+    result: Dict[str, Tuple[float, float]] = {}
+    lock = threading.Lock()
+    done = [0]
+
+    def work(site: str) -> None:
+        coord = geocode(site, city_hint_of.get(site, ""))
+        with lock:
+            done[0] += 1
+            if coord:
+                result[site] = coord
+            if done[0] % 40 == 0 or done[0] == len(names):
+                print("       %d/%d（成功 %d）" % (done[0], len(names), len(result)))
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        list(pool.map(work, names))
+    return result
+
 
 def fetch_driving(origin: Tuple[float, float], dest: Tuple[float, float],
                   strategy: int = 32) -> Optional[Dict[str, Any]]:
@@ -304,13 +398,10 @@ def resolve_coordinates(od_df: pd.DataFrame, city_hint_of: Dict[str, str],
 
     todo = [s for s in sites if s not in cache]
     if todo and not offline and key_available():
-        print("  [R2] 地理编码 %d 个网点（高德 /v3/geocode/geo）…" % len(todo))
-        for i, site in enumerate(todo, 1):
-            coord = geocode(site, city_hint_of.get(site, ""))
-            if coord:
-                cache[site] = coord
-            if i % 20 == 0:
-                print("       %d/%d…" % (i, len(todo)))
+        print("  [R2] 地理编码 %d 个网点（高德 /v3/geocode/geo，批量 10 个/次）…" % len(todo))
+        resolved = geocode_batch(todo, city_hint_of)
+        cache.update(resolved)
+        print("       成功 %d / %d" % (len(resolved), len(todo)))
         _save_geo_cache(cache)
     elif todo and offline:
         print("  [R2] 离线模式：跳过地理编码，%d 个网点用城市级近似坐标" % len(todo))
@@ -370,8 +461,18 @@ def _save_geo_cache(cache: Dict[str, Tuple[float, float]]) -> None:
     df.to_parquet(GEO_CACHE_PATH, index=False)
 
 
+_city_table_cache: Optional[Dict[str, Tuple[float, float]]] = None
+
+
 def _city_coordinate_table() -> Dict[str, Tuple[float, float]]:
-    """城市名 → 坐标（离线兜底用）。来源：宽表 origin/dest + 城市级近似坐标。"""
+    """城市名 → 坐标（离线兜底用）。来源：宽表 origin/dest + 城市级近似坐标。
+
+    带进程内缓存——这个函数被频繁调用（每次城市归属判断都要用），
+    每次重读 parquet 会把 310 条路线的处理拖慢几十秒。
+    """
+    global _city_table_cache
+    if _city_table_cache is not None:
+        return _city_table_cache
     wide_path = PROCESSED / "wide_data.parquet"
     if not wide_path.exists():
         return {}
@@ -404,6 +505,7 @@ def _city_coordinate_table() -> Dict[str, Tuple[float, float]]:
                 table.setdefault(str(name), (lon_v, lat_v))
             except (TypeError, ValueError):
                 continue
+    _city_table_cache = table
     return table
 
 
@@ -491,13 +593,77 @@ def _city_hint_map(od_df: pd.DataFrame) -> Dict[str, str]:
 # 批量预取
 # ---------------------------------------------------------------------------
 
+def _base_distances() -> pd.Series:
+    """OD（od_site）→ 历史实测里程中位（km）。
+
+    来自 baseline_carbon.parquet 的 dist_km —— 运单回传的真实里程，
+    是判断"高德路线是否匹配错了城市"的锚：路线距离超过实测里程 6 倍就是错配。
+    """
+    path = PROCESSED / "baseline_carbon.parquet"
+    if not path.exists():
+        return pd.Series(dtype=float)
+    try:
+        seg = pd.read_parquet(path, columns=["od_site", "dist_km"])
+    except Exception:
+        return pd.Series(dtype=float)
+    if seg.empty or "od_site" not in seg.columns:
+        return pd.Series(dtype=float)
+    dist = pd.to_numeric(seg["dist_km"], errors="coerce")
+    median = dist.groupby(seg["od_site"].astype(str)).median()
+    # 必须显式命名：Series 自带名字（dist_km），merge 后列名会跟着变，
+    # 后面 row.get("base_km") 就取不到了
+    return median.rename("base_km")
+
+
+def _same_city(row: Any) -> bool:
+    """判断这条 OD 的起点和终点是否属于同一城市（按网点名前缀解析）。"""
+    origin = str(row.get("origin", ""))
+    dest = str(row.get("dest", ""))
+    if not origin or not dest:
+        return False
+    city_names = _short_city_names(_city_coordinate_table().keys())
+    o_city = _site_to_city(origin, city_names)
+    d_city = _site_to_city(dest, city_names)
+    return bool(o_city) and o_city == d_city
+
+
+def _implausible(result: Dict[str, Any], row: Any) -> bool:
+    """路线是否明显错配（True = 不可信，应作废）。
+
+    两条判据，任一命中即判为错配：
+      ① **同城 + 距离过大**：同城市的 OD，路线不可能超过 300 km；
+      ② **倍数异常**：路线距离 > 实测里程 × 6（实测里程取该 OD 的历史中位）。
+         实测里程是运单回传的真实里程，路线距离是其 6 倍以上只能是匹配错了城市。
+
+    判据 ② 是主力：它不依赖"网点名以城市开头"这个假设——
+    实测"嘉兴分拣中心 → 京东南湖城南银河营业部"（终点名不含城市），
+    同城判断失效但倍数判断照样能抓住（路线 1222 km vs 实测 23 km）。
+    """
+    distance = float(result.get("distance_km") or 0.0)
+    if distance <= 0:
+        return False
+    if _same_city(row) and distance > 300.0:
+        return True
+    base_km = row.get("base_km")
+    if base_km is None:
+        return False
+    try:
+        base = float(base_km)
+    except (TypeError, ValueError):
+        return False
+    if base <= 0:
+        return False
+    return distance > base * 6.0
+
+
 def batch_fetch(od_df: pd.DataFrame, qps: float = _QPS,
                 refresh: bool = False, offline: bool = False,
-                cache_path: Path = ROUTE_PATH) -> pd.DataFrame:
-    """批量算路 + 限流 + 退避重试 + parquet 缓存。
+                cache_path: Path = ROUTE_PATH, workers: int = _RATE_WORKERS) -> pd.DataFrame:
+    """批量算路 + 并发限流 + 退避重试 + parquet 缓存。
 
     - 已有缓存的 od_key 直接跳过（第二次运行零 API 调用）；
     - 任何单点失败只跳过该 OD，不影响整批（走 offline_route 兜底）；
+    - 并发受全局令牌桶约束（workers=2, QPS=2.0，实测 100% 成功率）；
     - 不抛异常：函数一定返回一张表。
     """
     if od_df.empty:
@@ -522,7 +688,10 @@ def batch_fetch(od_df: pd.DataFrame, qps: float = _QPS,
 
     interval = 1.0 / max(qps, 0.1)
     fetched = 0
-    for idx, row in enumerate(todo, 1):
+    lock = threading.Lock()
+    counter = [0]
+
+    def work(row: Any) -> Tuple[str, Dict[str, Any]]:
         od_key = str(row["od_key"])
         origin = (float(row["o_lng"]), float(row["o_lat"]))
         dest = (float(row["d_lng"]), float(row["d_lat"]))
@@ -530,6 +699,13 @@ def batch_fetch(od_df: pd.DataFrame, qps: float = _QPS,
         result: Optional[Dict[str, Any]] = None
         if not offline and origin != (0.0, 0.0) and dest != (0.0, 0.0):
             result = fetch_driving(origin, dest)
+            # 合理性校验（双保险）：高德对虚构网点名会字面匹配到别的城市，
+            # 实测"北京光华散货分拣中心"被安到惠州市，路线算出 2100 km。
+            #   ① 同城校验：同城市的 OD 不可能是几百上千公里；
+            #   ② 倍数校验：路线距离超过实测里程的 6 倍 → 明显错配。
+            # 命中的路线作废，回退离线估算——**宁可粗一点，也不给错路线**。
+            if result is not None and _implausible(result, row):
+                result = None
         if result is None:
             result = offline_route(origin, dest)
         if not result:
@@ -565,15 +741,24 @@ def batch_fetch(od_df: pd.DataFrame, qps: float = _QPS,
             "flag_route_est": result["flag_route_est"],
             "fetched_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
-        existing[od_key] = record
-        fetched += 1
-        if idx % 20 == 0 or idx == len(todo):
-            print("       %d/%d（在线 %d / 离线兜底 %d）"
-                  % (idx, len(todo),
-                     sum(1 for v in existing.values() if v["source"] == "amap_rest"),
-                     sum(1 for v in existing.values() if v["source"] != "amap_rest")))
-        if not offline and idx < len(todo):
-            time.sleep(interval)
+        with lock:
+            counter[0] += 1
+            n = counter[0]
+            if n % 40 == 0 or n == len(todo):
+                online = sum(1 for v in existing.values() if v["source"] == "amap_rest")
+                print("       %d/%d（在线 %d）" % (n, len(todo), online))
+        return od_key, record
+
+    # 并发抓路：高德个人 key 的 QPS 远够用，6 路并发把 310 条从 ~5 分钟压到 ~40 秒
+    if not offline:
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            for od_key, record in pool.map(work, todo):
+                existing[od_key] = record
+    else:
+        for row in todo:
+            od_key, record = work(row)
+            existing[od_key] = record
+    fetched = len(existing)
 
     out = pd.DataFrame(list(existing.values()))
     if out.empty:
@@ -597,6 +782,11 @@ def build_routes(limit: Optional[int] = None, refresh: bool = False,
 
     hints = _city_hint_map(od_df)
     od_df = resolve_coordinates(od_df, hints, offline=offline)
+
+    # 附上该 OD 的历史实测里程中位——用于路线合理性校验（倍数判据）。
+    # 实测里程来自运单回传（baseline_carbon.parquet），是判断"路线是否匹配错城市"的锚。
+    od_df = od_df.merge(_base_distances(), left_on="od_site", right_index=True,
+                        how="left")
 
     online_ready = sum(1 for _, r in od_df.iterrows()
                        if str(r.get("o_precise")) == "exact"

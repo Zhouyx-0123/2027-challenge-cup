@@ -89,6 +89,11 @@ python -m venv .venv
 
 pip install -r requirements.txt
 
+python -m tools.launch       # ★ 一键：环境自检 → 一键复算 → 打开五页
+                             #   浏览器访问 http://localhost:8501
+                             #   Windows 可直接双击「启动.bat」，macOS 双击「启动.command」
+
+# 下面两条是 launch 内部做的事，需要单独调时用：
 python -m src.pipeline      # 一键复算：宽表 → 段表 → 热点/方案 → 台账/披露/闸门
 streamlit run app/app.py    # 只读结果表，打开五页
 
@@ -97,11 +102,21 @@ python -m src.pipeline --strict            # 真实数据全绿；演示数据�
 python -m src.pipeline --simulate-fail 2   # 期望打印“第 2 段失败”，退出码 1
 ```
 
+> **`tools/launch.py` 是演示入口**：`src/pipeline.py` 是引擎（算），`tools/launch.py` 是入口（跑）。
+> 启动器**任何一步失败都不阻断启动**——缺依赖会先尝试安装，缺高德 key 自动走离线降级，
+> 缺结果表会提示先跑 pipeline。答辩现场用陌生电脑也不至于白屏。
+> 完整运行手册见 `docs/27_项目运行手册.md`。
+
 > 当前 `data/raw` 已放附件1/附件2，运行即实测模式；把附件移走则自动回退 6,000 行演示样本。
 > 真实数据的 Sheet 结构、去重键、75 车型映射见 `docs/21_真实数据表结构与接入记录.md`。
 >
 > **当前真实数据**：`python -m src.pipeline` 退出码 **0**，闸门 PASS 22 / FAIL 0。
 > E₀ 4,502,042.41 kg 精确；均速 49.51 对官方速度文件 49.57 在 ±0.1 内，已在说明列标注。
+>
+> **高德地图（T7，可选）**：配好 `config/amap_*` 三把 key 后，
+> `python -m tools.route_fetch` 预取 310 条真路线（已入库，团队共享），
+> 第 3 页出现「动态路线」区块（高德真底图 + 路径级碳-成本联合决策）。
+> 没配 key 也能演示——自动回退 Plotly 离线底图。详见 `config/README.md`。
 
 ## 五、数据（永不入库）
 

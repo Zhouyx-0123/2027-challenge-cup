@@ -113,7 +113,13 @@ def _write(path: Path, value: str) -> None:
 
 
 def verify_web_key() -> Tuple[bool, str]:
-    """真调一次高德 REST，验证 Web 服务 key 有效。"""
+    """真调一次高德 REST，验证 Web 服务 key 有效。
+
+    高德的错误码能精确区分病因，这是排障的关键：
+      10001 INVALID_USER_KEY      → 服务端**查不到**这把 key：填错位了 / 复制错列 / key 不存在
+      10009 USERKEY_PLAT_NOMATCH  → 服务端认得它，但**平台不对**（这是把 JS API key 填来了）
+      10000 OK                    → 正确
+    """
     key = _read(WEB_KEY_PATH)
     if not key or key.startswith(PLACEHOLDER):
         return False, "未配置"
@@ -125,16 +131,27 @@ def verify_web_key() -> Tuple[bool, str]:
             timeout=10,
         )
         data = resp.json()
+        code = str(data.get("infocode", ""))
         if data.get("status") == "1":
             loc = (data.get("geocodes") or [{}])[0].get("location", "?")
             return True, "调用成功（天安门 → %s）" % loc
-        return False, "调用失败：%s（%s）" % (data.get("info", "?"), data.get("infocode", "?"))
+        if code == "10009":
+            return False, ("这把是【Web 端(JS API)】的 key，填错文件了——"
+                           "应放到 amap_js_key.txt")
+        if code == "10001":
+            return False, ("服务端查不到这把 key——多半是把『安全密钥』当 key 复制了，"
+                           "或复制了别的列。请到控制台核对【Web 服务】那一行的 Key 列")
+        return False, "调用失败：%s（%s）" % (data.get("info", "?"), code or "?")
     except Exception as exc:
         return False, "网络异常：%s" % exc
 
 
 def verify_js_key() -> Tuple[bool, str]:
-    """JS key 只能做格式与顺序检查（真正渲染要开浏览器）。"""
+    """JS key：格式检查 + 交叉验证。
+
+    交叉验证的办法：把 JS key 打到 REST，若返回 10009（平台不匹配），
+    反而证明**服务端认得它、且它确实是 JS 平台绑定的 key**——这是最可靠的离线验证。
+    """
     key = _read(JS_KEY_PATH)
     code = _read(JS_CODE_PATH)
     if not key or key.startswith(PLACEHOLDER):
@@ -143,7 +160,23 @@ def verify_js_key() -> Tuple[bool, str]:
         return False, "key 已填但缺安全密钥（JS API 强制，缺了会白屏）"
     if key == code:
         return False, "两个文件内容相同——多半复制错列了，安全密钥和 key 是两串不同的值"
-    return True, "格式正确（key 与安全密钥已区分）"
+    try:
+        import requests
+        resp = requests.get(
+            "https://rest.amap.com/v3/geocode/geo",
+            params={"key": key, "address": "北京市", "output": "json"},
+            timeout=10,
+        )
+        data = resp.json()
+        code_str = str(data.get("infocode", ""))
+        if code_str == "10009":
+            return True, "服务端已识别（JS 平台绑定，正确）｜key 与安全密钥已区分"
+        if data.get("status") == "1":
+            return False, ("这把其实是【Web 服务】key——应放到 amap_key.txt；"
+                           "JS API 位置需要另建一把【Web 端(JS API)】key")
+        return True, "格式正确｜key 与安全密钥已区分（交叉验证未通过，请人工确认）"
+    except Exception:
+        return True, "格式正确（key 与安全密钥已区分；交叉验证因网络未跑）"
 
 
 def main(argv: Optional[List[str]] = None) -> int:

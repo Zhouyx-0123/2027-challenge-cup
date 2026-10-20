@@ -390,7 +390,15 @@ div[data-testid="stDataFrame"] table { font-variant-numeric: tabular-nums; }
 .cm-gate-skip { color: var(--muted); font-weight: 600; }
 
 /* ---------- 侧边栏品牌/导航 ---------- */
-div[data-testid="stSidebarNav"] { display: none; }
+section[data-testid="stSidebar"] div[data-testid="stSidebarNav"],
+section[data-testid="stSidebar"] nav[data-testid="stSidebarNav"],
+section[data-testid="stSidebar"] div[data-testid="stSidebarNavItems"],
+div[data-testid="stSidebarNav"] {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
 section[data-testid="stSidebar"] {
   background: #080C11;
   border-right: 1px solid var(--line);
@@ -506,12 +514,15 @@ div[data-testid="stNumberInput"] input {
 """
 
 
+_CSS_VERSION = "enterprise-2026-10-20"
+
+
 def inject() -> None:
-    """注入全局样式。每个页面在 setup() 之后调用一次，重复调用无副作用。"""
-    if st.session_state.get("_cm_css_injected"):
+    """注入全局样式；版本变了会重新注入，避免旧 CSS 缓存。"""
+    if st.session_state.get("_cm_css_version") == _CSS_VERSION:
         return
     st.markdown(CSS, unsafe_allow_html=True)
-    st.session_state["_cm_css_injected"] = True
+    st.session_state["_cm_css_version"] = _CSS_VERSION
 
 
 def hero(title: str, subtitle: str, kicker: str = "CARBON LEDGER",

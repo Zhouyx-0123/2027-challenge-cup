@@ -35,6 +35,7 @@ data/processed/route_geo.parquet
 
 # ===== 离线包与产物 =====
 wheels/
+outputs/
 outputs/figures/
 outputs/tables/
 db/

@@ -47,6 +47,11 @@ RUN_LOG_PATH = PROCESSED / "run_log.json"
 SOURCE_PATH = PROCESSED / "_source.json"
 MOCK_FLAG = PROCESSED / "_mock.flag"
 
+# T7 · 路线情景（可选段，docs/23 §6.3）
+ROUTE_PATH = PROCESSED / "route_od.parquet"
+ROUTE_CARBON_PATH = PROCESSED / "route_carbon.parquet"
+ROUTE_SELECT_PATH = PROCESSED / "route_select.parquet"
+
 ACCOUNTING_DATE = "2026-11-01"
 BOUNDARY = "自营公路运输 · 范围一（移动源燃烧）"
 ANNUAL_FACTOR = 3.0417  # 365 / 120
@@ -156,7 +161,7 @@ def _fmt(value: Any, unit: str = "") -> str:
 
 
 def _status_icon(status: str) -> str:
-    return {"PASS": "✓", "FAIL": "✗", "SKIP": "⏭"}.get(status, "?")
+    return {"PASS": "✓", "FAIL": "✗", "SKIP": "⏭", "WARN": "⚠"}.get(status, "?")
 
 
 # ---------------------------------------------------------------------------
@@ -498,6 +503,90 @@ def _structural_items(wide: pd.DataFrame, seg: pd.DataFrame, schemes: pd.DataFra
     return items
 
 
+def _route_items() -> List[Dict[str, Any]]:
+    """T7 · 路线情景软校验 S1–S3（仅在 route_od.parquet 存在时启用）。
+
+    这三项**不参与退出码判定**（避免 L1 情景问题拖垮 L0 主口径），
+    但结论照常写进 gate_report.json，答辩时可现场翻出来看。
+
+    S1 路线距离 vs 实测里程：中位 |Δ|/km ≤ 10%     —— 防止路线数据源错乱
+    S2 路线碳 vs 基准碳：同向偏差、无系统性漂移    —— 防止因子口径串味
+    S3 热点 OD 缓存率 ≥ 95%                       —— 防止"看起来有路线其实没数据"
+    """
+    items: List[Dict[str, Any]] = []
+    if not ROUTE_PATH.exists():
+        return items
+
+    route = _read_parquet(ROUTE_PATH)
+    seg = _read_parquet(SEG_PATH)
+    if route.empty or seg.empty:
+        return items
+
+    # ---- S1：路线距离 vs 宽表实测里程 ----
+    s1_status, s1_detail = "SKIP", "路线表或段表为空"
+    if "distance_km" in route.columns:
+        rdist = pd.to_numeric(route["distance_km"], errors="coerce")
+        valid = rdist > 0
+        if valid.any():
+            # 与段表按 OD 聚合对比（同 OD 的路线距离 vs 实测里程中位）
+            merged = seg.merge(route[["od_site", "distance_km"]],
+                                left_on="od_site", right_on="od_site", how="inner")
+            if not merged.empty:
+                base = pd.to_numeric(merged["dist_km"], errors="coerce")
+                line = pd.to_numeric(merged["distance_km"], errors="coerce")
+                mask = (base > 0) & (line > 0)
+                if mask.any():
+                    rel = ((line[mask] - base[mask]).abs() / base[mask]) * 100.0
+                    med = float(rel.median())
+                    s1_status = "PASS" if med <= 10.0 else "FAIL"
+                    s1_detail = "中位 |Δ|/km = %.2f%%（目标 ≤10%%，比对 %d 段）" % (med, int(mask.sum()))
+                else:
+                    s1_detail = "无可比段"
+            else:
+                s1_detail = "OD 未对齐"
+    items.append({"id": "S1", "label": "路线距离 vs 实测里程", "stage": "route",
+                  "status": s1_status, "detail": s1_detail})
+
+    # ---- S2：路线碳 vs 基准碳（同 OD 聚合，双向偏差不得系统性漂移） ----
+    s2_status, s2_detail = "SKIP", "路线情景表未生成"
+    if ROUTE_CARBON_PATH.exists():
+        rc = _read_parquet(ROUTE_CARBON_PATH)
+        if not rc.empty and "kg_co2_route_legal" in rc.columns and "flag_route_hit" in rc.columns:
+            hit = rc[rc["flag_route_hit"] == 1]
+            if not hit.empty:
+                base = pd.to_numeric(hit["kg_co2"], errors="coerce")
+                line = pd.to_numeric(hit["kg_co2_route_legal"], errors="coerce")
+                mask = (base > 0) & (line > 0)
+                if mask.any():
+                    rel = ((line[mask] - base[mask]) / base[mask]) * 100.0
+                    med = float(rel.median())
+                    # 只判"系统性漂移"：中位偏差超过 ±50% 才算口径串味
+                    s2_status = "PASS" if abs(med) <= 50.0 else "FAIL"
+                    s2_detail = "中位偏差 %+.2f%%（阈值 ±50%%，比对 %d 段）" % (med, int(mask.sum()))
+                else:
+                    s2_detail = "无可比段"
+            else:
+                s2_detail = "无命中段"
+    items.append({"id": "S2", "label": "路线碳 vs 基准碳（无系统漂移）", "stage": "route",
+                  "status": s2_status, "detail": s2_detail})
+
+    # ---- S3：热点 OD 缓存率 ----
+    s3_status, s3_detail = "SKIP", "路线表为空"
+    if not route.empty:
+        total = len(route)
+        hit = int((pd.to_numeric(route.get("flag_route_est", pd.Series(dtype=int)),
+                                 errors="coerce").fillna(1) == 0).sum())
+        rate = 100.0 * hit / max(total, 1)
+        # 真路线占比；离线兜底不算"已缓存真路线"，但也不阻断
+        s3_status = "PASS" if rate >= 95.0 else "WARN"
+        s3_detail = "真路线 %d / %d（%.1f%%，目标 ≥95%%）；其余为离线兜底或坐标缺失" % (
+            hit, total, rate)
+    items.append({"id": "S3", "label": "热点 OD 真路线覆盖率", "stage": "route",
+                  "status": s3_status, "detail": s3_detail})
+
+    return items
+
+
 def run_gate(strict: bool = False) -> Dict[str, Any]:
     source = str(_read_json(SOURCE_PATH).get("source", "unknown"))
     mode = "strict" if strict else ("real" if source == "real" else "demo")
@@ -514,6 +603,7 @@ def run_gate(strict: bool = False) -> Dict[str, Any]:
     targets = _target_items(kpi, schemes, "demo" if mode == "strict" and source != "real" else mode, strict)
     structural = _structural_items(wide, seg, schemes, hotspots, band, ledger,
                                    disclosure, kpi, quality, source)
+    route_items = _route_items()
     counts = {
         "pass": sum(1 for x in targets + structural if x["status"] == "PASS"),
         "fail": sum(1 for x in targets + structural if x["status"] == "FAIL"),
@@ -526,6 +616,7 @@ def run_gate(strict: bool = False) -> Dict[str, Any]:
         "passed": counts["fail"] == 0,
         "targets": targets,
         "structural": structural,
+        "route_checks": route_items,
         "counts": counts,
     }
     _write_json(GATE_PATH, report)
@@ -552,6 +643,13 @@ def _print_gate(report: Dict[str, Any]) -> None:
     print("  结构项：%d / %d 通过" % (total - len(bad), total))
     for item in bad:
         print("    ✗ %s：%s" % (item["label"], item.get("detail", "")))
+    route_items = report.get("route_checks", [])
+    if route_items:
+        print("  路线情景软校验（T7 · 不参与退出码）：")
+        for item in route_items:
+            print("    %s %-4s %s：%s"
+                  % (_status_icon(item["status"]), item["status"],
+                     item["label"], item.get("detail", "")))
     counts = report.get("counts", {})
     print("  汇总：PASS %s｜FAIL %s｜SKIP %s"
           % (counts.get("pass", 0), counts.get("fail", 0), counts.get("skip", 0)))
@@ -563,7 +661,8 @@ def _print_gate(report: Dict[str, Any]) -> None:
 # G5 · 一键入口
 # ---------------------------------------------------------------------------
 
-def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None) -> int:
+def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
+                with_routes: bool = False) -> int:
     run_log: Dict[str, Any] = {
         "generated_at": _now(),
         "source": "unknown",
@@ -627,6 +726,39 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None) -> i
         run_log["source"] = str(_read_json(SOURCE_PATH).get("source", "unknown"))
         return _fail(run_log, "第 4 段 ④ 报表段", "%s: %s" % (type(exc).__name__, exc))
 
+    # T7 · 路线情景（可选段）：route_od.parquet 存在才跑，不存在打印 SKIP
+    if with_routes:
+        print("\n[5/5] ⑤ 路线情景段（T7 · L1/L2 口径）")
+        t0 = time.perf_counter()
+        try:
+            if not ROUTE_PATH.exists():
+                print("      ⏭ SKIP：未找到 route_od.parquet"
+                      "（先跑 python -m tools.route_fetch）——主口径不受影响")
+                run_log["stages"].append({
+                    "key": "routes", "name": "⑤ 路线情景段（T7）",
+                    "status": "skip", "seconds": 0.0,
+                    "error": "缺少 route_od.parquet",
+                })
+            else:
+                optimizer.build_routes()
+                seconds = time.perf_counter() - t0
+                print("      ✓ %.2f s｜路线情景表已更新" % seconds)
+                run_log["stages"].append({
+                    "key": "routes", "name": "⑤ 路线情景段（T7）",
+                    "status": "ok", "seconds": round(seconds, 3), "error": "",
+                })
+        except Exception as exc:
+            seconds = time.perf_counter() - t0
+            print("      ✗ 第 5 段失败：⑤ 路线情景段")
+            traceback.print_exc()
+            run_log["stages"].append({
+                "key": "routes", "name": "⑤ 路线情景段（T7）",
+                "status": "fail", "seconds": round(seconds, 3),
+                "error": "%s: %s" % (type(exc).__name__, exc),
+            })
+            # 可选段失败**不阻断**主流程：L0 主口径照常出结果（降级纪律）
+            print("      ⚠ 路线情景段失败，但主口径不受影响——继续出闸门结论")
+
     # 演示标记：前端据此显示“演示数据”
     if source == "real":
         try:
@@ -667,8 +799,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="严格模式：演示数据也强制对拍七个数（用于验证闸门会红）")
     parser.add_argument("--simulate-fail", type=int, choices=[1, 2, 3], default=None,
                         help="验收自测：模拟第 N 段失败（G1 定位段名）")
+    parser.add_argument("--with-routes", action="store_true",
+                        help="启用 T7 路线情景段（需先跑 python -m tools.route_fetch）")
     args = parser.parse_args(argv)
-    return run_pipeline(strict=args.strict, simulate_fail=args.simulate_fail)
+    return run_pipeline(strict=args.strict, simulate_fail=args.simulate_fail,
+                        with_routes=args.with_routes)
 
 
 if __name__ == "__main__":

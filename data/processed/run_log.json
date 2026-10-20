@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-19T22:09:15",
+  "generated_at": "2026-10-20T14:36:46",
   "source": "real",
   "mode": "auto",
   "stages": [
@@ -7,7 +7,7 @@
       "key": "preprocess",
       "name": "① 数据层 preprocess.py",
       "status": "ok",
-      "seconds": 4.013,
+      "seconds": 3.875,
       "error": ""
     },
     {
@@ -21,14 +21,21 @@
       "key": "evaluator",
       "name": "③ 分析层 evaluator.py",
       "status": "ok",
-      "seconds": 0.121,
+      "seconds": 0.149,
       "error": ""
     },
     {
       "key": "reports",
       "name": "④ 报表段（G3 台账 + G4 披露）",
       "status": "ok",
-      "seconds": 0.044,
+      "seconds": 0.034,
+      "error": ""
+    },
+    {
+      "key": "routes",
+      "name": "⑤ 路线情景段（T7）",
+      "status": "ok",
+      "seconds": 1.669,
       "error": ""
     }
   ],
@@ -39,5 +46,5 @@
     "fail": 0,
     "skip": 0
   },
-  "total_seconds": 4.359
+  "total_seconds": 5.957
 }

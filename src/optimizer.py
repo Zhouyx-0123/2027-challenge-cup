@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -200,6 +200,300 @@ def build_baseline() -> pd.DataFrame:
     return out
 
 
+# ---------------------------------------------------------------------------
+# O8 · 路线情景（L1/L2）——只读结果表，不动 L0
+# ---------------------------------------------------------------------------
+#
+# 口径分层（docs/23 §6.1）：
+#   L0 基准核算 = 宽表实测里程 × 因子        → E₀ = 4,502,042.41 kg，**永不动**
+#   L1 路线情景 = 高德路线距离/时长 × 同一因子 → 只做差量分析，不覆盖 E₀
+#   L2 λ 决策   = L1 + 运营成本 + λ          → 回答"λ 一动推荐换不换"
+#
+# 为什么可以放在 optimizer：
+#   因子是口径、路线碳排仍然属于"算碳"，所以路线碳核算留在引擎层，
+#   保持"核心算法只看结果表"的边界（前端只读 parquet，零计算）。
+
+ROUTE_PATH = PROCESSED_DIR / "route_od.parquet"
+
+# 展示口径常量（不是业务口径——页面上必须标注"展示口径"）
+TIME_VALUE_YUAN_PER_HOUR = 200.0   # 司机工时成本假设
+ENERGY_PRICE_YUAN_PER_KWH = 0.8    # 电价假设
+DIESEL_PRICE_YUAN_PER_L = 7.5      # 柴油价假设
+
+
+def _route_index(route: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
+    """od_key → 路线记录（后出现的覆盖先出现的，与 preprocess 的取数口径一致）。
+
+    连接键说明：段表里 `od_key` 是**城市级**（"上海|深圳"），`od_site` 才是**网点级**
+    （"上海茸华路营业部|上海车墩集货分拣中心"）。路线表是网点级的，所以这里
+    **优先用 od_site 匹配**，od_site 缺失时回退 od_key——保证 310 个热点 OD 全命中。
+    """
+    index: Dict[str, Dict[str, Any]] = {}
+    if route is None or route.empty:
+        return index
+    for _, r in route.iterrows():
+        record = r.to_dict()
+        for key_col in ("od_site", "od_key"):
+            value = record.get(key_col)
+            if value is None or str(value) in ("", "nan"):
+                continue
+            index[str(value)] = record
+    return index
+
+
+def _segment_join_key(seg: pd.DataFrame) -> pd.Series:
+    """段表的路线连接键：优先 od_site（网点级），缺失回退 od_key（城市级）。"""
+    if "od_site" in seg.columns:
+        keys = seg["od_site"].astype(str)
+        if "od_key" in seg.columns:
+            fallback = seg["od_key"].astype(str)
+            keys = keys.where((keys != "") & (keys != "nan"), fallback)
+        return keys
+    if "od_key" in seg.columns:
+        return seg["od_key"].astype(str)
+    return pd.Series([""] * len(seg), index=seg.index)
+
+
+def route_carbon(seg: pd.DataFrame, route: pd.DataFrame) -> pd.DataFrame:
+    """路线情景双轨碳核算（L1）。
+
+    输入：段表 baseline_carbon + 路线表 route_od
+    输出：在段表上追加列（**不修改任何原有列**，L0 主口径不动）：
+        route_km / route_min      该段所在 OD 的路线距离/时长（缺失回退宽表值 + flag_route_est）
+        kg_co2_route_legal        法定轨 = route_km × factor_gkm（常因子，口径不变）
+        kg_co2_route_phys         物理轨 = 用路线平均速度 → VSP 档位 → er_gs × 时长积分
+        delta_pct_route           路线情景 vs 宽表基准的双轨偏差（正负都保留）
+        flag_route_est            1 = 该段路线为离线估算或未命中
+
+    因子仍从 FACTOR_BY_CLASS_LOAD 查——"因子是口径不是数据"的边界不变。
+    """
+    if seg is None or seg.empty:
+        return seg.copy() if seg is not None else pd.DataFrame()
+
+    out = seg.copy()
+    index = _route_index(route)
+
+    if "od_key" not in out.columns and "od_site" not in out.columns:
+        out["route_km"] = np.nan
+        out["route_min"] = np.nan
+        out["kg_co2_route_legal"] = np.nan
+        out["kg_co2_route_phys"] = np.nan
+        out["delta_pct_route"] = np.nan
+        out["flag_route_est"] = 1
+        return out
+
+    base_km = pd.to_numeric(out.get("dist_km", pd.Series(dtype=float)), errors="coerce")
+    factor = pd.to_numeric(out.get("factor_gkm", pd.Series(dtype=float)), errors="coerce")
+    speed = pd.to_numeric(out.get("speed_kmh", pd.Series(dtype=float)), errors="coerce")
+    load = pd.to_numeric(out.get("load_t", pd.Series(dtype=float)), errors="coerce")
+
+    n = len(out)
+    route_km = np.zeros(n, dtype=float)
+    route_min = np.zeros(n, dtype=float)
+    flag_est = np.ones(n, dtype=int)
+    flag_hit = np.zeros(n, dtype=int)
+
+    join_keys = _segment_join_key(out).tolist()
+    for i, join_key in enumerate(join_keys):
+        rec = index.get(str(join_key))
+        if not rec:
+            # 未命中路线表：回退宽表实测里程，标为估算
+            route_km[i] = float(base_km.iloc[i]) if i < len(base_km) and pd.notna(base_km.iloc[i]) else 0.0
+            route_min[i] = 0.0
+            continue
+        flag_hit[i] = 1
+        km = pd.to_numeric(pd.Series([rec.get("distance_km")]), errors="coerce").iloc[0]
+        minutes = pd.to_numeric(pd.Series([rec.get("duration_min")]), errors="coerce").iloc[0]
+        if pd.isna(km) or km <= 0:
+            route_km[i] = float(base_km.iloc[i]) if i < len(base_km) and pd.notna(base_km.iloc[i]) else 0.0
+            flag_est[i] = 1
+        else:
+            route_km[i] = float(km)
+        route_min[i] = float(minutes) if (minutes is not None and not pd.isna(minutes)) else 0.0
+        # 该 OD 的路线是离线兜底（haversine 估算）→ 本段也是估算
+        flag_est[i] = int(rec.get("flag_route_est", 0) or 0)
+        if route_min[i] <= 0 and route_km[i] > 0:
+            # 时长缺失：按 50 km/h 行业均速反推（与 tools/route_fetch 离线兜底同口径）
+            route_min[i] = route_km[i] / INDUSTRY_SPEED_KMH * 60.0
+            flag_est[i] = 1
+
+    route_km_arr = np.asarray(route_km, dtype=float)
+    route_min_arr = np.asarray(route_min, dtype=float)
+
+    # 法定轨：路线距离 × 同一因子
+    kg_legal = factor.fillna(0.0).to_numpy(dtype=float) * route_km_arr / 1000.0
+
+    # 物理轨：路线平均速度 → VSP 档位 → er_gs × 行驶秒数
+    route_speed = np.divide(route_km_arr, route_min_arr / 60.0,
+                            out=np.full(n, INDUSTRY_SPEED_KMH, dtype=float),
+                            where=route_min_arr > 0)
+    route_speed = np.clip(route_speed, 1.0, 130.0)
+    vsp = np.clip(1.0 + (route_speed - 30.0) / 20.0, 0.0, 4.0)
+    er = factor.fillna(0.0).to_numpy(dtype=float) / 72.0 * np.interp(vsp, VSP_X, VSP_MULT)
+    kg_phys = er * (route_min_arr / 60.0) * SECONDS_PER_HOUR / 1000.0
+
+    # 与 L0 基准的差量（正负都保留——差值本身是信息，不是误差）
+    kg_base = pd.to_numeric(out.get("kg_co2", pd.Series(dtype=float)), errors="coerce").fillna(0.0).to_numpy(dtype=float)
+    delta_route = np.where(kg_base > 0, (kg_legal - kg_base) / kg_base * 100.0, 0.0)
+
+    out["route_km"] = np.round(route_km_arr, 4)
+    out["route_min"] = np.round(route_min_arr, 2)
+    out["kg_co2_route_legal"] = np.round(kg_legal, 6)
+    out["kg_co2_route_phys"] = np.round(kg_phys, 6)
+    out["delta_pct_route"] = np.round(delta_route, 4)
+    out["flag_route_hit"] = flag_hit
+    out["flag_route_est"] = flag_est
+    return out
+
+
+def route_select_by_lambda(seg: pd.DataFrame, route: pd.DataFrame,
+                           lam: float = 100.0) -> pd.DataFrame:
+    """L2 · λ 联合目标：选路线/选车型。
+
+    score = 运营成本(元) + λ × 碳排(t)
+      运营成本 = 能耗成本(油/电) + 过路费 + 时间成本(路线时长 × 时薪假设)
+
+    输出每 OD 的最优选择，λ 变则推荐变——这就是首页旋钮的落地点。
+    **全部标注为展示口径**：时薪/油价/电价是假设值，不是业务口径。
+
+    车型候选来自段表里实际跑过的车型（同一 OD 的历史车型池），
+    碳排按 factor_lookup(载重档) × 路线距离估算，时间成本按路线时长。
+    """
+    if seg is None or seg.empty or ("od_key" not in seg.columns and "od_site" not in seg.columns):
+        return pd.DataFrame()
+
+    index = _route_index(route)
+    lam = float(lam or 0.0)
+
+    work = seg.copy()
+    work["_route_join_key"] = _segment_join_key(seg)
+
+    rows: List[Dict[str, Any]] = []
+    grouped = work.groupby("_route_join_key", sort=False)
+    for od_key, sub in grouped:
+        rec = index.get(str(od_key))
+        if not rec:
+            continue
+        km = pd.to_numeric(pd.Series([rec.get("distance_km")]), errors="coerce").iloc[0]
+        minutes = pd.to_numeric(pd.Series([rec.get("duration_min")]), errors="coerce").iloc[0]
+        if pd.isna(km) or km <= 0:
+            continue
+        if pd.isna(minutes) or minutes <= 0:
+            minutes = float(km) / INDUSTRY_SPEED_KMH * 60.0
+        toll = float(rec.get("toll_yuan") or 0.0)
+
+        best: Optional[Dict[str, Any]] = None
+        candidates = sub.groupby("vehicle_type", sort=False).agg(
+            load_t=("load_t", "mean"),
+            n=("kg_co2", "size"),
+        ).reset_index()
+        for _, cand in candidates.iterrows():
+            load_v = float(cand["load_t"]) if pd.notna(cand["load_t"]) else 12.0
+            factor = float(factor_lookup(load_v))
+            kg = factor * float(km) / 1000.0
+            # 能耗成本：柴油按里程油耗假设，电车按电耗假设（均为展示口径）
+            if "电" in str(cand["vehicle_type"]):
+                kwh = float(km) * 0.9
+                energy = kwh * ENERGY_PRICE_YUAN_PER_KWH
+            else:
+                liters = float(km) * 0.35
+                energy = liters * DIESEL_PRICE_YUAN_PER_L
+            time_cost = float(minutes) / 60.0 * TIME_VALUE_YUAN_PER_HOUR
+            opex = energy + toll + time_cost
+            carbon_cost = kg / 1000.0 * lam
+            score = opex + carbon_cost
+            record = {
+                "od_key": str(od_key),
+                "vehicle_type": str(cand["vehicle_type"]),
+                "load_t": round(load_v, 2),
+                "route_km": round(float(km), 3),
+                "route_min": round(float(minutes), 2),
+                "toll_yuan": round(toll, 2),
+                "kg_co2_route": round(kg, 3),
+                "opex_yuan": round(opex, 2),
+                "carbon_cost_yuan": round(carbon_cost, 2),
+                "score_yuan": round(score, 2),
+                "flag_route_est": int(rec.get("flag_route_est", 0) or 0),
+            }
+            if best is None or record["score_yuan"] < best["score_yuan"]:
+                best = record
+        if best is not None:
+            best["od_pair"] = str(rec.get("od_pair") or "")
+            best["origin"] = str(rec.get("origin") or "")
+            best["dest"] = str(rec.get("dest") or "")
+            rows.append(best)
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    return out.sort_values("score_yuan").reset_index(drop=True)
+
+
+def route_constraint(route_km: float, available_range_km: float,
+                     charging_ok: bool = True) -> Dict[str, Any]:
+    """C1/C4 约束校验：路线距离直接挂钩。
+
+    规则文本见 docs/20 §7：
+      C1 续航：线路里程 ≤ 可用续航 × 0.8
+      C4 补能：线路 30 km 缓冲区内有站（charging_ok 由调用方给，本函数不查站）
+
+    返回结论字段，**不在前端重算**（页面只读结论列）。
+    """
+    route_km = float(route_km or 0.0)
+    available_range_km = float(available_range_km or 0.0)
+    usable = available_range_km * 0.8
+    c1_ok = route_km <= usable if usable > 0 else False
+    gap = max(route_km - usable, 0.0)
+    return {
+        "c1_range_ok": bool(c1_ok),
+        "c1_gap_km": round(gap, 2),
+        "c4_charging_ok": bool(charging_ok),
+        "constraint_status": "pass" if (c1_ok and charging_ok) else "fail",
+        "constraint_note": (
+            "C1 续航达标（%.1f ≤ %.1f km）" % (route_km, usable)
+            if c1_ok else "C1 续航不达标，缺口 %.1f km" % gap
+        ) + ("；C4 补能可达" if charging_ok else "；C4 补能不可达"),
+    }
+
+
+def build_routes() -> pd.DataFrame:
+    """O8 落库：读 route_od.parquet + 段表 → route_carbon.parquet + route_select.parquet。
+
+    只在 route_od.parquet 存在时跑；不存在直接返回空表（pipeline 打印 SKIP）。
+    """
+    if not ROUTE_PATH.exists():
+        return pd.DataFrame()
+    if not BASELINE_PATH.exists():
+        return pd.DataFrame()
+
+    seg = pd.read_parquet(BASELINE_PATH)
+    route = pd.read_parquet(ROUTE_PATH)
+
+    enriched = route_carbon(seg, route)
+    out_path = PROCESSED_DIR / "route_carbon.parquet"
+    _save_parquet(enriched, out_path)
+
+    selected = route_select_by_lambda(enriched, route, lam=100.0)
+    sel_path = PROCESSED_DIR / "route_select.parquet"
+    if not selected.empty:
+        _save_parquet(selected, sel_path)
+
+    n_est = int(enriched["flag_route_est"].sum()) if "flag_route_est" in enriched.columns else 0
+    print("  [O8] 路线情景落盘：%s（%d 段，其中估算 %d 段）"
+          % (out_path.name, len(enriched), n_est))
+    if "route_km" in enriched.columns and "dist_km" in enriched.columns:
+        delta = (pd.to_numeric(enriched["route_km"], errors="coerce")
+                 - pd.to_numeric(enriched["dist_km"], errors="coerce"))
+        base = pd.to_numeric(enriched["dist_km"], errors="coerce")
+        valid = base > 0
+        if valid.any():
+            med = float((delta[valid].abs() / base[valid]).median() * 100.0)
+            print("       路线距离 vs 实测里程：中位 |Δ|/km = %.2f%%（闸门 S1 目标 ≤10%%）" % med)
+    if not selected.empty:
+        print("  [O8] λ=100 推荐落盘：%s（%d 个 OD）" % (sel_path.name, len(selected)))
+    return enriched
+
+
 if __name__ == "__main__":
     print("=" * 78)
     print("引擎层 optimizer.py · 因子表自测")
@@ -210,4 +504,5 @@ if __name__ == "__main__":
     print("  VSP=3 平行校验偏差 → %.4f%%（目标 12.68 ±0.01）" % st["vsp3_dev_pct"])
     print("-" * 78)
     build_baseline()
+    build_routes()
     print("=" * 78)

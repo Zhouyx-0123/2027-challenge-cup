@@ -34,6 +34,10 @@ RESULT_FILES: Dict[str, str] = {
     "gate": "gate_report.json",
     "run_log": "run_log.json",
     "source": "_source.json",
+    # T7 · 路线情景（可选；缺失时页面自动回退离线模式）
+    "routes": "route_od.parquet",
+    "route_carbon": "route_carbon.parquet",
+    "route_select": "route_select.parquet",
 }
 
 # ---- 冻结的列名：只增不改 ----
@@ -181,6 +185,28 @@ def source() -> Dict[str, Any]:
 
 def source_name() -> str:
     return str(source().get("source", "unknown"))
+
+
+# ---------------- T7 · 路线情景（只读） ----------------
+
+def routes() -> pd.DataFrame:
+    """路线表 route_od.parquet（高德真路线 + 离线兜底）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["routes"])
+
+
+def route_carbon() -> pd.DataFrame:
+    """路线情景段表 route_carbon.parquet（L1 双轨碳排）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_carbon"])
+
+
+def route_select() -> pd.DataFrame:
+    """λ 推荐表 route_select.parquet（L2 联合决策）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_select"])
+
+
+def route_available() -> bool:
+    """路线表是否就绪（决定第 3 页显示动态路线面板还是提示）。"""
+    return not routes().empty
 
 
 def is_mock() -> bool:

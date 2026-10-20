@@ -20,7 +20,7 @@ import pandas as pd
 import streamlit as st
 
 import services
-from components import cards, charts, flags, layout, theme
+from components import cards, charts, decision_panel, flags, layout, theme
 
 layout.setup("3 替代方案")
 src = services.source()
@@ -193,7 +193,38 @@ with b2:
                "两个口径都展示，推荐结论以达标线 + 单位减排成本为准。"
                % services.fmt(main_row.get("payback_years"), 2))
 
-# ================= C · 换车候选线路 =================
+# ================= C · 动态路线（路 + 车 双自由度） =================
+st.markdown("")
+layout.section("动态路线 · 路径级碳-成本联合决策",
+               "高德真路线只出'路'；选哪条路、派什么车、λ 一动推荐换不换，由本系统算")
+
+route_df = services.routes()
+if route_df.empty:
+    cards.chips(["路线表未生成", "L0 基准账不受影响", "本区块自动跳过"],
+                 tones=["warn", "skip", "skip"])
+    cards.note("动态路线（T7）为**可选段**：缺路线表时本页其余内容照常演示。"
+               "生成方式：python -m tools.route_fetch（需在 config/amap_key.txt 配 Web 服务 key），"
+               "再跑 python -m src.pipeline --with-routes。")
+else:
+    n_online = int((route_df["source"] == "amap_rest").sum()) if "source" in route_df.columns else 0
+    n_est = int((route_df.get("flag_route_est", pd.Series(dtype=int)) == 1).sum())
+    cards.chips(
+        ["路线表 %d 条" % len(route_df),
+         "高德真路线 %d 条" % n_online,
+         "离线兜底 %d 条" % n_est,
+         "L0 主口径不动"],
+        tones=["ok", "mint" if n_online else "warn", "skip", "skip"])
+    decision_panel.render(
+        route_df,
+        carbon_df=services.route_carbon(),
+        select_df=services.route_select(),
+        segments=services.segments(),
+        lam=lam,
+        height=520,
+        key_prefix="p3_route",
+    )
+
+# ================= D · 换车候选线路 =================
 st.markdown("")
 ratio_max = (float(pd.to_numeric(band_all["ratio"], errors="coerce").max())
              if not band_all.empty and "ratio" in band_all.columns else 0.0)
@@ -283,7 +314,7 @@ else:
             flags.flagged_table(sub.sort_values("kg_co2", ascending=False),
                                 columns=cols, max_rows=30, show_legend=True)
 
-# ================= D · 运营约束校验 C1–C5 =================
+# ================= E · 运营约束校验 C1–C5 =================
 st.markdown("")
 layout.section("运营约束校验", "带宽 → 可兑现减排，中间隔着五道约束；结论由引擎层 O6 产出")
 

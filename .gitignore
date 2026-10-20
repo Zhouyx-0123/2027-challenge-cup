@@ -1,3 +1,10 @@
+# ===== 高德 key：永不入库 =====
+config/amap_key.txt
+config/amap_js_key.txt
+config/amap_js_code.txt
+config/*.key
+config/*_secret.txt
+
 # ===== 原始数据：永不入库 =====
 data/raw/
 data/reference/
@@ -20,6 +27,11 @@ data/processed/*
 !data/processed/run_log.json
 !data/processed/_source.json
 !data/processed/_mock.flag
+# T7 路线情景：路线表与情景表入库（可复现），坐标缓存不入库（机器本地状态）
+!data/processed/route_od.parquet
+!data/processed/route_carbon.parquet
+!data/processed/route_select.parquet
+data/processed/route_geo.parquet
 
 # ===== 离线包与产物 =====
 wheels/
@@ -36,6 +48,9 @@ _tmp*
 .dsh-office-*/
 ~$*
 *.tmp
+
+# ===== WorkBuddy 项目数据（本地记忆/会话记录，不入库）=====
+.workbuddy/
 
 # ===== Python 常规 =====
 __pycache__/

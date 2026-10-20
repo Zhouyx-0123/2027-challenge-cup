@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-19T22:09:19",
+  "generated_at": "2026-10-20T14:36:52",
   "source": "real",
   "mode": "real",
   "passed": true,
@@ -177,6 +177,29 @@
       "label": "数据来源标记",
       "status": "PASS",
       "detail": "source = real"
+    }
+  ],
+  "route_checks": [
+    {
+      "id": "S1",
+      "label": "路线距离 vs 实测里程",
+      "stage": "route",
+      "status": "FAIL",
+      "detail": "中位 |Δ|/km = 27.82%（目标 ≤10%，比对 8261 段）"
+    },
+    {
+      "id": "S2",
+      "label": "路线碳 vs 基准碳（无系统漂移）",
+      "stage": "route",
+      "status": "PASS",
+      "detail": "中位偏差 +0.00%（阈值 ±50%，比对 13493 段）"
+    },
+    {
+      "id": "S3",
+      "label": "热点 OD 真路线覆盖率",
+      "stage": "route",
+      "status": "WARN",
+      "detail": "真路线 0 / 310（0.0%，目标 ≥95%）；其余为离线兜底或坐标缺失"
     }
   ],
   "counts": {

@@ -318,16 +318,43 @@ def fetch_driving(origin: Tuple[float, float], dest: Tuple[float, float],
         traffic_lights = int(lights) if lights not in (None, "") else None
     except (TypeError, ValueError):
         traffic_lights = None
+    # 高德 /v3/direction/driving 的路径几何在 path.steps[*].polyline，
+    # path 顶层通常没有 polyline；之前只读顶层导致 295 条“真路线”全是空线。
+    polyline = str(path.get("polyline", "") or "")
+    if not polyline:
+        steps = path.get("steps") or []
+        polyline = ";".join(
+            str(step.get("polyline", "") or "")
+            for step in steps
+            if step.get("polyline")
+        )
+    polyline = _simplify_polyline(polyline, max_points=400)
     return {
         "distance_km": distance_km,
         "duration_min": duration_min,
         "toll_yuan": toll_yuan,
         "traffic_lights": traffic_lights,
         "strategy": strategy,
-        "polyline": str(path.get("polyline", "") or ""),
+        "polyline": polyline,
         "source": "amap_rest",
         "flag_route_est": 0,
     }
+
+
+def _simplify_polyline(polyline: str, max_points: int = 400) -> str:
+    """抽稀高德 polyline，保留首尾点。
+
+    高德一条 1,300 km 路线约 1.2 万个点；310 条全存会到几十 MB。
+    页面只需要“看得出走向”，400 个点足够，且不影响距离/时长/碳排。
+    """
+    chunks = [c for c in str(polyline or "").split(";") if c]
+    if len(chunks) <= max_points:
+        return ";".join(chunks)
+    step = max(1, len(chunks) // max_points)
+    sampled = chunks[::step]
+    if sampled[-1] != chunks[-1]:
+        sampled.append(chunks[-1])
+    return ";".join(sampled)
 
 
 def _polyline_to_points(polyline: str) -> List[List[float]]:

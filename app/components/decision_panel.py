@@ -110,9 +110,10 @@ def render(route_df: pd.DataFrame,
     picked_key = None
     if show_selector and len(route_df) > 1:
         labels = [
-            "%s → %s（%.0f km）" % (
+            "%s → %s（%.0f km）%s" % (
                 str(r.get("origin", "")), str(r.get("dest", "")),
-                float(r.get("distance_km") or 0.0))
+                float(r.get("distance_km") or 0.0),
+                "（离线）" if int(r.get("flag_route_est", 0) or 0) else "")
             for _, r in route_df.iterrows()
         ]
         picked = st.selectbox("选一条线路（网点级 OD）", labels, index=0,
@@ -153,6 +154,9 @@ def render(route_df: pd.DataFrame,
         {"label": "路线碳排", "value": _fmt(kg_co2, 1) + " kg",
          "tone": tone, "sub": src_label},
     ], cols=4)
+    if est:
+        cards.note("该 OD 是离线兜底：地图只显示起终点，没有真实路径；"
+                   "选一条未标“离线”的 OD 可看高德真路线。")
 
     # ---- λ 视角：推荐车型（来自 route_select.parquet，不在前端算）----
     if select_df is not None and not select_df.empty:

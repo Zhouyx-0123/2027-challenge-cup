@@ -13,14 +13,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-ACCENT = "#2DD4A7"
-ACCENT2 = "#F5C86B"
-SCALE = ["#0E3B2E", "#1C8F6B", ACCENT, ACCENT2, "#FF8A5B"]
+ACCENT = "#6FD3BF"
+ACCENT2 = "#D2B36F"
+SCALE = ["#0E3B2E", "#1C8F6B", ACCENT, ACCENT2, "#C98A6B"]
 
 GEO_LAYOUT = dict(
     showcountries=True, countrycolor="#1E2A36", countrywidth=0.6,
     showcoastlines=True, coastlinecolor="#1E2A36", coastlinewidth=0.6,
-    showland=True, landcolor="#0F1620",
+    showland=True, landcolor="#070A0E",
     showocean=True, oceancolor="#0A0E13",
     showlakes=False, showframe=False,
     bgcolor="rgba(0,0,0,0)",
@@ -144,7 +144,7 @@ def flow_map(
         lon=cities[lon_o], lat=cities[lat_o], mode="markers+text",
         text=cities[city_o], textposition="top center",
         textfont=dict(size=10, color="#8A97A6"),
-        marker=dict(size=5, color="#E6EDF3", opacity=0.75),
+        marker=dict(size=5, color="#E9EEF4", opacity=0.75),
         hoverinfo="skip", showlegend=False,
     ))
 

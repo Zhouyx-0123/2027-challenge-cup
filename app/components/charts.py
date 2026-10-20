@@ -13,23 +13,23 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-ACCENT = "#2DD4A7"
-ACCENT2 = "#F5C86B"
-SCALE = ["#0E3B2E", "#1C8F6B", ACCENT, ACCENT2, "#FF8A5B"]
+ACCENT = "#6FD3BF"
+ACCENT2 = "#D2B36F"
+SCALE = ["#12211F", "#2E6F64", ACCENT, ACCENT2, "#8A6B54"]
 
 BASE = dict(
     template="plotly_dark",
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(size=12, color="#C9D4E0"),
+    font=dict(size=11.5, color="#94A1AD"),
     margin=dict(l=8, r=8, t=28, b=8),
     coloraxis_showscale=False,
-    hoverlabel=dict(bgcolor="#131A23", bordercolor="#2DD4A7", font_size=12),
+    hoverlabel=dict(bgcolor="#0E151C", bordercolor="#6FD3BF", font_size=12),
 )
 
 AXIS = dict(
-    showgrid=True, gridcolor="rgba(255,255,255,0.06)", zeroline=False,
-    showline=False, ticks="outside", tickcolor="rgba(255,255,255,0.15)",
+    showgrid=True, gridcolor="rgba(255,255,255,0.055)", zeroline=False,
+    showline=False, ticks="outside", tickcolor="rgba(255,255,255,0.12)",
 )
 
 
@@ -38,7 +38,7 @@ def _finish(fig: go.Figure, title: Optional[str], height: int) -> go.Figure:
     fig.update_xaxes(**AXIS)
     fig.update_yaxes(**AXIS)
     if title:
-        fig.update_layout(title=dict(text=title, font=dict(size=13, color="#E6EDF3"), x=0.01, y=0.97))
+        fig.update_layout(title=dict(text=title, font=dict(size=12.5, color="#E9EEF4"), x=0.01, y=0.97))
     return fig
 
 
@@ -181,14 +181,14 @@ def line_multi(df: pd.DataFrame, x: str, y: str, color: str, vline_x: Optional[f
         st.caption("暂无数据")
         return
     fig = px.line(data, x=x, y=y, color=color, labels=labels or {},
-                  color_discrete_sequence=[ACCENT, ACCENT2, "#6FB1FF", "#FF8A5B",
-                                           "#B58CFF", "#7BD0FF", "#FF7A7A"])
+                  color_discrete_sequence=[ACCENT, ACCENT2, "#8AA9C9", "#C98A6B",
+                                           "#B8A6D9", "#7FB3C9", "#D97A7A"])
     fig.update_traces(line=dict(width=2.2))
     fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02,
                                   xanchor="right", x=1, title_text=""))
     if vline_x is not None:
-        fig.add_vline(x=vline_x, line=dict(color="#E6EDF3", width=1.2, dash="dot"),
-                      annotation_text=vline_label, annotation_font_color="#E6EDF3",
+        fig.add_vline(x=vline_x, line=dict(color="#94A1AD", width=1.1, dash="dot"),
+                      annotation_text=vline_label, annotation_font_color="#94A1AD",
                       annotation_position="top")
     if ymax is not None:
         fig.update_yaxes(range=[0, ymax])
@@ -224,15 +224,15 @@ def payback_curve(specs: List[dict], years: int = 15, height: int = 380) -> None
             fig.add_trace(go.Scatter(
                 x=[cross], y=[capex], mode="markers",
                 marker=dict(size=11, color=color, symbol="diamond",
-                            line=dict(width=1.5, color="#0B0F14")),
+                            line=dict(width=1.5, color="#070A0E")),
                 name="回本 %.1f 年" % cross, showlegend=False,
                 hovertemplate="回本 %.1f 年<extra></extra>" % cross,
             ))
         if capex > 0 and capex not in seen_capex:
             seen_capex.append(capex)
-            fig.add_hline(y=capex, line=dict(color="#FF7A7A", width=1.2, dash="dash"),
+            fig.add_hline(y=capex, line=dict(color="#D97A7A", width=1.2, dash="dash"),
                           annotation_text="一次性投资 {:,.0f} 万元".format(capex),
-                          annotation_font_color="#FFB3B3", annotation_position="top left")
+                          annotation_font_color="#D97A7A", annotation_position="top left")
     fig.update_xaxes(title_text="年份", dtick=2)
     fig.update_yaxes(title_text="累计节省（万元）")
     st.plotly_chart(_finish(fig, "投资回收曲线（展示口径：年度节省 = 运营节省 + 减排量 × λ）",

@@ -27,7 +27,7 @@ CODE_PATH = ROOT / "config" / "amap_js_code.txt"
 PLACEHOLDER = "请至高德开放平台申请自有 key 并替换此占位符"
 
 # 线条配色与 components/theme.py 对齐：重型=橙（减排瓶颈），轻中=青
-_LINE_COLORS = {"2": "#FF8A5B", "1": "#2DD4A7", "0": "#5DCAA5"}
+_LINE_COLORS = {"2": "#C98A6B", "1": "#6FD3BF", "0": "#8AA9C9"}
 _VCLASS_NAMES = {0: "轻型", 1: "中型", 2: "重型"}
 
 _HTML = """<!DOCTYPE html>
@@ -35,11 +35,11 @@ _HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <style>
-  html,body{margin:0;padding:0;height:100%;background:#0F1620;}
+  html,body{margin:0;padding:0;height:100%;background:#070A0E;}
   #map{width:100%;height:__HEIGHT__px;}
   #fallback{display:none;padding:32px;color:#8A97A6;font-size:13px;line-height:1.7;}
   .amap-info{font-size:12px;line-height:1.8;min-width:220px;}
-  .amap-info b{color:#E6EDF3;}
+  .amap-info b{color:#E9EEF4;}
   .amap-note{color:#8A97A6;font-size:11px;}
 </style>
 <script>window._AMapSecurityConfig={securityJsCode:"__JSCODE__"};</script>
@@ -77,7 +77,7 @@ function init(){
   ROUTES.forEach(function(r, i){
     if(r.polyline && r.polyline.length >= 2){
       var line = new AMap.Polyline({
-        path: r.polyline, strokeColor: COLORS[i] || "#2DD4A7", strokeWeight: 4,
+        path: r.polyline, strokeColor: COLORS[i] || "#6FD3BF", strokeWeight: 4,
         strokeOpacity: 0.9, cursor: "pointer", zIndex: 10, showDir: true
       });
       line.on("click", function(){ showInfo(r); });
@@ -85,12 +85,12 @@ function init(){
     }
     [["o", r.o_lng, r.o_lat, r.origin], ["d", r.d_lng, r.d_lat, r.dest]].forEach(function(p){
       markers.push(new AMap.CircleMarker({
-        center:[p[1],p[2]], radius:5, strokeColor:"#E6EDF3", strokeWeight:1,
-        fillColor:"#F5C86B", fillOpacity:0.95, zIndex:20, cursor:"pointer"
+        center:[p[1],p[2]], radius:5, strokeColor:"#E9EEF4", strokeWeight:1,
+        fillColor:"#D2B36F", fillOpacity:0.95, zIndex:20, cursor:"pointer"
       }));
       markers.push(new AMap.Text({
         position:[p[1],p[2]], text:p[3], anchor:"bottom-center",
-        style:{color:"#E6EDF3", background:"rgba(15,22,32,0.72)",
+        style:{color:"#E9EEF4", background:"rgba(15,22,32,0.72)",
                border:"none", fontSize:"11px", padding:"1px 4px"}
       }));
     });
@@ -137,7 +137,7 @@ def route_map(routes: List[Dict[str, Any]], height: int = 560) -> bool:
     key = load_js_key()
     if not key or not routes:
         return False
-    colors = [_LINE_COLORS.get(str(r.get("vclass", 1)), "#2DD4A7") for r in routes]
+    colors = [_LINE_COLORS.get(str(r.get("vclass", 1)), "#6FD3BF") for r in routes]
     doc = (
         _HTML.replace("__KEY__", key)
         .replace("__JSCODE__", _read_secret(CODE_PATH))

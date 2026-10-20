@@ -21,18 +21,18 @@ import streamlit as st
 GRAY = "#E5E7EB"
 YELLOW = "#FFF3C4"
 EST = "#FFF8E1"
-BORDER = "#F5C86B"
+BORDER = "#D2B36F"
 
 FLAG_COLUMNS = ["flag_dup", "flag_anomaly", "flag_basis", "flag_estimated"]
 
 FLAG_META = [
     {"col": "flag_dup", "label": "重复行", "color": "#9CA3AF",
      "desc": "已去重，不计入基准", "key": "dup_rows", "scope": "all"},
-    {"col": "flag_anomaly", "label": "时间戳异常", "color": "#F5C86B",
+    {"col": "flag_anomaly", "label": "时间戳异常", "color": "#D2B36F",
      "desc": "保留计碳，只影响速度统计", "key": "anomaly_rows", "scope": "unique"},
-    {"col": "flag_basis", "label": "载重口径换算", "color": "#F5C86B",
+    {"col": "flag_basis", "label": "载重口径换算", "color": "#D2B36F",
      "desc": "总质量/准牵引 → 载质量", "key": "basis_rows", "scope": "unique"},
-    {"col": "flag_estimated", "label": "估算值", "color": "#FF8A5B",
+    {"col": "flag_estimated", "label": "估算值", "color": "#C98A6B",
      "desc": "缺失值按历史/行业均值填补", "key": "estimated_rows", "scope": "unique"},
 ]
 

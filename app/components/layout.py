@@ -1,4 +1,4 @@
-"""版式组件（A1）：页头、指标卡、结论带、空状态、全局参数。"""
+"""版式组件（A1）：品牌侧栏、页头、指标卡、结论带、空状态、全局参数。"""
 
 from __future__ import annotations
 
@@ -8,11 +8,21 @@ import streamlit as st
 
 from . import theme
 
-ACCENT = "#1F3A5F"
-SOFT = "#F4F7FA"
+# 五页主线 + 一个实验室预览页
+_NAV_MAIN = [
+    ("app.py", "总览"),
+    ("pages/1_基准核算.py", "01  基准核算"),
+    ("pages/2_高排放诊断.py", "02  高排放诊断"),
+    ("pages/3_替代方案.py", "03  替代方案"),
+    ("pages/4_成本效益.py", "04  成本效益"),
+    ("pages/5_碳会计台账.py", "05  碳会计台账"),
+]
+_NAV_LAB = [
+    ("pages/6_路线沙盘.py", "06  路线沙盘"),
+]
 
 
-def setup(title: str, icon: str = "📦") -> None:
+def setup(title: str, icon: str = "◈") -> None:
     """页面配置。每个页面第一行调用，必须在其他 st 调用之前。"""
     st.set_page_config(
         page_title=title,
@@ -24,7 +34,7 @@ def setup(title: str, icon: str = "📦") -> None:
 
 
 def page_header(title: str, question: Optional[str] = None, badge: Optional[str] = None) -> None:
-    """页头：标题 + 一句话问题 + 右上角状态标签。"""
+    """兼容旧页面的页头；新页面统一用 theme.hero。"""
     left, right = st.columns([0.8, 0.2])
     with left:
         st.markdown("## " + title)
@@ -33,9 +43,8 @@ def page_header(title: str, question: Optional[str] = None, badge: Optional[str]
     with right:
         if badge:
             st.markdown(
-                "<div style='text-align:right;color:#7a8794;font-size:12px;padding-top:14px'>"
-                + badge
-                + "</div>",
+                "<div style='text-align:right;color:#63707C;font-size:11px;"
+                "letter-spacing:.08em;padding-top:14px'>" + badge + "</div>",
                 unsafe_allow_html=True,
             )
     st.markdown("---")
@@ -91,15 +100,61 @@ def empty_state(need: List[str]) -> None:
         st.caption("缺少：" + " / ".join(need))
 
 
+def _safe_page_link(page: str, label: str) -> None:
+    """真实多页环境可点；单页 AppTest 里退化为文本，不红屏。"""
+    try:
+        st.page_link(page, label=label)
+    except Exception:
+        st.markdown("<div class='cm-navitem'>" + label + "</div>", unsafe_allow_html=True)
+
+
+def _brand() -> None:
+    st.markdown(
+        "<div class='cm-brand'>"
+        "<div class='cm-brand-mark'>CI</div>"
+        "<div class='cm-brand-text'>"
+        "<div class='eyebrow'>CARBON INTELLIGENCE</div>"
+        "<div class='name'>物流碳决策台</div>"
+        "<div class='sub'>2027 · DECISION OS</div>"
+        "</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _nav() -> None:
+    st.markdown("<div class='cm-navlabel'>决策链 / DECISION LOOP</div>", unsafe_allow_html=True)
+    for page, label in _NAV_MAIN:
+        _safe_page_link(page, label)
+    st.markdown("<div class='cm-navlabel'>实验室 / LAB</div>", unsafe_allow_html=True)
+    for page, label in _NAV_LAB:
+        _safe_page_link(page, label)
+
+
+def _status(source_name: str, gate: Optional[Dict[str, Any]]) -> None:
+    ok = bool(gate and gate.get("passed"))
+    dot = "ok" if ok else "warn"
+    source = source_badge(source_name)
+    gate_text = gate_badge(gate)
+    st.markdown(
+        "<div class='cm-side-status'>"
+        "<div><span class='" + dot + "'>●</span> <b>" + source + "</b></div>"
+        "<div>" + gate_text + "</div>"
+        "<div>数据期 2023 · 120 天</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def sidebar_params(source_name: str = "unknown",
                    gate: Optional[Dict[str, Any]] = None,
                    current: str = "") -> Dict[str, Any]:
-    """全局参数：λ 与成本口径。全站只有这一处，其他页面读 session_state。
-
-    current 是页面 3–5 的导航参数；当前布局不强制高亮，保留接口以兼容。
-    """
+    """品牌 + 决策链导航 + 全局参数；current 仅保留兼容。"""
     with st.sidebar:
-        st.markdown("### 全局参数")
+        _brand()
+        _nav()
+        st.markdown("<div class='cm-navlabel'>状态 / STATUS</div>", unsafe_allow_html=True)
+        _status(source_name, gate)
+        st.markdown("<div class='cm-navlabel'>全局参数 / PARAMETERS</div>", unsafe_allow_html=True)
         lam = st.number_input(
             "内部碳价 λ（元/吨 CO₂e）",
             min_value=0.0,
@@ -114,10 +169,6 @@ def sidebar_params(source_name: str = "unknown",
             index=0 if st.session_state.get("basis", "赛题口径") == "赛题口径" else 1,
             help="赛题口径＝购置+能耗+维护−补贴；延展口径＝排放量 × λ。",
         )
-        st.markdown("---")
-        st.caption("数据源：" + source_badge(source_name))
-        if gate is not None:
-            st.caption(gate_badge(gate))
         if st.button("刷新结果表", use_container_width=True,
                      help="只清缓存、重新读表；不会调用任何算法。"):
             st.cache_data.clear()

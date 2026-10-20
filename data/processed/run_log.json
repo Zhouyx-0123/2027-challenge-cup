@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-20T14:36:46",
+  "generated_at": "2026-10-20T14:44:47",
   "source": "real",
   "mode": "auto",
   "stages": [
@@ -7,35 +7,28 @@
       "key": "preprocess",
       "name": "① 数据层 preprocess.py",
       "status": "ok",
-      "seconds": 3.875,
+      "seconds": 3.927,
       "error": ""
     },
     {
       "key": "optimizer",
       "name": "② 引擎层 optimizer.py",
       "status": "ok",
-      "seconds": 0.139,
+      "seconds": 0.149,
       "error": ""
     },
     {
       "key": "evaluator",
       "name": "③ 分析层 evaluator.py",
       "status": "ok",
-      "seconds": 0.149,
+      "seconds": 0.156,
       "error": ""
     },
     {
       "key": "reports",
       "name": "④ 报表段（G3 台账 + G4 披露）",
       "status": "ok",
-      "seconds": 0.034,
-      "error": ""
-    },
-    {
-      "key": "routes",
-      "name": "⑤ 路线情景段（T7）",
-      "status": "ok",
-      "seconds": 1.669,
+      "seconds": 0.037,
       "error": ""
     }
   ],
@@ -46,5 +39,5 @@
     "fail": 0,
     "skip": 0
   },
-  "total_seconds": 5.957
+  "total_seconds": 4.354
 }

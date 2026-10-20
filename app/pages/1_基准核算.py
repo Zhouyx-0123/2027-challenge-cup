@@ -91,7 +91,7 @@ layout.kpi_row([
     {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—")},
     {"label": "估算值占比", "value": (("%.2f%%" % (100 * est_share)) if est_share is not None else "—"),
      "help": "黄框标出的行；只填补、不删除"},
-], per_row=6)
+], per_row=3)
 st.caption("剔除 >100 km/h 的时间戳异常后均速 %s km/h；异常段保留计碳，只影响速度统计。"
            % services.fmt(avg_speed_clean, 2))
 

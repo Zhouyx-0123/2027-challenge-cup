@@ -53,6 +53,9 @@ html, body, [class*="css"] {
   color: var(--text);
 }
 header[data-testid="stHeader"] { background: transparent; }
+div[data-testid="stToolbar"],
+div[data-testid="stAppDeployButton"],
+button[data-testid="stAppDeployButton"] { display: none !important; }
 footer, #MainMenu { visibility: hidden; }
 .block-container { padding-top: 1.35rem; padding-bottom: 3.5rem; max-width: 1360px; }
 
@@ -514,15 +517,14 @@ div[data-testid="stNumberInput"] input {
 """
 
 
-_CSS_VERSION = "enterprise-2026-10-20"
-
-
 def inject() -> None:
-    """注入全局样式；版本变了会重新注入，避免旧 CSS 缓存。"""
-    if st.session_state.get("_cm_css_version") == _CSS_VERSION:
-        return
+    """每次页面运行都注入样式。
+
+    Streamlit 多页导航会重建页面 DOM，但 session_state 会保留；如果这里
+    按 session_state 只注入一次，第 2 页起就只剩自定义导航、默认导航重新
+    出现，表现为左侧目录重合。CSS 重复注入无副作用。
+    """
     st.markdown(CSS, unsafe_allow_html=True)
-    st.session_state["_cm_css_version"] = _CSS_VERSION
 
 
 def hero(title: str, subtitle: str, kicker: str = "CARBON LEDGER",

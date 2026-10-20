@@ -61,7 +61,8 @@ function fail(){
 }
 function init(){
   if(inited) return; inited = true;
-  var map = new AMap.Map("map", {zoom:5, center:[110.0,35.0], viewMode:"2D"});
+  var map = new AMap.Map("map", {zoom:5, center:[110.0,35.0], viewMode:"2D",
+      mapStyle:"amap://styles/dark"});
   var info = new AMap.InfoWindow({isCustom:false, autoMove:true});
   function showInfo(r){
     var html = '<div class="amap-info"><b>' + r.origin + ' → ' + r.dest + '</b><br>'

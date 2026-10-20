@@ -47,8 +47,10 @@ def bar(df: pd.DataFrame, x: str, y: str, title: Optional[str] = None, height: i
         st.caption("暂无数据")
         return
     data = df[[x, y]].dropna()
-    fig = px.bar(data, x=x, y=y, color=y, color_continuous_scale=SCALE)
+    fig = px.bar(data, x=x, y=y, color_discrete_sequence=[ACCENT])
     fig.update_traces(marker_line_width=0)
+    fig.update_xaxes(title_text="")
+    fig.update_yaxes(title_text="")
     st.plotly_chart(_finish(fig, title, height), use_container_width=True,
                     config={"displayModeBar": False})
 
@@ -79,9 +81,11 @@ def hbar(df: pd.DataFrame, y: str, x: str, title: Optional[str] = None, height: 
         st.caption("暂无数据")
         return
     data = df[[x, y]].dropna().sort_values(x, ascending=True)
-    fig = px.bar(data, x=x, y=y, orientation="h", color=x, color_continuous_scale=SCALE)
+    fig = px.bar(data, x=x, y=y, orientation="h", color_discrete_sequence=[ACCENT])
     fig.update_traces(marker_line_width=0)
     fig.update_layout(yaxis=dict(showgrid=False))
+    fig.update_xaxes(title_text="")
+    fig.update_yaxes(title_text="")
     st.plotly_chart(_finish(fig, title, height), use_container_width=True,
                     config={"displayModeBar": False})
 

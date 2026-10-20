@@ -54,7 +54,7 @@ layout.kpi_row([
      "help": "重型车是电动化瓶颈，也是减排空间"},
     {"label": "估算值（黄框）", "value": services.fmt(k.get("estimated_rows")),
      "help": "缺失字段按历史/行业均值填补的行数；前端用黄框标出"},
-], per_row=6)
+], per_row=3)
 
 # ---------------- 五页主线 + 路线沙盘 ----------------
 st.markdown("")
@@ -62,19 +62,19 @@ layout.section("五页主线 + 路线沙盘", "五页主线已接通；⑥ 为�
 
 c1, c2, c3 = st.columns(3)
 with c1:
-    st.page_link("pages/1_基准核算.py", label="① 基准核算", icon="📊")
+    st.page_link("pages/1_基准核算.py", label="① 基准核算")
     st.caption("排了多少碳、跑多远、数据多脏")
-    st.page_link("pages/2_高排放诊断.py", label="② 高排放诊断", icon="🔥")
+    st.page_link("pages/2_高排放诊断.py", label="② 高排放诊断")
     st.caption("四维热点 + 同线带宽 1.50×")
 with c2:
-    st.page_link("pages/3_替代方案.py", label="③ 替代方案", icon="🚚")
+    st.page_link("pages/3_替代方案.py", label="③ 替代方案")
     st.caption("这条线该派什么车，运营跑不跑通")
-    st.page_link("pages/4_成本效益.py", label="④ 成本效益", icon="💰")
+    st.page_link("pages/4_成本效益.py", label="④ 成本效益")
     st.caption("多花多少钱、几年回本、λ 一动推荐换不换")
 with c3:
-    st.page_link("pages/5_碳会计台账.py", label="⑤ 碳会计台账", icon="📒")
+    st.page_link("pages/5_碳会计台账.py", label="⑤ 碳会计台账")
     st.caption("怎么记、怎么披露、对接什么制度")
-    st.page_link("pages/6_路线沙盘.py", label="⑥ 路线沙盘（预览）", icon="🗺️")
+    st.page_link("pages/6_路线沙盘.py", label="⑥ 路线沙盘（预览）")
     st.caption("高德真路线 + 未来候选/权重模型；不计入五页主线")
 
 # ---------------- 数据状态 ----------------

@@ -18,7 +18,6 @@ import json
 from pathlib import Path
 
 import streamlit as st
-from streamlit.components.v1 import html as st_html
 
 ROOT = Path(__file__).resolve().parents[1]
 KEY_PATH = ROOT / "config" / "amap_js_key.txt"
@@ -115,7 +114,7 @@ doc = (
     .replace("__ORIGIN__", json.dumps(ORIGIN))
     .replace("__DEST__", json.dumps(DEST))
 )
-st_html(doc, height=640)
+st.iframe(doc, height=640)
 
 with st.expander("失败排查表", expanded=True):
     st.markdown(

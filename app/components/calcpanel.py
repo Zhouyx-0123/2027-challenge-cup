@@ -119,7 +119,7 @@ def npv_stacked(npv_by_scenario: Dict[str, Dict[str, float]],
     fig.update_yaxes(**charts.AXIS)
     fig.update_layout(title=dict(text=title, font=dict(size=13, color="#E6EDF3"),
                                  x=0.01, y=0.97))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def cumulative_chart(cumulative: List[Dict[str, Any]],
@@ -174,4 +174,4 @@ def result_json(params: Dict[str, Any], result: Dict[str, Any]) -> None:
         "下载本次测算 JSON",
         data=json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode("utf-8"),
         file_name="what_if_result.json", mime="application/json",
-        use_container_width=True)
+        width="stretch")

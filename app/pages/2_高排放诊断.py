@@ -96,7 +96,7 @@ for tab, (dim, _key, title) in zip(tabs, DIMS):
         charts.hbar(top, "value", "metric_t", title=title, height=380)
         show = top[["value", "metric_t", "share_pct", "n"]].rename(columns={
             "value": "类别", "metric_t": "碳排放(t)", "share_pct": "占比(%)", "n": "段数"})
-        st.dataframe(show, use_container_width=True, hide_index=True)
+        st.dataframe(show, width="stretch", hide_index=True)
 
 # ---------------- 同线带宽 ----------------
 st.markdown("---")
@@ -114,7 +114,7 @@ else:
         "od_pair": "线路", "n": "段数", "nt": "车型数", "fmin": "最低因子(g/km)",
         "fmax": "最高因子(g/km)", "ratio": "倍数", "kg_t": "碳排(t)", "coverage_pct": "覆盖率(%)",
     })
-    st.dataframe(table.head(50), use_container_width=True, hide_index=True)
+    st.dataframe(table.head(50), width="stretch", hide_index=True)
     st.caption("倍数高不代表一定能换：还要过续航、14 小时驾驶窗口、补能与运力匹配四道约束（第 3 页）。"
                "这里的倍数是结构性带宽，不是可立即兑现的减排量。")
 

@@ -10,7 +10,7 @@
   3. key 只在服务端拼 HTML 时注入，不出现在任何前端源码；
   4. 断网不留灰块——SDK 未加载 / Driving 超时都会在 iframe 内显示可读提示；
   5. 几何使用 AMap.Driving 实时返回的逐点路径（约 0.1 km 一点），
-     不再拿 route_od.parquet 里 400 点抽稀的缓存折线做主视觉。
+     不再拿 route_od.parquet 里 RDP 1500 上限的缓存折线做主视觉。
 
 坐标一律 GCJ-02（高德原生）。本地 CITY 表是城市级近似坐标，仅用于 Plotly 离线回退。
 """
@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import streamlit as st
-from streamlit.components.v1 import html as st_html
 
 from . import route_lab_html
 
@@ -201,7 +200,7 @@ def route_lab(routes: List[Dict[str, Any]], height: int = 820,
         payload, key=key, jscode=load_js_code(), mode="lab",
         height=max(480, int(height)), title="路线实验室 · 高德实时路线",
     )
-    st_html(doc, height=max(480, int(height)))
+    st.iframe(doc, height=max(480, int(height)))
     return True
 
 
@@ -225,7 +224,7 @@ def route_map(routes: List[Dict[str, Any]], height: int = 560) -> bool:
         payload, key=key, jscode=load_js_code(), mode="compact",
         height=max(360, int(height)), title="路线图 · 高德实时路线",
     )
-    st_html(doc, height=max(360, int(height)))
+    st.iframe(doc, height=max(360, int(height)))
     return True
 
 

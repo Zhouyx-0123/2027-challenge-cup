@@ -118,7 +118,7 @@ def sidebar_params(source_name: str = "unknown",
         st.caption("数据源：" + source_badge(source_name))
         if gate is not None:
             st.caption(gate_badge(gate))
-        if st.button("刷新结果表", use_container_width=True,
+        if st.button("刷新结果表", width="stretch",
                      help="只清缓存、重新读表；不会调用任何算法。"):
             st.cache_data.clear()
             st.rerun()

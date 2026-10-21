@@ -1,4 +1,6 @@
-streamlit>=1.38.0
+# streamlit 1.56.0 起 width 参数与 st.iframe 全量就绪
+# （替代已弃用的 use_container_width 与 streamlit.components.v1.html）
+streamlit>=1.56.0
 pandas>=2.0.0
 numpy>=1.24.0
 openpyxl>=3.1.0

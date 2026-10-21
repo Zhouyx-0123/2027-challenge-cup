@@ -94,7 +94,7 @@ layout.section("数据状态", "前端只读结果表；缺表不报错，只提
 status = pd.DataFrame(services.file_status())
 _counts = pd.to_numeric(status["行数"], errors="coerce")
 status["行数"] = _counts.apply(lambda x: "—" if pd.isna(x) else f"{int(x):,}")
-st.dataframe(status, use_container_width=True, hide_index=True)
+st.dataframe(status, width="stretch", hide_index=True)
 
 # ---------------- 闸门 ----------------
 st.markdown("")
@@ -111,7 +111,7 @@ if gate and gate.get("targets"):
         show = items[["label", "stage", "目标", "实测", "判定", "note"]].rename(columns={
             "label": "核对项", "stage": "出处", "note": "说明",
         })
-        st.dataframe(show, use_container_width=True, hide_index=True)
+        st.dataframe(show, width="stretch", hide_index=True)
     c = gate.get("counts", {})
     st.caption("模式：%s｜PASS %s｜FAIL %s｜SKIP %s｜%s"
                % (gate.get("mode", "—"), c.get("pass", 0), c.get("fail", 0),
@@ -126,7 +126,7 @@ else:
 # ---------------- 数据健康 ----------------
 st.markdown("")
 layout.section("数据健康", "四类标记：灰底=重复，黄底=异常/口径，黄框=估算")
-st.dataframe(flags.flag_summary(None, counts), use_container_width=True, hide_index=True)
+st.dataframe(flags.flag_summary(None, counts), width="stretch", hide_index=True)
 flags.flag_legend()
 
 # ---------------- 台账 + 披露 ----------------
@@ -137,7 +137,7 @@ with st.expander("G3 台账六字段 / G4 披露六要素（已生成，可下�
         st.info("台账未生成——先运行 python -m src.pipeline")
     else:
         cols = [c for c in (["scheme"] + services.LEDGER_COLUMNS + ["is_baseline"]) if c in led.columns]
-        st.dataframe(led[cols], use_container_width=True, hide_index=True)
+        st.dataframe(led[cols], width="stretch", hide_index=True)
         st.caption("台账基准行的排放量 = 第 1 页 E₀（同一数据源，不二次计算）")
         st.download_button(
             "下载台账 CSV",
@@ -149,7 +149,7 @@ with st.expander("G3 台账六字段 / G4 披露六要素（已生成，可下�
         keys = [k for k in services.DISCLOSURE_KEYS if k in disc]
         st.dataframe(
             pd.DataFrame([{"要素": k, "内容": str(disc[k])} for k in keys]),
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
         )
         st.download_button(
             "下载披露 JSON",
@@ -168,7 +168,7 @@ if log:
                 "name": "阶段", "status": "状态", "seconds": "耗时(s)", "error": "错误",
             })
             st.dataframe(stages[["阶段", "状态", "耗时(s)", "错误"]],
-                         use_container_width=True, hide_index=True)
+                         width="stretch", hide_index=True)
         c1, c2 = st.columns(2)
         c1.metric("总耗时（s）", services.fmt(log.get("total_seconds"), 2))
         c2.metric("退出码", str(log.get("exit_code", "—")))

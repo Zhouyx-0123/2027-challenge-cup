@@ -30,7 +30,7 @@ if missing:
     st.warning("缺少字段：" + "、".join(missing))
     st.caption("当前字段：" + "、".join([str(c) for c in seg.columns]))
     with st.expander("先看看现有数据"):
-        st.dataframe(seg.head(20), use_container_width=True)
+        st.dataframe(seg.head(20), width="stretch")
     layout.conclusion("数据契约没落地之前，页面不编数字——这是硬规矩。")
     st.stop()
 
@@ -110,7 +110,7 @@ if targets:
     st.dataframe(
         tdf[["label", "stage", "目标", "实测", "判定", "note"]].rename(columns={
             "label": "核对项", "stage": "出处", "note": "说明"}),
-        use_container_width=True, hide_index=True,
+        width="stretch", hide_index=True,
     )
     st.caption("真实数据八项全过：E₀ 4,502,042.41 kg 精确；均速 49.51 对官方 49.57 在 ±0.1 内。"
                "演示模式则跳过依赖真数据的五项。")
@@ -159,7 +159,7 @@ with right:
 st.markdown("")
 layout.section("数据健康", "四类标记：灰底=重复，黄底=异常/口径，黄框=估算")
 counts = services.flag_counts()
-st.dataframe(flags.flag_summary(None, counts), use_container_width=True, hide_index=True)
+st.dataframe(flags.flag_summary(None, counts), width="stretch", hide_index=True)
 flags.flag_legend()
 
 # ---- 数据层审计（DA 增量：61 字段数据字典 + 逐行可追溯 + 重复组冲突） ----
@@ -208,7 +208,7 @@ if not est_rows.empty:
     reasons.columns = ["估算原因", "行数"]
     c1, c2 = st.columns([0.45, 0.55])
     with c1:
-        st.dataframe(reasons, use_container_width=True, hide_index=True)
+        st.dataframe(reasons, width="stretch", hide_index=True)
     with c2:
         st.caption("填补顺序：同线历史均值 → 行业绕行系数 → 全样本中位数；"
                    "车型找不到按载重推断；发票匹配不上按同类别历史均价。"

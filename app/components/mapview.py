@@ -275,5 +275,5 @@ def render(fig: Optional[go.Figure], height: int = 560) -> None:
     if fig is None:
         st.info("地图数据还没就绪：宽表需要 origin_lat / origin_lon / dest_lat / dest_lon 四列。")
         return
-    st.plotly_chart(fig, use_container_width=True,
+    st.plotly_chart(fig, width="stretch",
                     config={"displayModeBar": False, "scrollZoom": False})

@@ -110,12 +110,12 @@ with c1:
     st.download_button(
         "下载台账 CSV",
         data=led.to_csv(index=False).encode("utf-8-sig"),
-        file_name="ledger.csv", mime="text/csv", use_container_width=True)
+        file_name="ledger.csv", mime="text/csv", width="stretch")
 with c2:
     st.download_button(
         "下载披露 JSON",
         data=pd.Series(disc).to_json(force_ascii=False, indent=2).encode("utf-8"),
-        file_name="disclosure.json", mime="application/json", use_container_width=True)
+        file_name="disclosure.json", mime="application/json", width="stretch")
 
 # ================= B · 披露六要素 =================
 st.markdown("")

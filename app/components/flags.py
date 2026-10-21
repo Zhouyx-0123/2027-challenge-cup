@@ -148,7 +148,7 @@ def flagged_table(
         return [css] * len(row)
 
     styler = disp.style.apply(_row_style, axis=1)
-    kwargs: Dict[str, Any] = {"use_container_width": True}
+    kwargs: Dict[str, Any] = {"width": "stretch"}
     if height:
         kwargs["height"] = height
     st.dataframe(styler, **kwargs)

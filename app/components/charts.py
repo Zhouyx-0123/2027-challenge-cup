@@ -49,7 +49,7 @@ def bar(df: pd.DataFrame, x: str, y: str, title: Optional[str] = None, height: i
     data = df[[x, y]].dropna()
     fig = px.bar(data, x=x, y=y, color=y, color_continuous_scale=SCALE)
     fig.update_traces(marker_line_width=0)
-    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+    st.plotly_chart(_finish(fig, title, height), width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -69,7 +69,7 @@ def hist(df: pd.DataFrame, x: str, title: Optional[str] = None, bins: int = 30,
     if x_label:
         fig.update_xaxes(title_text=x_label)
     fig.update_yaxes(title_text="段数")
-    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+    st.plotly_chart(_finish(fig, title, height), width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -82,7 +82,7 @@ def hbar(df: pd.DataFrame, y: str, x: str, title: Optional[str] = None, height: 
     fig = px.bar(data, x=x, y=y, orientation="h", color=x, color_continuous_scale=SCALE)
     fig.update_traces(marker_line_width=0)
     fig.update_layout(yaxis=dict(showgrid=False))
-    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+    st.plotly_chart(_finish(fig, title, height), width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -92,7 +92,7 @@ def line(df: pd.DataFrame, x: str, y: str, title: Optional[str] = None, height: 
         return
     fig = px.line(df[[x, y]].dropna(), x=x, y=y)
     fig.update_traces(line=dict(color=ACCENT, width=2.4), marker=dict(size=6, color=ACCENT2))
-    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+    st.plotly_chart(_finish(fig, title, height), width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -102,7 +102,7 @@ def scatter(df: pd.DataFrame, x: str, y: str, title: Optional[str] = None, heigh
         return
     fig = px.scatter(df[[x, y]].dropna(), x=x, y=y, opacity=0.55)
     fig.update_traces(marker=dict(size=7, color=ACCENT, line=dict(width=0)))
-    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+    st.plotly_chart(_finish(fig, title, height), width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -134,7 +134,7 @@ def bubble(df: pd.DataFrame, x: str, y: str, size: str, color: Optional[str] = N
                                   xanchor="right", x=1, title_text=""))
     if ymax is not None:
         fig.update_yaxes(range=[0, ymax])
-    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+    st.plotly_chart(_finish(fig, title, height), width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -165,7 +165,7 @@ def vbar_target(df: pd.DataFrame, x: str, y: str, target: Optional[float] = None
     if target is not None:
         top = max(top, float(target))
     fig.update_yaxes(range=[0, max(top * 1.18, 1)])
-    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+    st.plotly_chart(_finish(fig, title, height), width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -192,7 +192,7 @@ def line_multi(df: pd.DataFrame, x: str, y: str, color: str, vline_x: Optional[f
                       annotation_position="top")
     if ymax is not None:
         fig.update_yaxes(range=[0, ymax])
-    st.plotly_chart(_finish(fig, title, height), use_container_width=True,
+    st.plotly_chart(_finish(fig, title, height), width="stretch",
                     config={"displayModeBar": False})
 
 
@@ -236,5 +236,5 @@ def payback_curve(specs: List[dict], years: int = 15, height: int = 380) -> None
     fig.update_xaxes(title_text="年份", dtick=2)
     fig.update_yaxes(title_text="累计节省（万元）")
     st.plotly_chart(_finish(fig, "投资回收曲线（展示口径：年度节省 = 运营节省 + 减排量 × λ）",
-                            height), use_container_width=True,
+                            height), width="stretch",
                     config={"displayModeBar": False})

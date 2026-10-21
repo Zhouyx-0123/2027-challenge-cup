@@ -179,7 +179,7 @@ csv_rows = rows.drop(columns=["polyline"], errors="ignore")
 st.download_button(
     "下载路线账本 CSV",
     data=csv_rows.to_csv(index=False).encode("utf-8-sig"),
-    file_name="route_lab.csv", mime="text/csv", use_container_width=True,
+    file_name="route_lab.csv", mime="text/csv", width="stretch",
 )
 
 layout.section("这次修了什么", "从“抽象折线”到“贴着公路跑”")

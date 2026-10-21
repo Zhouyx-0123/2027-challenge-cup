@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src import evaluator, optimizer, preprocess  # noqa: E402
+from src import evaluator, optimizer, preprocess, schema  # noqa: E402
 
 PROCESSED = ROOT / "data" / "processed"
 WIDE_PATH = PROCESSED / "wide_data.parquet"
@@ -57,15 +57,12 @@ BOUNDARY = "自营公路运输 · 范围一（移动源燃烧）"
 ANNUAL_FACTOR = 3.0417  # 365 / 120
 DATA_PERIOD = "2023 年 1/2/11/12 月，共 120 天（另有 10 条 3 月记录，保留计碳）"
 
-SIX_LEDGER = ["accounting_date", "boundary", "emission_t", "quota_gap", "book_cost", "note"]
-SIX_DISCLOSURE = ["boundary", "factor_source", "assumptions", "period", "annual_factor", "limitations"]
+# 列契约只在这里定义一次（src/schema.py），本处保留同名别名以兼容既有调用。
+SIX_LEDGER = schema.SIX_LEDGER
+SIX_DISCLOSURE = schema.SIX_DISCLOSURE
 
-WIDE_REQUIRED = [
-    "waybill_no", "plate", "vehicle_type", "vclass", "load_t", "origin", "dest",
-    "od_pair", "od_site", "dist_km", "month",
-    "flag_dup", "flag_anomaly", "flag_basis", "flag_estimated",
-]
-SEG_REQUIRED = WIDE_REQUIRED + ["factor_gkm", "kg_co2", "kg_co2_phys", "delta_pct"]
+WIDE_REQUIRED = schema.WIDE_REQUIRED
+SEG_REQUIRED = schema.SEG_REQUIRED
 
 # G2 · 七个数（+ 总里程），全部来自 docs/17 §1.5 对拍表
 TARGETS: List[Dict[str, Any]] = [
@@ -279,17 +276,21 @@ def build_disclosure(kpi: Dict[str, Any], quality: Dict[str, Any], source: str) 
         "boundary": BOUNDARY,
         "factor_source": "%s；因子表版本 %s" % (optimizer.FACTOR_SOURCE, optimizer.FACTOR_VERSION),
         "assumptions": (
-            "额定载重按载质量口径；整车总质量/准牵引总质量已换算成载质量并打 flag_basis；"
+            "额定载重按载质量口径；整车总质量/准牵引总质量已换算成载质量并打 flag_basis"
+            "（75 车型映射为 provisional，待逐车型复核）；"
             "缺失里程按同线历史均值、缺失车型按载重推断、未匹配发票按同类别历史均价，全部打 flag_estimated；"
             "速度 >100 km/h 的时间戳异常段保留计碳，只标记不删除；"
-            "当前因子表与 75 车型总质量映射为 provisional，E₀ 与同线 1.50× 待文献表 8 定稿。"
+            "排放因子按文献[1] 表 8 六锚点分段内插（30 t / VSP=2 = 14.666 g/s、"
+            "VSP=3 = 16.525 g/s，偏差 12.68%，闸门已对拍）。"
         ),
         "period": DATA_PERIOD + "；年化系数 365/120 = %.4f" % ANNUAL_FACTOR,
         "annual_factor": ANNUAL_FACTOR,
         "limitations": (
             "含 %d 条时间戳异常段（保留计碳）；%d 条口径换算；%d 条估算值（前端黄框）；"
-            "未含制冷、空驶调车、仓储与上游燃料生产；方案成本为答辩稿静态标定；"
-            "因子表/总质量映射为 provisional，真数据接入后需按实际车队与文献表 8 重算。"
+            "未含制冷、空驶调车、仓储与上游燃料生产；"
+            "方案成本与减排率为答辩稿静态标定（calculation_mode=legacy_calibration、"
+            "decision_eligible=False），不是逐车组测算结果，不可对外称“已核验”；"
+            "75 车型总质量映射为 provisional，复核后 E₀ 会小幅变动并需重跑闸门。"
             % (anomaly, basis, estimated)
         ),
         "data_source": source,

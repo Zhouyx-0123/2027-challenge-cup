@@ -1,7 +1,8 @@
 """数据读取层（A0）：前端唯一的数据入口。
 
 规矩：
-1. 只读 data/processed/，绝不 import src.*、绝不调用核心算法；
+1. 只读 data/processed/；**只从 src/schema.py 取常量**（文件名/列名/校验），
+   不调用任何核心算法（A0 规则针对算法，不针对常量——契约必须只有一份）；
 2. 缺文件、缺列、文件损坏一律返回空表 + 原因，不抛异常（答辩现场不能红屏）；
 3. 页面只能通过本模块取数，不允许直接 pd.read_parquet；
 4. 结果表由 python -m src.pipeline 预先生成，页面里没有一行业务公式。
@@ -10,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -20,54 +22,24 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 PROCESSED = ROOT / "data" / "processed"
 
-# ---- 结果文件清单（与 src/pipeline.py 输出一一对应）----
-RESULT_FILES: Dict[str, str] = {
-    "wide": "wide_data.parquet",
-    "segments": "baseline_carbon.parquet",
-    "scenarios": "final_report.parquet",
-    "hotspots": "hotspots.parquet",
-    "od_band": "od_band.parquet",
-    "ledger": "ledger.parquet",
-    "disclosure": "disclosure.json",
-    "kpi": "kpi.json",
-    "quality": "data_quality.json",
-    "gate": "gate_report.json",
-    "run_log": "run_log.json",
-    "source": "_source.json",
-    # T7 · 路线情景（可选；缺失时页面自动回退离线模式）
-    "routes": "route_od.parquet",
-    "route_carbon": "route_carbon.parquet",
-    "route_select": "route_select.parquet",
-}
+if str(ROOT) not in sys.path:      # 只为 import src.schema（常量），不是算法
+    sys.path.insert(0, str(ROOT))
+from src import schema  # noqa: E402
+
+# ---- 结果文件清单 / 列契约：唯一来源是 src/schema.py（此处只做别名） ----
+RESULT_FILES: Dict[str, str] = schema.RESULT_FILES
 
 # ---- 冻结的列名：只增不改 ----
-SEGMENT_COLUMNS: List[str] = [
-    "waybill_no", "plate", "vehicle_type", "vclass", "load_t", "load_raw_t",
-    "mass_basis", "origin", "dest", "od_pair", "od_site", "dist_km", "month",
-    "factor_gkm", "er_gs", "kg_co2", "kg_co2_phys", "delta_pct", "speed_kmh",
-    "vtype_code", "dep_site", "arr_site",
-    "cargo_weight_kg", "cargo_volume_cm3", "cargo_pieces", "complete_ts",
-    "flag_dup", "flag_anomaly", "flag_basis", "flag_estimated", "estimate_note",
-]
+SEGMENT_COLUMNS: List[str] = schema.SEGMENT_COLUMNS
 
 # 页面能不能出数，只看这四列在不在（缺任何一列，页面停在数据检查，不编数字）
-CORE_COLUMNS: List[str] = ["waybill_no", "od_pair", "dist_km", "kg_co2"]
+CORE_COLUMNS: List[str] = schema.CORE_COLUMNS
 
-SCENARIO_COLUMNS: List[str] = [
-    "scenario", "emission_t", "reduction_pct", "capex_wan",
-    "opex_save_wan", "payback_years", "unit_cost_yuan_t", "meets_target",
-    # 曾广 evaluator 增量：口径/资格元数据；旧结果表缺这些列时页面仍可跑
-    "data_source", "e0_t", "calculation_mode", "parameter_status",
-    "operational_status", "decision_eligible", "boundary",
-]
+SCENARIO_COLUMNS: List[str] = schema.SCENARIO_COLUMNS
 
-LEDGER_COLUMNS: List[str] = [
-    "accounting_date", "boundary", "emission_t", "quota_gap", "book_cost", "note",
-]
+LEDGER_COLUMNS: List[str] = schema.LEDGER_COLUMNS
 
-DISCLOSURE_KEYS: List[str] = [
-    "boundary", "factor_source", "assumptions", "period", "annual_factor", "limitations",
-]
+DISCLOSURE_KEYS: List[str] = schema.DISCLOSURE_KEYS
 
 
 def path_of(name: str) -> Path:

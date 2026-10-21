@@ -1,0 +1,34 @@
+# CODEOWNERS —— 代码审阅责任人（docs/06 §3：W1 填齐三人 handle 后生效）
+#
+# 现状：仅确认 PM（仓库 owner）的 GitHub handle @Zhouyx-0123；
+# 蒿韵丞 / 曾广 / 杨盛文 三人的 handle 到位后，把对应行的 @Zhouyx-0123
+# 替换为本人 handle（可多人，空格分隔）。匹配规则：后面的规则优先，
+# 路径越具体越优先；没有命中任何规则时走默认行 *。
+#
+# 默认责任人：PM 周嬴鑫（统筹 + pipeline + app 框架 + 文档终审）
+*                               @Zhouyx-0123
+
+# ---- 按 README §8 分工的路径归属（三人 handle 待填，暂由 PM 代管）----
+
+# DA 数据 · 蒿韵丞：src/preprocess.py、台账字段口径（关键路径）
+/src/preprocess.py              @Zhouyx-0123
+
+# FM 财务 · 曾广：src/evaluator.py、成本口径、商业计划书
+/src/evaluator.py               @Zhouyx-0123
+
+# FE 算法 · 杨盛文：src/optimizer.py、app/ 3–8 页、离线打包
+/src/optimizer.py               @Zhouyx-0123
+/app/pages/                     @Zhouyx-0123
+
+# 高德地图组件：key 在服务端拼 HTML 时注入，属前端边界，双人复核
+/app/components/amapview.py      @Zhouyx-0123
+/app/components/route_lab_html.py @Zhouyx-0123
+/app/components/mapview.py       @Zhouyx-0123
+
+# 路线预取工具：动缓存 = 动团队共享数据，PM 复核后再跑
+/tools/route_fetch.py            @Zhouyx-0123
+/tools/route_candidates.py       @Zhouyx-0123
+
+# 口径与合同文档：全员可提改，PM 终审
+/docs/                           @Zhouyx-0123
+/config/calc_factors.json        @Zhouyx-0123

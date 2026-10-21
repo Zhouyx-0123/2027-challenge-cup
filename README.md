@@ -114,12 +114,21 @@ streamlit run app/app.py    # 只读结果表，直接打开应用（不重算�
 # 验收闸门会红 / 能定位失败段
 python -m src.pipeline --strict            # 真实数据全绿；演示数据下 5 项 FAIL
 python -m src.pipeline --simulate-fail 2   # 期望打印“第 2 段失败”，退出码 1
+
+# 测试套件（CI 同款）：引擎闸门 + 前端 AppTest + 弃用 API 防线
+pytest tests/                             # 全绿才算完成；push / PR 时 GitHub Actions 自动跑
 ```
 
 > **`tools/launch.py` 是演示入口**：`src/pipeline.py` 是引擎（算），`tools/launch.py` 是入口（跑）。
 > 启动器**任何一步失败都不阻断启动**——缺依赖会先尝试安装，缺高德 key 自动走离线降级，
 > 缺结果表会提示先跑 pipeline。答辩现场用陌生电脑也不至于白屏。
 > 完整运行手册见 `docs/27_项目运行手册.md`。
+>
+> **测试与 CI**：`pytest tests/` = 引擎闸门对拍（退出码 0、PASS 22 / FAIL 0、`--simulate-fail 2` 退出码 1）
+> + 首页与八页 AppTest 逐页渲染 + 弃用 API 扫描防线；`.github/workflows/ci.yml` 在 push / 开 PR 时
+> 自动跑同一套（Python 3.10 / 3.12 矩阵）。CI 环境没有 `data/raw`，pipeline 自动走演示样本，
+> 依赖真数据的五项闸门标 SKIP、因子两项 PASS，退出码仍为 0。闸门用例在临时工作区副本里跑，
+> **不会覆盖 `data/processed/` 的入库结果表**。
 
 > 当前 `data/raw` 已放附件1/附件2，运行即实测模式；把附件移走则自动回退 6,000 行演示样本。
 > 真实数据的 Sheet 结构、去重键、75 车型映射见 `docs/21_真实数据表结构与接入记录.md`。

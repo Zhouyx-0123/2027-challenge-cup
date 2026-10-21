@@ -20,7 +20,7 @@
 | A0 | services.py 只读 parquet + 缓存 | ✅ 页面无一行 `pd.read_parquet` |
 | A1 | layout / charts / flags（黄框估算值） | ✅ 四类标记 + 图例 |
 | A2 | 首页 + 第 1、2 页 | ✅ 三页 AppTest 0 异常 |
-| A3 | 第 3–5 页（合并 WorkBuddy 版本） | ✅ 五页 AppTest 0 异常，待口径/视觉复核 |
+| A3 | 第 3–5 页（合并 WorkBuddy 版本） | ✅ 主线五页 AppTest 0 异常，待口径/视觉复核 |
 | D0 | 附件1/附件2 真实数据接入 | ✅ 33,214 / 4,690,435.81 / 33,213 精确 |
 
 **真实模式（当前）**：`data/raw` 已放附件1（订单+运单）和附件2（车辆核心信息）。
@@ -128,8 +128,9 @@ python -m src.pipeline --simulate-fail 2   # 期望打印“第 2 段失败”�
 > E₀ 4,502,042.41 kg 精确；均速 49.51 对官方速度文件 49.57 在 ±0.1 内，已在说明列标注。
 >
 > **高德地图（T7，可选）**：配好 `config/amap_*` 三把 key 后，
-> `python -m tools.route_fetch` 预取 310 条真路线；`python -m tools.route_candidates` 预取 310×4 策略（均已入库，团队共享），
-> 第 3 页出现「动态路线」区块，第 6 页为完整路线实验室（高德实时底图 + 4 策略碳账 + 路径级碳-成本联合决策）。
+> `python -m tools.route_fetch` 预取 310 条真路线；`python -m tools.route_candidates` 预取 310×4 策略（均已入库，团队共享）。
+> **第 6 页「路线实验室」**已接通（高德实时底图 + 4 策略碳账 + 路径级碳-成本联合决策），
+> 第 3 页只保留入口提示、不重复画地图。
 > 没配 key 也能演示——自动回退 Plotly 离线底图。详见 `config/README.md`。
 
 ## 五、数据（永不入库）

@@ -63,17 +63,16 @@
 
 ## 3. 嵌入机制：Streamlit 怎么装一张高德地图
 
-Streamlit 没有原生地图组件，用官方 `components.v1.html` 把一段自包含 HTML 装进 iframe。三条纪律：
+Streamlit 没有原生地图组件，用官方 `st.iframe`（1.56.0 起，取代已弃用的 `components.v1.html`）把一段自包含 HTML 装进 iframe。三条纪律：
 
 1. **数据从 Python 侧注入，不从前端拉**：`route_od.parquet` → `json.dumps` → 替换 HTML 模板 token。前端只读铁律的延伸：浏览器不请求任何业务接口。
-2. **容器必须有像素高度**：`components.v1.html(html, height=560)`，HTML 里 `#map{height:560px}` 双写，缺一不可。
+2. **容器必须有像素高度**：`st.iframe(html, height=560)`，HTML 里 `#map{height:560px}` 双写，缺一不可。
 3. **key 只在服务端拼 HTML 时注入**：Python 读 `config/amap_js_key.txt` → `.replace("__KEY__", key)`；key 不出现在任何前端源码文件里。
 
 ```python
 # app/components/amapview.py（完整实现见 §6）
 import json
 import streamlit as st
-from streamlit.components.v1 import html as st_html
 
 def route_map(routes: list[dict], height: int = 560) -> bool:
     key = _load_js_key()
@@ -83,7 +82,7 @@ def route_map(routes: list[dict], height: int = 560) -> bool:
                 .replace("__JSCODE__", _load_js_code() or "")
                 .replace("__ROUTES_JSON__", json.dumps(routes, ensure_ascii=False))
                 .replace("__HEIGHT__", str(height)))
-    st_html(doc, height=height)
+    st.iframe(doc, height=height)
     return True
 ```
 
@@ -153,7 +152,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import streamlit as st
-from streamlit.components.v1 import html as st_html
 
 ROOT = Path(__file__).resolve().parents[2]
 KEY_PATH = ROOT / "config" / "amap_js_key.txt"
@@ -265,16 +263,16 @@ def route_map(routes: List[Dict[str, Any]], height: int = 560) -> bool:
         .replace("__LINE_COLORS__", json.dumps(colors))
         .replace("__HEIGHT__", str(height))
     )
-    st_html(doc, height=height)
+    st.iframe(doc, height=height)
     return True
 ```
 
 > 注入安全说明：`json.dumps` 的数据是坐标数组与中文地名，不含 `</script>` 序列；即便如此，生产环境建议加一道 `json.dumps(...).replace("</", "<\\/")` 防御。
 
-### 6.1 调用方写法（第 3 页片段）
+### 6.1 调用方写法（路线实验室片段）
 
 ```python
-# app/pages/3_替代方案.py —— 在线/离线双轨，key 缺失自动降级
+# app/pages/6_路线实验室.py —— 在线/离线双轨，key 缺失自动降级
 from components import amapview, mapview
 
 routes_df = services.routes()                     # services.py 新增：只读 route_od.parquet

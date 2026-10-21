@@ -168,9 +168,12 @@ def _normalize(row: Any, with_poly: bool = False) -> Optional[Dict[str, Any]]:
 
 
 def route_lab(routes: List[Dict[str, Any]], height: int = 820,
-              default_key: Optional[str] = None, lam: float = 100.0) -> bool:
+              default_key: Optional[str] = None, lam: float = 100.0,
+              candidates: Optional[Dict[str, Dict[str, Dict[str, Any]]]] = None) -> bool:
     """第 6 页：路线实验室（左侧线路列表 + 右侧高德实时路线 + 平滑动画）。
 
+    candidates：od_key → {strategy: 同策略碳账}；有值时前端切换策略会同步
+    更新碳排/成本/推荐车型，不再使用“综合策略缓存”兜底。
     未配置 key / 没有路线时返回 False，调用方回退离线示意图。
     """
     key = load_js_key()
@@ -183,6 +186,10 @@ def route_lab(routes: List[Dict[str, Any]], height: int = 820,
         if not item or item["id"] in seen:
             continue
         seen.add(item["id"])
+        if candidates:
+            cand = candidates.get(item["id"])
+            if cand:
+                item["cand"] = {str(k): v for k, v in cand.items()}
         items.append(item)
     if not items:
         return False

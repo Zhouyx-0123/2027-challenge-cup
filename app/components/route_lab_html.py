@@ -355,6 +355,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   var state = {
     id: DATA.default || (ROUTES[0] && ROUTES[0].id),
     policy: 0,
+    strategy: 0,
     live: null,
     alts: [],
     altIndex: 0,
@@ -402,6 +403,10 @@ TEMPLATE = r"""<!DOCTYPE html>
     return null;
   }
   function routeById(id){ return BY_ID[id] || ROUTES[0]; }
+  function candidateFor(r, strategy){
+    if(!r || !r.cand) return null;
+    return r.cand[String(strategy)] || null;
+  }
   function fmtPct(v){ return Math.max(0, Math.min(100, Math.round(v*100))) + "%"; }
 
   function renderHeader(r){
@@ -417,19 +422,22 @@ TEMPLATE = r"""<!DOCTYPE html>
     $("#ccTitle").textContent = r.on + " → " + r.dn;
   }
   function renderStatic(r){
-    $("#mKm").textContent = num(r.km, 1);
-    $("#mMin").textContent = num(r.min, 0);
-    $("#mToll").textContent = num(r.toll, 0);
-    $("#mCo2").textContent = (r.co2 == null ? "—" : fixed(r.co2, 2));
-    $("#mOpex").textContent = (r.opex == null ? "—" : num(r.opex, 0));
-    $("#mCc").textContent = (r.cc == null ? "—" : num(r.cc, 0));
-    $("#mScore").textContent = (r.score == null ? "—" : num(r.score, 0));
-    $("#mVeh").textContent = r.veh || "—";
-    $("#ccKm").textContent = num(r.km, 1);
-    $("#ccMin").textContent = num(r.min, 0);
-    $("#ccToll").textContent = num(r.toll, 0);
-    $("#ccCo2").textContent = (r.co2 == null ? "—" : fixed(r.co2, 2));
-    $("#ccOpex").textContent = (r.opex == null ? "—" : num(r.opex, 0));
+    var m = candidateFor(r, state.strategy) || r;
+    $("#mKm").textContent = num(m.km, 1);
+    $("#mMin").textContent = num(m.min, 0);
+    $("#mToll").textContent = num(m.toll, 0);
+    $("#mCo2").textContent = (m.co2 == null ? "—" : fixed(m.co2, 2));
+    $("#mOpex").textContent = (m.opex == null ? "—" : num(m.opex, 0));
+    $("#mCc").textContent = (m.cc == null ? "—" : num(m.cc, 0));
+    $("#mScore").textContent = (m.score == null ? "—" : num(m.score, 0));
+    $("#mVeh").textContent = m.veh || "—";
+    $("#ccKm").textContent = num(m.km, 1);
+    $("#ccMin").textContent = num(m.min, 0);
+    $("#ccToll").textContent = num(m.toll, 0);
+    $("#ccCo2").textContent = (m.co2 == null ? "—" : fixed(m.co2, 2));
+    $("#ccOpex").textContent = (m.opex == null ? "—" : num(m.opex, 0));
+    window.__ROUTE_LAB__.strategy = state.strategy;
+    window.__ROUTE_LAB__.candidate = candidateFor(r, state.strategy);
   }
   function setStatus(kind, text){
     var el = $("#status");
@@ -439,8 +447,16 @@ TEMPLATE = r"""<!DOCTYPE html>
   function updateLedgerNote(r, live){
     var note = $("#ledgerNote");
     if(!note) return;
+    var cand = candidateFor(r, state.strategy);
+    if(cand){
+      var diff = (live && cand.km > 0) ? Math.abs(live.km - cand.km) / cand.km : 0;
+      note.className = diff > 0.05 ? "ledger-note warn" : "ledger-note";
+      note.textContent = "策略碳账 · REST " + state.strategy + " 预计算 · λ=100"
+        + (diff > 0.05 ? "；实时里程相差 " + Math.round(diff * 100) + "%" : "");
+      return;
+    }
     var parts = [];
-    if(state.policy !== 0) parts.push("当前策略仅重算几何/距离/时长/过路费");
+    if(state.policy !== 0) parts.push("当前策略缺少预计算碳账");
     if(live && r.km && Math.abs(live.km - r.km) / r.km > 0.03){
       parts.push("实时里程与缓存相差 " + Math.round(Math.abs(live.km - r.km) / r.km * 100) + "%");
     }
@@ -904,15 +920,18 @@ TEMPLATE = r"""<!DOCTYPE html>
     if(!r) return;
     state.id = id;
     state.policy = state.policy || 0;
+    state.strategy = state.policy;
     state.live = null; state.alts = []; state.altIndex = 0;
     window.__ROUTE_LAB__.live = null;
     window.__ROUTE_LAB__.ready = false;
+    window.__ROUTE_LAB__.candidate = candidateFor(r, state.strategy);
     $("#btnPlay").disabled = true;
     clearOverlays();
     renderAlts();
     renderList(); renderHeader(r); renderStatic(r); renderSteps([]);
     updateLedgerNote(r, null);
-    setLiveMetrics(r.km, r.min, r.toll, false);
+    var base = candidateFor(r, state.strategy) || r;
+    setLiveMetrics(base.km, base.min, base.toll, false);
     if(state.map){
       setStatus("planning", "实时规划中");
       plan(r, force);
@@ -942,6 +961,7 @@ TEMPLATE = r"""<!DOCTYPE html>
         document.querySelectorAll(".pill").forEach(function(x){ x.classList.remove("on"); });
         b.classList.add("on");
         state.policy = Number(b.getAttribute("data-policy")) || 0;
+        state.strategy = state.policy;
         selectRoute(state.id, false);
       });
     });

@@ -33,6 +33,8 @@ data/processed/*
 !data/processed/route_od.parquet
 !data/processed/route_carbon.parquet
 !data/processed/route_select.parquet
+!data/processed/route_candidates.parquet
+!data/processed/route_candidate_carbon.parquet
 data/processed/route_geo.parquet
 
 # ===== 离线包与产物 =====

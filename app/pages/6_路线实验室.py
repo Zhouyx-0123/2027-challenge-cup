@@ -53,15 +53,17 @@ n_online = int((rows["source"] == "amap_rest").sum()) if "source" in rows.column
 _flag = rows["flag_route_est"] if "flag_route_est" in rows.columns else pd.Series([0] * len(rows))
 n_est = int((pd.to_numeric(_flag, errors="coerce").fillna(0) == 1).sum())
 coverage = services.kpis().get("od_coverage_pct")
+candidates = services.route_lab_candidates()
+n_cand_od = sum(1 for v in candidates.values() if len(v) >= 4)
 
 cards.chips([
     "%d 条网点级 OD" % len(rows),
     "%d 条高德真路线" % n_online,
     "%d 条离线兜底" % n_est,
     ("基准碳覆盖 %.1f%%" % float(coverage)) if coverage is not None else "基准碳覆盖 —",
+    ("策略级碳账 %d OD" % n_cand_od) if n_cand_od else "策略碳账未生成",
     "金额单位：元",
-    "几何实时 · 碳账缓存",
-], tones=["mint", "mint", "skip", "info", "warn", "skip"])
+], tones=["mint", "mint", "skip", "info", "mint" if n_cand_od else "warn", "warn"])
 
 layout.section(
     "实时路线实验室",
@@ -74,6 +76,7 @@ online = amapview.route_lab(
     height=820,
     default_key=default_id,
     lam=lam,
+    candidates=candidates,
 )
 
 if not online:
@@ -102,12 +105,53 @@ if not online:
         {"label": "运营成本", "value": services.fmt(row.get("opex_yuan"), 0) + " 元",
          "sub": "能耗 + 过路 + 时间"},
         {"label": "推荐车型", "value": str(row.get("vehicle_type") or "—"),
-         "sub": "λ=100 缓存口径"},
+         "sub": "λ=100 策略口径"},
     ], cols=6)
     cards.note(
         "离线模式画的是 route_od.parquet 里的缓存几何（按点数抽稀），只作示意；"
         "在线模式会用 AMap.Driving 重新规划，逐点贴合公路。"
     )
+
+# ---- 同一 OD 的四策略对比 ----
+cand_df = services.route_candidate_carbon()
+if not cand_df.empty and "od_key" in cand_df.columns:
+    first_od = str(rows.iloc[0]["od_key"])
+    sub = cand_df[cand_df["od_key"].astype(str) == first_od].copy()
+    if not sub.empty:
+        layout.section(
+            "同一 OD 的四种策略",
+            "默认线路 %s → %s；金额为元，碳账为 λ=100 策略情景，几何以实验室实时规划为准。"
+            % (str(rows.iloc[0].get("origin", "")), str(rows.iloc[0].get("dest", ""))),
+        )
+        _order = {0: 0, 4: 1, 1: 2, 6: 3}
+        sub = sub.assign(_order=sub["strategy"].map(lambda x: _order.get(int(x), 9))).sort_values("_order")
+        srows = []
+        for _, r in sub.iterrows():
+            kg = pd.to_numeric(pd.Series([r.get("kg_co2_route")]), errors="coerce").iloc[0]
+            srows.append([
+                str(r.get("strategy_name") or r.get("strategy")),
+                services.fmt(r.get("route_km"), 1),
+                services.fmt(r.get("route_min"), 0),
+                services.fmt(r.get("toll_yuan"), 0),
+                services.fmt((float(kg) / 1000.0) if pd.notna(kg) else None, 2),
+                services.fmt(r.get("opex_yuan"), 0),
+                services.fmt(r.get("carbon_cost_yuan"), 0),
+                services.fmt(r.get("score_yuan"), 0),
+                str(r.get("vehicle_type") or "—"),
+            ])
+        cards.htable(
+            ["策略", "距离(km)", "时长(min)", "过路费(元)", "碳排(t)",
+             "运营成本(元)", "碳成本(元)", "综合得分(元)", "推荐车型"],
+            srows, num_cols=[1, 2, 3, 4, 5, 6, 7],
+        )
+        cards.note(
+            "REST 策略 0/4/1/6 与实验室的 JS policy 一一对应；两边分别请求，"
+            "距离/时长可能差几个百分点。同一 OD 的策略路线可能重合（如当前无拥堵时避堵=综合），"
+            "所以表内数值相同并不代表没有切换。碳账是 L2 展示口径，不覆盖 L0 基准。"
+            "下方路线账本按 route_select 默认策略口径；上表按候选路线 0/4/1/6，"
+            "个别 OD 因路线不同会有差异，以实验室实时几何为准。",
+            sub="候选路线预取：python -m tools.route_candidates；碳账重算：python -m src.pipeline --with-routes。",
+        )
 
 # ---- 路线账本 ----
 layout.section(
@@ -147,9 +191,10 @@ cards.steps([
 ], active=-1)
 
 cards.note(
-    "金额口径：过路费、运营成本、碳成本（λ=100 缓存口径）、综合得分全部为元；"
+    "金额口径：过路费、运营成本、碳成本（λ=100 策略碳账）、综合得分全部为元；"
     "碳排为 tCO₂e。几何、距离、时长、过路费由高德实时规划提供；"
-    "碳排/运营成本/推荐车型来自 route_select.parquet，浏览器只展示、不重算。",
+    "碳排/运营成本/推荐车型来自 route_candidate_carbon.parquet（缺失时回退 route_select），"
+    "浏览器只展示、不重算。",
     sub="L1 路线情景与 L0 基准账分列：E₀ 仍以 baseline_carbon.parquet 为准，本页不覆盖主口径。",
 )
 

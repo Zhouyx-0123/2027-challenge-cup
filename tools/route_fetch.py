@@ -284,10 +284,12 @@ def geocode_batch(names: List[str], city_hint_of: Optional[Dict[str, str]] = Non
 
 
 def fetch_driving(origin: Tuple[float, float], dest: Tuple[float, float],
-                  strategy: int = 32) -> Optional[Dict[str, Any]]:
+                  strategy: int = 32,
+                  with_polyline: bool = True) -> Optional[Dict[str, Any]]:
     """单 OD 驾车规划 /v3/direction/driving。
 
     strategy：32=默认（综合）、33=躲避拥堵、34=避开收费、35=不走高速。
+    with_polyline=False 时不解析/抽稀几何，供候选路线批量预取省 CPU。
     失败/超时/配额耗尽 → None（调用方走 offline_route）。
     """
     payload = _request(DRIVING_URL, {
@@ -320,15 +322,17 @@ def fetch_driving(origin: Tuple[float, float], dest: Tuple[float, float],
         traffic_lights = None
     # 高德 /v3/direction/driving 的路径几何在 path.steps[*].polyline，
     # path 顶层通常没有 polyline；之前只读顶层导致 295 条“真路线”全是空线。
-    polyline = str(path.get("polyline", "") or "")
-    if not polyline:
-        steps = path.get("steps") or []
-        polyline = ";".join(
-            str(step.get("polyline", "") or "")
-            for step in steps
-            if step.get("polyline")
-        )
-    polyline = _simplify_polyline(polyline, max_points=400)
+    polyline = ""
+    if with_polyline:
+        polyline = str(path.get("polyline", "") or "")
+        if not polyline:
+            steps = path.get("steps") or []
+            polyline = ";".join(
+                str(step.get("polyline", "") or "")
+                for step in steps
+                if step.get("polyline")
+            )
+        polyline = _simplify_polyline(polyline, max_points=1500)
     return {
         "distance_km": distance_km,
         "duration_min": duration_min,

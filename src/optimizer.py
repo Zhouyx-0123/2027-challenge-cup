@@ -29,6 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = ROOT / "data" / "processed"
 WIDE_PATH = PROCESSED_DIR / "wide_data.parquet"
 BASELINE_PATH = PROCESSED_DIR / "baseline_carbon.parquet"
+ROUTE_CANDIDATES_PATH = PROCESSED_DIR / "route_candidates.parquet"
+ROUTE_CANDIDATE_CARBON_PATH = PROCESSED_DIR / "route_candidate_carbon.parquet"
 
 FACTOR_VERSION = "JCB2023-BASE-v1"
 FACTOR_SOURCE = "吴睿中等（2024）VSP 排放率；v=50 km/h；2023年基准碳排放计算结果.xlsx 因子表"
@@ -346,9 +348,61 @@ def route_carbon(seg: pd.DataFrame, route: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _best_vehicle_for_route(sub: pd.DataFrame, rec: Dict[str, Any],
+                            lam: float) -> Optional[Dict[str, Any]]:
+    """给定一个 OD 的段子集与一条路线记录，选该路线下综合得分最低的车型。
+
+    口径与 route_select_by_lambda 完全一致：碳排按 factor_lookup(载重) × 路线距离，
+    运营成本 = 能耗 + 过路费 + 时间成本，score = opex + λ × 碳排。全部是展示口径。
+    """
+    if sub is None or sub.empty or "vehicle_type" not in sub.columns:
+        return None
+    km = pd.to_numeric(pd.Series([rec.get("distance_km")]), errors="coerce").iloc[0]
+    minutes = pd.to_numeric(pd.Series([rec.get("duration_min")]), errors="coerce").iloc[0]
+    if pd.isna(km) or km <= 0:
+        return None
+    if pd.isna(minutes) or minutes <= 0:
+        minutes = float(km) / INDUSTRY_SPEED_KMH * 60.0
+    toll = float(rec.get("toll_yuan") or 0.0)
+
+    candidates = sub.groupby("vehicle_type", sort=False).agg(
+        load_t=("load_t", "mean"),
+        n=("kg_co2", "size"),
+    ).reset_index()
+    best: Optional[Dict[str, Any]] = None
+    for _, cand in candidates.iterrows():
+        load_v = float(cand["load_t"]) if pd.notna(cand["load_t"]) else 12.0
+        factor = float(factor_lookup(load_v))
+        kg = factor * float(km) / 1000.0
+        if "电" in str(cand["vehicle_type"]):
+            energy = float(km) * 0.9 * ENERGY_PRICE_YUAN_PER_KWH
+        else:
+            energy = float(km) * 0.35 * DIESEL_PRICE_YUAN_PER_L
+        time_cost = float(minutes) / 60.0 * TIME_VALUE_YUAN_PER_HOUR
+        opex = energy + toll + time_cost
+        carbon_cost = kg / 1000.0 * float(lam)
+        score = opex + carbon_cost
+        record = {
+            "od_key": str(rec.get("od_site") or rec.get("od_key") or ""),
+            "vehicle_type": str(cand["vehicle_type"]),
+            "load_t": round(load_v, 2),
+            "route_km": round(float(km), 3),
+            "route_min": round(float(minutes), 2),
+            "toll_yuan": round(toll, 2),
+            "kg_co2_route": round(kg, 3),
+            "opex_yuan": round(opex, 2),
+            "carbon_cost_yuan": round(carbon_cost, 2),
+            "score_yuan": round(score, 2),
+            "flag_route_est": int(rec.get("flag_route_est", 0) or 0),
+        }
+        if best is None or record["score_yuan"] < best["score_yuan"]:
+            best = record
+    return best
+
+
 def route_select_by_lambda(seg: pd.DataFrame, route: pd.DataFrame,
                            lam: float = 100.0) -> pd.DataFrame:
-    """L2 · λ 联合目标：选路线/选车型。
+    """L2 · λ 联合目标：选路线/选车型（每个 OD 一条默认路线）。
 
     score = 运营成本(元) + λ × 碳排(t)
       运营成本 = 能耗成本(油/电) + 过路费 + 时间成本(路线时长 × 时薪假设)
@@ -364,59 +418,15 @@ def route_select_by_lambda(seg: pd.DataFrame, route: pd.DataFrame,
 
     index = _route_index(route)
     lam = float(lam or 0.0)
-
     work = seg.copy()
     work["_route_join_key"] = _segment_join_key(seg)
 
     rows: List[Dict[str, Any]] = []
-    grouped = work.groupby("_route_join_key", sort=False)
-    for od_key, sub in grouped:
+    for od_key, sub in work.groupby("_route_join_key", sort=False):
         rec = index.get(str(od_key))
         if not rec:
             continue
-        km = pd.to_numeric(pd.Series([rec.get("distance_km")]), errors="coerce").iloc[0]
-        minutes = pd.to_numeric(pd.Series([rec.get("duration_min")]), errors="coerce").iloc[0]
-        if pd.isna(km) or km <= 0:
-            continue
-        if pd.isna(minutes) or minutes <= 0:
-            minutes = float(km) / INDUSTRY_SPEED_KMH * 60.0
-        toll = float(rec.get("toll_yuan") or 0.0)
-
-        best: Optional[Dict[str, Any]] = None
-        candidates = sub.groupby("vehicle_type", sort=False).agg(
-            load_t=("load_t", "mean"),
-            n=("kg_co2", "size"),
-        ).reset_index()
-        for _, cand in candidates.iterrows():
-            load_v = float(cand["load_t"]) if pd.notna(cand["load_t"]) else 12.0
-            factor = float(factor_lookup(load_v))
-            kg = factor * float(km) / 1000.0
-            # 能耗成本：柴油按里程油耗假设，电车按电耗假设（均为展示口径）
-            if "电" in str(cand["vehicle_type"]):
-                kwh = float(km) * 0.9
-                energy = kwh * ENERGY_PRICE_YUAN_PER_KWH
-            else:
-                liters = float(km) * 0.35
-                energy = liters * DIESEL_PRICE_YUAN_PER_L
-            time_cost = float(minutes) / 60.0 * TIME_VALUE_YUAN_PER_HOUR
-            opex = energy + toll + time_cost
-            carbon_cost = kg / 1000.0 * lam
-            score = opex + carbon_cost
-            record = {
-                "od_key": str(od_key),
-                "vehicle_type": str(cand["vehicle_type"]),
-                "load_t": round(load_v, 2),
-                "route_km": round(float(km), 3),
-                "route_min": round(float(minutes), 2),
-                "toll_yuan": round(toll, 2),
-                "kg_co2_route": round(kg, 3),
-                "opex_yuan": round(opex, 2),
-                "carbon_cost_yuan": round(carbon_cost, 2),
-                "score_yuan": round(score, 2),
-                "flag_route_est": int(rec.get("flag_route_est", 0) or 0),
-            }
-            if best is None or record["score_yuan"] < best["score_yuan"]:
-                best = record
+        best = _best_vehicle_for_route(sub, rec, lam)
         if best is not None:
             best["od_pair"] = str(rec.get("od_pair") or "")
             best["origin"] = str(rec.get("origin") or "")
@@ -427,6 +437,48 @@ def route_select_by_lambda(seg: pd.DataFrame, route: pd.DataFrame,
     if out.empty:
         return out
     return out.sort_values("score_yuan").reset_index(drop=True)
+
+
+def route_candidate_select(seg: pd.DataFrame, candidates: pd.DataFrame,
+                           lam: float = 100.0) -> pd.DataFrame:
+    """候选路线 × 车型的 L2 展示口径：每个 OD × 策略一行。
+
+    输入 candidates 来自 route_candidates.parquet（高德 REST 0/4/1/6 策略），
+    输出列在 route_select 基础上增加 strategy / strategy_name / source。
+    只做展示口径，不进 L0 对拍；候选缺失/距离无效的行直接跳过。
+    """
+    if seg is None or seg.empty or candidates is None or candidates.empty:
+        return pd.DataFrame()
+    work = seg.copy()
+    work["_route_join_key"] = _segment_join_key(seg)
+    grouped = {str(k): sub for k, sub in work.groupby("_route_join_key", sort=False)}
+
+    rows: List[Dict[str, Any]] = []
+    for _, cand in candidates.iterrows():
+        sub = None
+        for col in ("od_site", "od_key"):
+            value = cand.get(col)
+            if value is not None and str(value) not in ("", "nan"):
+                sub = grouped.get(str(value))
+                if sub is not None:
+                    break
+        if sub is None or sub.empty:
+            continue
+        best = _best_vehicle_for_route(sub, cand.to_dict(), float(lam or 0.0))
+        if best is None:
+            continue
+        best["strategy"] = int(cand.get("strategy") or 0)
+        best["strategy_name"] = str(cand.get("strategy_name") or "")
+        best["source"] = str(cand.get("source") or "")
+        best["od_pair"] = str(cand.get("od_pair") or "")
+        best["origin"] = str(cand.get("origin") or "")
+        best["dest"] = str(cand.get("dest") or "")
+        rows.append(best)
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    return out.sort_values(["od_key", "strategy", "score_yuan"]).reset_index(drop=True)
 
 
 def route_constraint(route_km: float, available_range_km: float,
@@ -477,6 +529,19 @@ def build_routes() -> pd.DataFrame:
     sel_path = PROCESSED_DIR / "route_select.parquet"
     if not selected.empty:
         _save_parquet(selected, sel_path)
+
+    # 候选路线 × 策略的碳账（可选；route_candidates.parquet 存在才跑）
+    if ROUTE_CANDIDATES_PATH.exists():
+        try:
+            candidates = pd.read_parquet(ROUTE_CANDIDATES_PATH)
+            cand_sel = route_candidate_select(enriched, candidates, lam=100.0)
+            if not cand_sel.empty:
+                _save_parquet(cand_sel, ROUTE_CANDIDATE_CARBON_PATH)
+                print("  [O8] 候选路线碳账落盘：%s（%d 行，%d 策略）"
+                      % (ROUTE_CANDIDATE_CARBON_PATH.name, len(cand_sel),
+                         int(cand_sel["strategy"].nunique())))
+        except Exception as exc:
+            print("  [O8] 候选路线碳账跳过：%s" % exc)
 
     n_est = int(enriched["flag_route_est"].sum()) if "flag_route_est" in enriched.columns else 0
     print("  [O8] 路线情景落盘：%s（%d 段，其中估算 %d 段）"

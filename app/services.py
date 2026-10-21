@@ -50,6 +50,8 @@ RESULT_FILES: Dict[str, str] = {
     "routes": "route_od.parquet",
     "route_carbon": "route_carbon.parquet",
     "route_select": "route_select.parquet",
+    "route_candidates": "route_candidates.parquet",
+    "route_candidate_carbon": "route_candidate_carbon.parquet",
 }
 
 # ---- 冻结的列名：只增不改 ----
@@ -243,6 +245,54 @@ def route_carbon() -> pd.DataFrame:
 def route_select() -> pd.DataFrame:
     """λ 推荐表 route_select.parquet（L2 联合决策）。缺失返回空表。"""
     return _read_parquet(RESULT_FILES["route_select"])
+
+
+def route_candidates() -> pd.DataFrame:
+    """候选路线表 route_candidates.parquet（OD × 4 策略）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_candidates"])
+
+
+def route_candidate_carbon() -> pd.DataFrame:
+    """候选路线碳账 route_candidate_carbon.parquet（OD × 策略 × 车型）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_candidate_carbon"])
+
+
+@st.cache_data(show_spinner=False)
+def route_lab_candidates() -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """路线实验室的策略碳账：od_key → {strategy: 指标}。
+
+    只做单位换算（kg → t）和字段搬运，不做碳/成本公式；缺失返回 {}。
+    """
+    df = route_candidate_carbon()
+    if df.empty or "od_key" not in df.columns or "strategy" not in df.columns:
+        return {}
+    out: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for _, r in df.iterrows():
+        try:
+            od = str(r.get("od_key") or "")
+            strategy = str(int(r.get("strategy")))
+        except (TypeError, ValueError):
+            continue
+        if not od:
+            continue
+        def _f(key: str) -> float:
+            value = pd.to_numeric(pd.Series([r.get(key)]), errors="coerce").iloc[0]
+            return float(value) if pd.notna(value) else 0.0
+
+        kg = pd.to_numeric(pd.Series([r.get("kg_co2_route")]), errors="coerce").iloc[0]
+        out.setdefault(od, {})[strategy] = {
+            "km": _f("route_km"),
+            "min": _f("route_min"),
+            "toll": _f("toll_yuan"),
+            "co2": (float(kg) / 1000.0) if pd.notna(kg) else None,
+            "opex": _f("opex_yuan"),
+            "cc": _f("carbon_cost_yuan"),
+            "score": _f("score_yuan"),
+            "veh": str(r.get("vehicle_type") or ""),
+            "load": _f("load_t"),
+            "name": str(r.get("strategy_name") or ""),
+        }
+    return out
 
 
 def route_available() -> bool:

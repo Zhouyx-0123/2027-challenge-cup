@@ -195,7 +195,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         ref = api.get_ref(args.branch)
     except urllib.error.HTTPError as exc:
-        print("  ✗ 取远端分支失败：HTTP %s" % exc.code)
+        print("  [FAIL] 取远端分支失败：HTTP %s" % exc.code)
         return 1
     remote_sha = ref["object"]["sha"]
     print("  远端 HEAD ：%s" % remote_sha[:10])
@@ -205,7 +205,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print("  提交信息 ：%s" % (message.splitlines()[0] if message else "(空)"))
 
     if local_sha == remote_sha:
-        print("  ✓ 已是最新，无需推送")
+        print("  [OK] 已是最新，无需推送")
         return 0
 
     # --- 两边的文件清单（快进/重建两条路都要用）---
@@ -254,7 +254,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                                        {"name": "WorkBuddy", "email": "workbuddy@local"})
         print("  新建 commit：%s" % new_commit[:10])
         api.update_ref(args.branch, new_commit, force=False)
-        print("  ✓ 远端分支已快进 → %s" % new_commit[:10])
+        print("  [OK] 远端分支已快进 → %s" % new_commit[:10])
         _align_local_ref(args.branch, new_commit)
         print("=" * 78)
         return 0
@@ -274,7 +274,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print("  需更新 %d 个 / 需删除 %d 个" % (len(changed), len(removed)))
 
     if not changed and not removed:
-        print("  ✓ 文件内容与远端**完全一致**——远端已是最新，无需再推")
+        print("  [OK] 文件内容与远端**完全一致**——远端已是最新，无需再推")
         _align_local_ref(args.branch, remote_sha)
         print("=" * 78)
         return 0
@@ -298,7 +298,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print("  新建 commit：%s" % new_commit[:10])
 
     api.update_ref(args.branch, new_commit, force=False)
-    print("  ✓ 远端分支已更新 → %s" % new_commit[:10])
+    print("  [OK] 远端分支已更新 → %s" % new_commit[:10])
     _align_local_ref(args.branch, new_commit)
     print("=" * 78)
     return 0

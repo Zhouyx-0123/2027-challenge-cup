@@ -774,7 +774,7 @@ def batch_fetch(od_df: pd.DataFrame, qps: float = _QPS,
     print("  [R2] 批量算路：待抓 %d 条 / 缓存命中 %d 条"
           % (len(todo), len(existing)))
     if todo and not offline and not key_available():
-        print("       ⚠ 未检测到可用 Web 服务 key → 全部走离线兜底（haversine×%.2f）"
+        print("       [!] 未检测到可用 Web 服务 key → 全部走离线兜底（haversine×%.2f）"
               % DETOUR_FACTOR)
         offline = True
 
@@ -926,9 +926,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     st = self_test()
     print("  离线兜底自测：距离 %.3f km｜绕行系数口径 %s｜时长反推 %s｜坐标缺失防护 %s"
           % (st["offline_distance_km"],
-             "✓" if st["detour_factor_ok"] else "✗",
-             "✓" if st["duration_ok"] else "✗",
-             "✓" if st["missing_coord_guard_ok"] else "✗"))
+             "OK" if st["detour_factor_ok"] else "NG",
+             "OK" if st["duration_ok"] else "NG",
+             "OK" if st["missing_coord_guard_ok"] else "NG"))
     print("  Web 服务 key：%s" % ("已配置" if st["key_available"] else "未配置（走离线兜底）"))
     print("-" * 78)
 

@@ -56,17 +56,27 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/4] 环境自检 + 一键复算...
+echo [3/4] 环境自检 + 可选复算...
 %PY% -m tools.launch --check
 if errorlevel 1 (
     echo.
     echo     [!] 自检有未通过项，继续启动（页面会提示，不白屏）。
-) else (
+)
+
+set "HAS_RAW="
+if exist "data\raw\*.xlsx" set "HAS_RAW=1"
+if exist "data\raw\*.xls" set "HAS_RAW=1"
+if exist "data\raw\*.csv" set "HAS_RAW=1"
+if defined HAS_RAW (
+    echo     检测到 data\raw 附件，开始复算...
     %PY% -m src.pipeline
+) else (
+    echo     data\raw 为空：跳过复算，直接使用现有结果表。
+    echo     （避免真实结果被合成演示样本覆盖）
 )
 
 echo.
-echo [4/4] 启动五页...
+echo [4/4] 启动应用...
 echo     浏览器地址：http://localhost:8501
 echo     停止服务：在此窗口按 Ctrl+C
 echo     --------------------------------------------------------------

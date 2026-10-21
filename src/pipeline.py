@@ -159,7 +159,7 @@ def _fmt(value: Any, unit: str = "") -> str:
 
 
 def _status_icon(status: str) -> str:
-    return {"PASS": "✓", "FAIL": "✗", "SKIP": "⏭", "WARN": "⚠"}.get(status, "?")
+    return {"PASS": "PASS", "FAIL": "FAIL", "SKIP": "SKIP", "WARN": "WARN"}.get(status, "?")
 
 
 # ---------------------------------------------------------------------------
@@ -181,12 +181,12 @@ def _run_stage(index: int, stage: Dict[str, Any], simulate: bool = False) -> Dic
             raise RuntimeError("验收自测：人为触发第 %d 段故障（--simulate-fail）" % index)
         stage["fn"]()
         seconds = time.perf_counter() - t0
-        print("      ✓ %.2f s" % seconds)
+        print("      [OK] %.2f s" % seconds)
         return {"key": stage["key"], "name": stage["name"], "status": "ok",
                 "seconds": round(seconds, 3), "error": ""}
     except Exception as exc:
         seconds = time.perf_counter() - t0
-        print("      ✗ 第 %d 段失败：%s" % (index, stage["name"]))
+        print("      [FAIL] 第 %d 段失败：%s" % (index, stage["name"]))
         print("        %s: %s" % (type(exc).__name__, exc))
         traceback.print_exc()
         return {"key": stage["key"], "name": stage["name"], "status": "fail",
@@ -722,7 +722,7 @@ def _print_gate(report: Dict[str, Any]) -> None:
     total = len(report.get("structural", []))
     print("  结构项：%d / %d 通过" % (total - len(bad), total))
     for item in bad:
-        print("    ✗ %s：%s" % (item["label"], item.get("detail", "")))
+        print("    [FAIL] %s：%s" % (item["label"], item.get("detail", "")))
     route_items = report.get("route_checks", [])
     if route_items:
         print("  路线情景软校验（T7 · 不参与退出码）：")
@@ -733,7 +733,7 @@ def _print_gate(report: Dict[str, Any]) -> None:
     counts = report.get("counts", {})
     print("  汇总：PASS %s｜FAIL %s｜SKIP %s"
           % (counts.get("pass", 0), counts.get("fail", 0), counts.get("skip", 0)))
-    print("  结论：%s" % ("✓ 通过" if report.get("passed") else "✗ 未通过（退出码 1）"))
+    print("  结论：%s" % ("[OK] 通过" if report.get("passed") else "[FAIL] 未通过（退出码 1）"))
     print("=" * 78)
 
 
@@ -796,7 +796,7 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
             _write_json(FLEET_STATS_PATH, {"source": source, "error": "fleet_stats 聚合失败",
                                            "note": "第 7/8 页将退回口径配置假设值"})
         seconds = time.perf_counter() - t0
-        print("      ✓ %.2f s｜台账 %d 行｜披露 %d 要素｜kpi %d 项"
+        print("      [OK] %.2f s｜台账 %d 行｜披露 %d 要素｜kpi %d 项"
               % (seconds, len(ledger), len(SIX_DISCLOSURE), len(kpi)))
         run_log["stages"].append({
             "key": "reports", "name": "④ 报表段（G3 台账 + G4 披露）",
@@ -804,7 +804,7 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
         })
     except Exception as exc:
         seconds = time.perf_counter() - t0
-        print("      ✗ 第 4 段失败：④ 报表段")
+        print("      [FAIL] 第 4 段失败：④ 报表段")
         traceback.print_exc()
         run_log["stages"].append({
             "key": "reports", "name": "④ 报表段（G3 台账 + G4 披露）",
@@ -820,7 +820,7 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
         t0 = time.perf_counter()
         try:
             if not ROUTE_PATH.exists():
-                print("      ⏭ SKIP：未找到 route_od.parquet"
+                print("      [SKIP] SKIP：未找到 route_od.parquet"
                       "（先跑 python -m tools.route_fetch）——主口径不受影响")
                 run_log["stages"].append({
                     "key": "routes", "name": "⑤ 路线情景段（T7）",
@@ -830,14 +830,14 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
             else:
                 optimizer.build_routes()
                 seconds = time.perf_counter() - t0
-                print("      ✓ %.2f s｜路线情景表已更新" % seconds)
+                print("      [OK] %.2f s｜路线情景表已更新" % seconds)
                 run_log["stages"].append({
                     "key": "routes", "name": "⑤ 路线情景段（T7）",
                     "status": "ok", "seconds": round(seconds, 3), "error": "",
                 })
         except Exception as exc:
             seconds = time.perf_counter() - t0
-            print("      ✗ 第 5 段失败：⑤ 路线情景段")
+            print("      [FAIL] 第 5 段失败：⑤ 路线情景段")
             traceback.print_exc()
             run_log["stages"].append({
                 "key": "routes", "name": "⑤ 路线情景段（T7）",
@@ -845,7 +845,7 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
                 "error": "%s: %s" % (type(exc).__name__, exc),
             })
             # 可选段失败**不阻断**主流程：L0 主口径照常出结果（降级纪律）
-            print("      ⚠ 路线情景段失败，但主口径不受影响——继续出闸门结论")
+            print("      [!] 路线情景段失败，但主口径不受影响——继续出闸门结论")
 
     # 演示标记：前端据此显示“演示数据”
     if source == "real":
@@ -875,9 +875,9 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
     _write_json(RUN_LOG_PATH, run_log)
     print("\n本次耗时 %.2f s｜结果目录 %s" % (run_log["total_seconds"], PROCESSED))
     if report.get("passed"):
-        print("流水线全部跑通 ✓")
+        print("流水线全部跑通 [OK]")
         return 0
-    print("流水线跑完，但闸门未通过 ✗（退出码 1）")
+    print("流水线跑完，但闸门未通过 [FAIL]（退出码 1）")
     return 1
 
 

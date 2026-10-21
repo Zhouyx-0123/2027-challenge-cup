@@ -147,7 +147,7 @@ def build(limit: Optional[int] = None, refresh: bool = False,
     print("  [C1] 候选路线：待抓 %d 条 / 缓存命中 %d 条（%d 个 OD × %d 策略，%d 并发）"
           % (len(todo), len(cache), len(base), len(STRATEGIES), max(1, workers)))
     if todo and not rf.key_available():
-        print("       ⚠ 未检测到 Web 服务 key，候选路线需要真实 key 才能生成")
+        print("       [!] 未检测到 Web 服务 key，候选路线需要真实 key 才能生成")
         return pd.DataFrame(columns=CAND_COLUMNS)
 
     def work(item: Any):

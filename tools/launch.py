@@ -32,9 +32,9 @@ ROOT = Path(__file__).resolve().parents[1]
 PROCESSED = ROOT / "data" / "processed"
 CONFIG = ROOT / "config"
 
-OK = "✓"
+OK = "[OK]"
 WARN = "!"
-BAD = "×"
+BAD = "[X]"
 
 # 前端只读铁律：这些必须成立
 GATE_EXPECT_PASS = 22
@@ -136,8 +136,24 @@ def check_routes() -> Tuple[bool, str]:
         return True, "路线表读不了（不影响启动）：%s" % exc
 
 
-def run_recalc(with_routes: bool = True) -> Tuple[bool, str]:
-    """一键复算。失败返回 False，但**不阻断启动**。"""
+def _raw_ready() -> bool:
+    """data/raw 是否有可读的附件（xlsx/xls/csv）。"""
+    raw = ROOT / "data" / "raw"
+    if not raw.exists():
+        return False
+    return any(p.is_file() and p.suffix.lower() in (".xlsx", ".xls", ".csv")
+               for p in raw.iterdir())
+
+
+def run_recalc(with_routes: bool = True, force: bool = False) -> Tuple[bool, str]:
+    """一键复算。失败返回 False，但**不阻断启动**。
+
+    data/raw 为空且已有结果表时默认跳过：否则 preprocess 会回退合成演示样本，
+    把真实的 data/processed 结果表覆盖掉。要强制复算（例如故意演练演示模式），
+    用 --force-recalc 或直接运行 python -m src.pipeline。
+    """
+    if not force and not _raw_ready() and (PROCESSED / "baseline_carbon.parquet").exists():
+        return True, "data/raw 为空：跳过复算，保留现有结果表（避免被演示样本覆盖）"
     cmd = [sys.executable, "-m", "src.pipeline"]
     if with_routes:
         cmd.append("--with-routes")
@@ -170,6 +186,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--check", action="store_true", help="只自检，不复算不启动")
     parser.add_argument("--no-recalc", action="store_true", help="不复算，直接启动")
     parser.add_argument("--no-routes", action="store_true", help="复算时不带路线段")
+    parser.add_argument("--force-recalc", action="store_true",
+                        help="data/raw 为空时也强制复算（会回退演示数据，慎用）")
     parser.add_argument("--port", type=int, default=8501)
     parser.add_argument("--open", action="store_true", help="自动打开浏览器")
     args = parser.parse_args(argv)
@@ -194,7 +212,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if hard_fail:
         print()
-        print("  ⚠ 有 %d 项硬性检查未通过。启动前建议先修：" % hard_fail)
+        print("  [!] 有 %d 项硬性检查未通过。启动前建议先修：" % hard_fail)
         for label, (ok, detail) in checks:
             if not ok and label not in ("高德 key", "路线表"):
                 print("     · %s → %s" % (label, detail))
@@ -208,12 +226,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.no_recalc:
         _print_header("一键复算（python -m src.pipeline）")
         t0 = time.perf_counter()
-        ok, summary = run_recalc(with_routes=not args.no_routes)
+        ok, summary = run_recalc(with_routes=not args.no_routes, force=args.force_recalc)
         print("  %s 耗时 %.1fs｜%s" % (OK if ok else WARN, time.perf_counter() - t0, summary))
         if not ok:
-            print("  ⚠ 复算未通过，但仍然启动——演示用上一轮结果表")
+            print("  [!] 复算未通过，但仍然启动——演示用上一轮结果表")
 
-    _print_header("启动五页")
+    _print_header("启动应用")
     return start_streamlit(args.port, open_browser=args.open)
 
 

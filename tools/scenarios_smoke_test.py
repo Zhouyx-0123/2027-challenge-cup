@@ -136,7 +136,7 @@ def main() -> int:
     if FAILED:
         print("未通过 %d 项：%s" % (len(FAILED), "、".join(FAILED)))
         return 1
-    print("全部通过 ✓")
+    print("全部通过 [OK]")
     return 0
 
 

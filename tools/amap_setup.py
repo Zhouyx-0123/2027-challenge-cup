@@ -79,7 +79,7 @@ def _status(path: Path) -> Tuple[str, str]:
     return "ok", "已配置"
 
 
-_STATUS_ICON = {"ok": "✓", "placeholder": "○", "missing": "×", "bad": "!"}
+_STATUS_ICON = {"ok": "OK", "placeholder": "?", "missing": "X", "bad": "!"}
 
 
 def show_status() -> Dict[str, Tuple[str, str]]:
@@ -223,7 +223,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("    跳过（还是占位符）。")
             continue
         if not KEY_PATTERN.match(value):
-            print("    ⚠ 格式不像 32 位十六进制 key，仍要写入吗？(y/N) > ", end="")
+            print("    [!] 格式不像 32 位十六进制 key，仍要写入吗？(y/N) > ", end="")
             try:
                 confirm = input().strip().lower()
             except (EOFError, KeyboardInterrupt):
@@ -232,16 +232,16 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print("    跳过。")
                 continue
         _write(path, value)
-        print("    ✓ 已写入 %s" % path.name)
+        print("    [OK] 已写入 %s" % path.name)
 
     print()
     print("=" * 78)
     print("验证")
     print("=" * 78)
     web_ok, web_msg = verify_web_key()
-    print("  %s Web 服务 key ：%s" % ("✓" if web_ok else "✗", web_msg))
+    print("  %s Web 服务 key ：%s" % ("OK" if web_ok else "FAIL", web_msg))
     js_ok, js_msg = verify_js_key()
-    print("  %s JS API key    ：%s" % ("✓" if js_ok else "✗", js_msg))
+    print("  %s JS API key    ：%s" % ("OK" if js_ok else "FAIL", js_msg))
     print()
     print("=" * 78)
     if web_ok and js_ok:

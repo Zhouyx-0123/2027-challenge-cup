@@ -102,13 +102,14 @@ python -m venv .venv
 
 pip install -r requirements.txt
 
-python -m tools.launch       # ★ 一键：环境自检 → 一键复算 → 打开五页
+python -m tools.launch       # ★ 一键：环境自检 → 可选复算 → 启动应用
                              #   浏览器访问 http://localhost:8501
                              #   Windows 可直接双击「启动.bat」，macOS 双击「启动.command」
+                             #   data/raw 为空时自动跳过复算，避免覆盖真实结果表
 
 # 下面两条是 launch 内部做的事，需要单独调时用：
 python -m src.pipeline      # 一键复算：宽表 → 段表 → 热点/方案 → 台账/披露/闸门
-streamlit run app/app.py    # 只读结果表，打开五页
+streamlit run app/app.py    # 只读结果表，直接打开应用（不重算）
 
 # 验收闸门会红 / 能定位失败段
 python -m src.pipeline --strict            # 真实数据全绿；演示数据下 5 项 FAIL
@@ -186,8 +187,9 @@ python -m src.pipeline --simulate-fail 2   # 期望打印“第 2 段失败”�
 | 曾广 | FM 财务 | `src/evaluator.py`、成本口径、商业计划书 |
 | 杨盛文 | FE 算法 | `src/optimizer.py`、`app/` 3–5 页、离线打包 |
 
-> 当前：五页已接通（3–5 页由 WorkBuddy 版本合并，待口径与视觉复核）；
-> `启动.bat`、离线 wheels、断网实测未做；报告/PPT/视频未开始。
+> 当前：五页主线 + 第 6 页路线实验室 + ⑦⑧ 情景演算页已接通；`启动.bat`/launcher 已加
+> “data/raw 为空则跳过复算”的保护；离线 wheels、真实断网实测仍未做；
+> 成本模型仍是静态标定，C1–C5 未接第 3 页，D4/D5/D6/D8 仍待处理；报告/PPT/视频未开始。
 
 ## 九、范围边界
 

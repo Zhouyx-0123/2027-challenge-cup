@@ -90,6 +90,11 @@ div[data-testid="stDataFrame"] table { font-variant-numeric: tabular-nums; }
 .cm-hero .k { color: var(--accent); font-size: 12px; letter-spacing: .22em; text-transform: uppercase; }
 .cm-hero h1 { font-size: 34px; margin: 8px 0 6px 0; line-height: 1.15; }
 .cm-hero p { color: var(--muted); margin: 0; font-size: 14.5px; }
+.cm-hero.compact { padding: 18px 24px 15px 24px; margin-bottom: 10px; border-radius: 16px; }
+.cm-hero.compact .k { font-size: 10.5px; letter-spacing: .20em; }
+.cm-hero.compact h1 { font-size: 25px; margin: 5px 0 4px 0; }
+.cm-hero.compact p { font-size: 13px; }
+.cm-hero.compact .cm-chip { margin-top: 9px; padding: 3px 9px; font-size: 11px; }
 .cm-chip { display:inline-block; margin: 12px 8px 0 0; padding: 4px 11px; border-radius: 999px;
   font-size: 12px; color: var(--text); border: 1px solid rgba(45,212,167,0.35);
   background: rgba(45,212,167,0.10); }
@@ -259,6 +264,21 @@ def hero(title: str, subtitle: str, kicker: str = "CARBON LEDGER", badges: Optio
     chips = "".join("<span class='cm-chip'>" + str(b) + "</span>" for b in (badges or []))
     st.markdown(
         "<div class='cm-hero'>"
+        + "<div class='k'>" + kicker + "</div>"
+        + "<h1>" + title + "</h1>"
+        + "<p>" + subtitle + "</p>"
+        + chips
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def hero_compact(title: str, subtitle: str, kicker: str = "CARBON LEDGER",
+                 badges: Optional[Iterable[str]] = None) -> None:
+    """紧凑页头：给地图/实验台留出首屏高度，视觉与 hero 同源。"""
+    chips = "".join("<span class='cm-chip'>" + str(b) + "</span>" for b in (badges or []))
+    st.markdown(
+        "<div class='cm-hero compact'>"
         + "<div class='k'>" + kicker + "</div>"
         + "<h1>" + title + "</h1>"
         + "<p>" + subtitle + "</p>"

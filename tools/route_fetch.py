@@ -341,20 +341,81 @@ def fetch_driving(origin: Tuple[float, float], dest: Tuple[float, float],
     }
 
 
-def _simplify_polyline(polyline: str, max_points: int = 400) -> str:
-    """抽稀高德 polyline，保留首尾点。
+def _simplify_polyline(polyline: str, max_points: int = 1500) -> str:
+    """抽稀高德 polyline（RDP，保形），保留首尾点。
 
-    高德一条 1,300 km 路线约 1.2 万个点；310 条全存会到几十 MB。
-    页面只需要“看得出走向”，400 个点足够，且不影响距离/时长/碳排。
+    为什么不再按固定步长抽样：旧实现 chunks[::step] 在 1,375 km 路线上
+    只留 400 个点（约 3.4 km 一个点），城市/山区路段会直接跨过道路拐弯，
+    渲染出来就是“抽象折线”。现在改用 Douglas–Peucker：
+    先按 20 m 容差保形抽稀，点仍太多再逐步放大容差，直到不超过 max_points。
+    这样同样点数下能保留弯道与互通立交的走向。
+
+    注意：在线页面用 AMap.Driving 实时几何（约 12,000 点），本函数只服务
+    route_od.parquet 的离线缓存；缓存几何再密也不可能替代实时路网。
     """
     chunks = [c for c in str(polyline or "").split(";") if c]
     if len(chunks) <= max_points:
         return ";".join(chunks)
-    step = max(1, len(chunks) // max_points)
-    sampled = chunks[::step]
-    if sampled[-1] != chunks[-1]:
-        sampled.append(chunks[-1])
-    return ";".join(sampled)
+    points = _polyline_to_points(polyline)
+    if len(points) <= max_points:
+        return polyline
+
+    # 以路线中心纬度做局部等距投影，RDP 的距离单位用米。
+    mean_lat = sum(p[1] for p in points) / len(points)
+    kx = 111320.0 * math.cos(math.radians(mean_lat))
+    ky = 110540.0
+    projected = [(p[0] * kx, p[1] * ky) for p in points]
+
+    tolerance = 20.0
+    simplified = _rdp(projected, tolerance)
+    while len(simplified) > max_points and tolerance < 5000.0:
+        tolerance *= 1.8
+        simplified = _rdp(projected, tolerance)
+    if len(simplified) > max_points:
+        step = max(1, len(simplified) // max_points)
+        simplified = simplified[::step]
+        if simplified[-1] != projected[-1]:
+            simplified.append(projected[-1])
+    out = []
+    for x, y in simplified:
+        out.append("%.6f,%.6f" % (x / kx, y / ky))
+    return ";".join(out)
+
+
+def _rdp(points: List[Tuple[float, float]], tolerance: float) -> List[Tuple[float, float]]:
+    """Douglas–Peucker 折线抽稀（迭代版，避免长路线递归过深）。"""
+    n = len(points)
+    if n <= 2:
+        return list(points)
+    keep = [False] * n
+    keep[0] = keep[-1] = True
+    stack = [(0, n - 1)]
+    while stack:
+        start, end = stack.pop()
+        if end <= start + 1:
+            continue
+        ax, ay = points[start]
+        bx, by = points[end]
+        dx, dy = bx - ax, by - ay
+        denom = dx * dx + dy * dy
+        max_dist = -1.0
+        max_idx = -1
+        for i in range(start + 1, end):
+            px, py = points[i]
+            if denom <= 1e-12:
+                dist = math.hypot(px - ax, py - ay)
+            else:
+                t = ((px - ax) * dx + (py - ay) * dy) / denom
+                t = max(0.0, min(1.0, t))
+                dist = math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+            if dist > max_dist:
+                max_dist = dist
+                max_idx = i
+        if max_dist > tolerance and max_idx > start:
+            keep[max_idx] = True
+            stack.append((start, max_idx))
+            stack.append((max_idx, end))
+    return [p for i, p in enumerate(points) if keep[i]]
 
 
 def _polyline_to_points(polyline: str) -> List[List[float]]:

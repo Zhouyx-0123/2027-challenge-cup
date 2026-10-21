@@ -250,6 +250,52 @@ def route_available() -> bool:
     return not routes().empty
 
 
+@st.cache_data(show_spinner=False)
+def route_lab_rows() -> pd.DataFrame:
+    """路线实验室的展示表：route_od 的几何/端点 + route_select 的碳账与推荐车型。
+
+    只做左连接与列改名，不做碳/成本计算；页面拿到的是已经算好的数字。
+    缺失 route_select 时仍返回 route_od，实验室自动隐藏碳账区块。
+    """
+    route = routes()
+    if route.empty:
+        return route
+    out = route.copy()
+    select = route_select()
+    if not select.empty and "od_key" in select.columns:
+        keep = ["od_key", "vehicle_type", "load_t", "route_km", "route_min",
+                "toll_yuan", "kg_co2_route", "opex_yuan", "carbon_cost_yuan",
+                "score_yuan", "flag_route_est"]
+        sub = select[[c for c in keep if c in select.columns]].copy()
+        sub = sub.rename(columns={
+            "route_km": "sel_km", "route_min": "sel_min",
+            "toll_yuan": "sel_toll_yuan", "kg_co2_route": "sel_kg_co2",
+            "flag_route_est": "sel_flag_route_est",
+        })
+        out = out.merge(sub, on="od_key", how="left")
+
+    for col in ("distance_km", "duration_min", "toll_yuan", "sel_km", "sel_min",
+                "sel_toll_yuan", "sel_kg_co2", "opex_yuan", "carbon_cost_yuan",
+                "score_yuan", "load_t", "flag_route_est", "sel_flag_route_est"):
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce")
+
+    if "distance_km" in out.columns and "sel_km" in out.columns:
+        out["distance_km"] = out["distance_km"].fillna(out["sel_km"])
+    if "duration_min" in out.columns and "sel_min" in out.columns:
+        out["duration_min"] = out["duration_min"].fillna(out["sel_min"])
+    if "toll_yuan" in out.columns and "sel_toll_yuan" in out.columns:
+        out["toll_yuan"] = out["toll_yuan"].fillna(out["sel_toll_yuan"])
+    if "flag_route_est" in out.columns and "sel_flag_route_est" in out.columns:
+        out["flag_route_est"] = out["flag_route_est"].fillna(out["sel_flag_route_est"])
+    if "flag_route_est" in out.columns:
+        out["flag_route_est"] = out["flag_route_est"].fillna(0).astype(int)
+
+    if "sel_kg_co2" in out.columns:
+        out["co2_t"] = out["sel_kg_co2"] / 1000.0
+    return out
+
+
 def is_mock() -> bool:
     """演示数据：_source.json 说 demo，或旧版 _mock.flag 还在。"""
     if source_name() == "demo":

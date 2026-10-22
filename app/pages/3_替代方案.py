@@ -194,17 +194,24 @@ with b1:
         {"k": "标定依据", "v": str(main_row.get("basis", ""))},
     ])
 with b2:
-    cards.panel_head("λ 视角", "内部碳价把减排变成钱", "展示口径 · 数据全部来自结果表")
-    # 年度减排量直接取结果表列（数据期减排 × 年化系数），页面不自己发明口径——
-    # 与 evaluator 的 internal_value / break_even_lambda 同源（D4/D5 收敛）。
+    cards.panel_head("λ 视角", "内部碳价把减排变成钱", "预计算口径 · 数据全部来自结果表")
+    # 年度减排量、含 λ 的年节省与回本全部读 lambda_curve.parquet（D5 唯一口径，
+    # 与 evaluator 的 internal_value / break_even_lambda 同源）——页面不再自算。
     saving_t = float(main_row.get("carbon_saving_t") or 0.0)
     annual_saving_t = float(main_row.get("annual_carbon_saving_t") or 0.0)
     annual_factor = float(main_row.get("annualization_factor") or 0.0)
     capex = float(main_row.get("capex_wan") or 0.0)
     opex = float(main_row.get("opex_save_wan") or 0.0)
-    carbon_gain_wan = annual_saving_t * lam / 10000.0
-    annual_with_lam = opex + carbon_gain_wan
-    payback_lam = (capex / annual_with_lam) if annual_with_lam > 0 else None
+    curve_main = services.lambda_curve_at(lam)
+    curve_main = (curve_main[curve_main["scenario"].astype(str) == str(main_row["scenario"])].iloc[0]
+                  if not curve_main.empty
+                  and (curve_main["scenario"].astype(str) == str(main_row["scenario"])).any() else None)
+    carbon_gain_wan = float(curve_main["annual_save_wan"]) - opex if curve_main is not None else None
+    annual_with_lam = float(curve_main["annual_save_wan"]) if curve_main is not None else None
+    payback_lam = float(curve_main["payback_years"]) if curve_main is not None else None
+    if annual_saving_t <= 0 and curve_main is not None:
+        # legacy 行没有年化减排列：展示 λ 曲线里的同一口径值（不自己乘年化系数）
+        annual_saving_t = float(curve_main.get("annual_carbon_t") or 0.0)
     cards.formula(
         "年度减排量 = 数据期减排 × 年化系数 = <span class='hl'>"
         + services.fmt(saving_t, 1) + " × " + services.fmt(annual_factor, 4) + "</span>"
@@ -215,7 +222,8 @@ with b2:
         "含碳收益年节省 = " + services.fmt(opex, 1) + " + " + services.fmt(carbon_gain_wan, 1)
         + " = <span class='hl'>" + services.fmt(annual_with_lam, 1) + " 万元/年</span>"
         " → 回本 <span class='hl2'>" + services.fmt(payback_lam, 2) + " 年</span>"
-        "<br><span class='dim'>λ 在左侧全局参数里调；完整敏感性曲线见第 4 页。</span>")
+        "<br><span class='dim'>λ 在左侧全局参数里调；含 λ 的年节省与回本读 "
+        "lambda_curve.parquet 预计算（网格步长 5 元/t），与第 4 页、evaluator NPV 同一份公式。</span>")
     cards.note("赛题口径只看运营节省（λ=0 → %s 年）；碳价延展口径把年度减排量按 λ 计价。"
                "两个口径都展示，推荐结论以达标线 + 单位减排成本为准。"
                % services.fmt(main_row.get("payback_years"), 2))
@@ -285,52 +293,49 @@ else:
                "共 %d 条，覆盖基准碳排 %.1f%%——不是边角样本。"
                % (len(band), float(k.get("od_coverage_pct") or 0.0)))
 
-    # ---- 下钻：选中 OD 的车型构成 ----
+    # ---- 下钻：选中 OD 的车型构成（读 od_vehicle_mix 预计算表，页面不聚合） ----
     picked_row = options[options["od_pair"].astype(str) == str(picked)].iloc[0]
-    od_key = str(picked_row.get("od_key") or picked_row.get("od_pair"))
-    if seg.empty or "od_key" not in seg.columns:
-        cards.empty_state("段级明细表未生成", "下钻需要 baseline_carbon.parquet。")
+    od_site = str(picked_row.get("od_site") or "")
+    mix = services.od_vehicle_mix(od_site)
+    if mix.empty:
+        cards.empty_state("这条线的车型构成还没预计算",
+                          "重跑  python -m src.pipeline  生成 od_vehicle_mix.parquet"
+                          "（可比较 OD 的逐车型构成，页面只查表）。")
     else:
-        sub = seg[seg["od_key"].astype(str) == od_key]
-        if sub.empty:
-            st.info("该线路在段表里没有明细（可能 od_key 口径不一致）。")
-        else:
-            st.markdown("")
-            layout.section("下钻 · " + str(picked), "这条线上实际跑了哪些车、各排多少碳")
-            fmin = float(picked_row.get("fmin") or 0.0)
-            fmax = float(picked_row.get("fmax") or 0.0)
-            cards.stats([
-                {"label": "路段数", "value": services.fmt(len(sub))},
-                {"label": "车型数", "value": services.fmt(sub["vehicle_type"].nunique())},
-                {"label": "因子带宽", "value": "%.2f×" % (fmax / fmin if fmin else 0.0),
-                 "tone": "coral", "sub": "%.2f → %.2f g/km" % (fmin, fmax)},
-                {"label": "该线碳排", "value": services.fmt(float(sub["kg_co2"].sum()) / 1000.0, 2) + " t",
-                 "tone": "amber"},
-            ], cols=4)
+        st.markdown("")
+        layout.section("下钻 · " + str(picked), "这条线上实际跑了哪些车、各排多少碳")
+        cards.stats([
+            {"label": "路段数", "value": services.fmt(picked_row.get("n"))},
+            {"label": "车型数", "value": services.fmt(picked_row.get("nt"))},
+            {"label": "因子带宽", "value": "%.2f×" % float(picked_row.get("ratio") or 0.0),
+             "tone": "coral",
+             "sub": "%.2f → %.2f g/km" % (float(picked_row.get("fmin") or 0.0),
+                                        float(picked_row.get("fmax") or 0.0))},
+            {"label": "该线碳排", "value": services.fmt(picked_row.get("kg_t"), 2) + " t",
+             "tone": "amber", "sub": "占基准碳排 %.2f%%" % float(picked_row.get("coverage_pct") or 0.0)},
+        ], cols=4)
 
-            grp = (sub.assign(kg=pd.to_numeric(sub["kg_co2"], errors="coerce").fillna(0.0))
-                      .groupby("vehicle_type", as_index=False)
-                      .agg(段数=("kg", "size"), 平均载重=("load_t", "mean"),
-                           因子=("factor_gkm", "mean"), 碳排kg=("kg", "sum")))
-            total_kg = float(grp["碳排kg"].sum()) or 1.0
-            grp["占比"] = grp["碳排kg"] / total_kg * 100.0
-            grp = grp.sort_values("碳排kg", ascending=False)
-            rows = [[str(r["vehicle_type"]), services.fmt(r["段数"]),
-                     services.fmt(r["平均载重"], 1), services.fmt(r["因子"], 2),
-                     services.fmt(r["碳排kg"], 1), "%.1f%%" % float(r["占比"])]
-                    for _, r in grp.iterrows()]
-            cards.htable(["车型", "段数", "平均载重(t)", "因子(g/km)", "碳排(kg)", "占比(%)"],
-                         rows, num_cols=[1, 2, 3, 4, 5])
-            charts.hbar(grp.rename(columns={"vehicle_type": "车型", "碳排kg": "碳排kg"}),
-                        "车型", "碳排kg", title="该线路各车型碳排（kg）", height=max(300, 46 * len(grp) + 90))
-            cards.note("同一 OD、同一段里程：因子由载重档位决定——这就是“换车”而不是“选路”的空间。"
-                       "最高因子车型承运的段，若能改由最低因子档位承运，结构性空间最大；"
-                       "能不能换要看下面五道运营约束。")
+        rows = [[str(r["vehicle_type"]), services.fmt(r.get("段数")),
+                 services.fmt(r.get("平均载重"), 1), services.fmt(r.get("因子"), 2),
+                 services.fmt(r.get("碳排kg"), 1), "%.1f%%" % float(r.get("占比") or 0.0)]
+                for _, r in mix.iterrows()]
+        cards.htable(["车型", "段数", "平均载重(t)", "因子(g/km)", "碳排(kg)", "占比(%)"],
+                     rows, num_cols=[1, 2, 3, 4, 5])
+        charts.hbar(mix.rename(columns={"vehicle_type": "车型", "碳排kg": "碳排kg"}),
+                    "车型", "碳排kg", title="该线路各车型碳排（kg）",
+                    height=max(300, 46 * len(mix) + 90))
+        cards.note("同一 OD、同一段里程：因子由载重档位决定——这就是“换车”而不是“选路”的空间。"
+                   "最高因子车型承运的段，若能改由最低因子档位承运，结构性空间最大；"
+                   "能不能换要看下面五道运营约束。构成表由 od_vehicle_mix.parquet 预计算。")
 
+        seg = services.segments()
+        if not seg.empty and "od_site" in seg.columns:
+            sub = seg[seg["od_site"].astype(str) == od_site]
             cols = [c for c in ["waybill_no", "plate", "vehicle_type", "dist_km",
                                 "factor_gkm", "kg_co2", "month"] if c in sub.columns]
-            flags.flagged_table(sub.sort_values("kg_co2", ascending=False),
-                                columns=cols, max_rows=30, show_legend=True)
+            if not sub.empty and cols:
+                flags.flagged_table(sub.sort_values("kg_co2", ascending=False),
+                                    columns=cols, max_rows=30, show_legend=True)
 
 # ================= E · 运营约束校验 C1–C5 =================
 st.markdown("")

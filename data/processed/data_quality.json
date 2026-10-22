@@ -1,6 +1,6 @@
 {
   "source": "real",
-  "generated_at": "2026-10-22T08:47:43",
+  "generated_at": "2026-10-22T09:47:37",
   "rows_raw": 36329,
   "rows_wide": 36329,
   "rows_dedup": 33214,
@@ -49,6 +49,13 @@
   "valid_speed_rows": 33213,
   "avg_speed": 49.5127,
   "avg_speed_1_100": 43.902,
+  "trace_rate": 1.0,
+  "estimate_reason_counts": {
+    "源订单号缺失→以运单号作为追踪代理": 6,
+    "包裹数缺失→数值列暂填 0，分析时须按缺失处理": 6,
+    "订单城市字段缺失→使用网点名称前缀尝试补齐": 5,
+    "时间戳异常→按行业均速 50 km/h 估算": 1
+  },
   "speed_method_counts": {
     "source_speed_column": 33213,
     "invalid_time_excluded": 1

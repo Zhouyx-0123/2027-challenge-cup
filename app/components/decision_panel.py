@@ -8,7 +8,7 @@
 
 **这个组件的边界**：
     - 只做展示：取数由调用方传入，本组件不读文件、不调业务接口、不做任何碳排计算；
-    - 碳排/成本/λ 结论全部来自结果表（route_carbon.parquet / route_select.parquet），
+    - 碳排/成本/λ 结论全部来自结果表（route_carbon_od.parquet / route_select.parquet），
       浏览器端零计算（docs/20 §4 前端只读铁律的延伸）；
     - 地图有则画高德、无则画 Plotly 离线图——**降级在组件内部闭环**，调用方不必写分支。
 
@@ -94,7 +94,8 @@ def render(route_df: pd.DataFrame,
     参数
     ----
     route_df    路线表 route_od.parquet（必需）
-    carbon_df   路线情景段表 route_carbon.parquet（可选，用于算该 OD 的路线碳排）
+    carbon_df   OD 级路线碳合计表 route_carbon_od.parquet（可选；每 OD 一行，
+                直接读 kg_co2_route_legal 列，不做任何 sum/mean）
     select_df   λ 推荐表 route_select.parquet（可选，用于展示推荐车型）
     segments    段表（可选，离线回退画布用）
     lam         内部碳价（元/t），仅用于展示 λ 视角
@@ -125,11 +126,13 @@ def render(route_df: pd.DataFrame,
     row = route_df.iloc[picked_key]
 
     # ---- 地图：在线高德 / 离线 Plotly（降级在组件内闭环）----
+    # kg_co2 取 OD 级预计算行（route_carbon_od.parquet）——不在浏览器端
+    # 对段表 sum 碳排：那是碳口径求和，已由 optimizer.build_routes 落表。
     kg_co2 = None
     if carbon_df is not None and not carbon_df.empty and "od_site" in carbon_df.columns:
         sub = carbon_df[carbon_df["od_site"].astype(str) == str(row.get("od_site", ""))]
         if not sub.empty and "kg_co2_route_legal" in sub.columns:
-            kg_co2 = float(pd.to_numeric(sub["kg_co2_route_legal"], errors="coerce").fillna(0.0).sum())
+            kg_co2 = float(sub.iloc[0]["kg_co2_route_legal"] or 0.0)
 
     payload = _route_to_payload(row, kg_co2)
     online_ok = False

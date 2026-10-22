@@ -1,6 +1,6 @@
 {
   "source": "real",
-  "generated_at": "2026-10-22T08:47:48",
+  "generated_at": "2026-10-22T09:47:42",
   "total_kg": 4502042.41069416,
   "e0_t": 4502.042410694159,
   "total_km": 4690435.81,
@@ -10,6 +10,9 @@
   "avg_speed": 49.512733417637676,
   "avg_speed_clean": 43.902023479925916,
   "heavy_share": 0.6504877817350587,
+  "longhaul_share": 0.6870728497972772,
+  "annual_emission_t": 13693.862400608425,
+  "annualization_factor": 3.0417,
   "dup_rows": 3115,
   "anomaly_rows": 1357,
   "basis_rows": 1935,

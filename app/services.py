@@ -171,12 +171,96 @@ def od_band() -> pd.DataFrame:
     return _read_parquet(RESULT_FILES["od_band"])
 
 
+def od_vehicle_mix(od_site: Optional[str] = None) -> pd.DataFrame:
+    """可比较 OD 的逐车型构成（od_vehicle_mix.parquet，D4 预计算）。
+
+    一行一个 (od_site, vehicle_type)；占比 = 该车型碳排占该 OD 碳排的比例。
+    页面按 od_site 查表显示，不再在页面上做 groupby / mean / 占比。
+    """
+    df = _read_parquet(RESULT_FILES["od_vehicle_mix"])
+    if od_site and not df.empty and "od_site" in df.columns:
+        df = df[df["od_site"].astype(str) == str(od_site)]
+    return df
+
+
+def route_carbon_od(od_site: Optional[str] = None) -> pd.DataFrame:
+    """OD 级路线口径碳合计（route_carbon_od.parquet，D4 预计算）。
+
+    一行一个 od_site；列 = 段数 + kg_co2_route_legal/phys + route_km 合计。
+    浏览器端不再对段表 sum 碳排——那是口径计算，只能在这里读行。
+    仅在 --with-routes 跑过 optimizer.build_routes 后存在。
+    """
+    df = _read_parquet(RESULT_FILES["route_carbon_od"])
+    if od_site and not df.empty and "od_site" in df.columns:
+        df = df[df["od_site"].astype(str) == str(od_site)]
+    return df
+
+
+# ---------------- D5 · λ 敏感性曲线（预计算，页面只读） ----------------
+# 公式全项目唯一一份在 src/evaluator.build_lambda_curve（与 evaluate_scenario 的
+# NPV 口径逐点一致：年节省 = 运营节省 + 年度减排量 × λ）。页面不得自建第二套。
+
+
+def lambda_curve() -> pd.DataFrame:
+    """λ × 回本年限全网格表（0–3000 元/t，步长 5）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["lambda_curve"])
+
+
+def lambda_grid() -> Dict[str, Any]:
+    """网格量程信息 {min, max, step, points}，页面据此注明“当前 λ 取最近网格点”。"""
+    df = lambda_curve()
+    if df.empty or "lambda_yuan_t" not in df.columns:
+        return {}
+    values = sorted(float(v) for v in
+                    pd.to_numeric(df["lambda_yuan_t"], errors="coerce").dropna().unique())
+    if len(values) < 2:
+        return {}
+    return {"min": values[0], "max": values[-1],
+            "step": float(values[1] - values[0]), "points": len(values)}
+
+
+def lambda_curve_at(lam: float) -> pd.DataFrame:
+    """当前 λ 的最近网格行（只做最近点选取，不做任何换算）。"""
+    df = lambda_curve()
+    if df.empty or "lambda_yuan_t" not in df.columns:
+        return df
+    values = [float(v) for v in
+              pd.to_numeric(df["lambda_yuan_t"], errors="coerce").dropna().unique()]
+    if not values:
+        return df
+    nearest = min(values, key=lambda v: abs(v - float(lam)))
+    return df[df["lambda_yuan_t"] == nearest]
+
+
 def ledger() -> pd.DataFrame:
     return _read_parquet(RESULT_FILES["ledger"])
 
 
 def disclosure() -> Dict[str, Any]:
     return _read_json(RESULT_FILES["disclosure"])
+
+
+def composition() -> Dict[str, Any]:
+    """E₀ 构成预计算表（第 5 页下钻）：combos[月份键|车型键] → 该组合的构成。
+
+    键规则与 src/pipeline._subset_key 一致：全集 = "all"，子集 = 升序逗号连接
+    （如 "1,2|1,3" = 1/2 月 × 轻型+重型）。页面只查表，不做聚合。
+    """
+    return _read_json(RESULT_FILES["composition"])
+
+
+def composition_combo(months: Optional[List[int]] = None,
+                      vclasses: Optional[List[int]] = None) -> Dict[str, Any]:
+    """按页面筛选取预计算组合；查不到返回 {}（页面显示提示，不自行聚合）。"""
+    data = composition()
+    combos = data.get("combos") or {}
+    all_months = [int(m) for m in (data.get("months") or [])]
+    all_classes = [int(v) for v in (data.get("vclasses") or [])]
+    picked_m = sorted(int(m) for m in (months or []))
+    picked_v = sorted(int(v) for v in (vclasses or []))
+    m_key = "all" if (not picked_m or picked_m == all_months) else ",".join(str(m) for m in picked_m)
+    v_key = "all" if (not picked_v or picked_v == all_classes) else ",".join(str(v) for v in picked_v)
+    return combos.get(m_key + "|" + v_key) or {}
 
 
 def quality() -> Dict[str, Any]:
@@ -355,86 +439,39 @@ def is_mock() -> bool:
 
 @st.cache_data(show_spinner=False)
 def kpis() -> Dict[str, Any]:
-    """优先读 kpi.json（pipeline 已算好）；缺了才从段表做展示性汇总。"""
-    d: Dict[str, Any] = dict(_read_json(RESULT_FILES["kpi"]))
-    seg = segments()
+    """kpi.json 是唯一来源（pipeline 预计算，口径只有这一份）。
 
-    if seg.empty:
-        for key in ("total_kg", "total_km", "segments", "avg_speed", "avg_speed_clean",
-                    "heavy_share", "dup_rows", "anomaly_rows", "basis_rows",
-                    "estimated_rows", "od_ratio_median", "od_pairs",
-                    "main_reduction_pct", "rows_wide", "valid_speed_rows"):
-            d.setdefault(key, None)
-        return d
-
-    if _has(seg, "kg_co2"):
-        d.setdefault("total_kg", float(pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0).sum()))
-    if "total_kg" in d and d.get("e0_t") is None:
-        d["e0_t"] = float(d["total_kg"] or 0) / 1000.0
-    if _has(seg, "dist_km"):
-        d.setdefault("total_km", float(pd.to_numeric(seg["dist_km"], errors="coerce").fillna(0).sum()))
-    d.setdefault("segments", int(len(seg)))
-
-    if _has(seg, "speed_kmh"):
-        s = pd.to_numeric(seg["speed_kmh"], errors="coerce")
-        valid = s.notna() & (s > 0)
-        clean = valid & s.between(1, 100)
-        d.setdefault("valid_speed_rows", int(valid.sum()))
-        d.setdefault("avg_speed", float(s[valid].mean()) if valid.any() else None)
-        d.setdefault("avg_speed_clean", float(s[clean].mean()) if clean.any() else None)
-
-    if _has(seg, "vclass") and _has(seg, "kg_co2"):
-        vc = pd.to_numeric(seg["vclass"], errors="coerce")
-        kg = pd.to_numeric(seg["kg_co2"], errors="coerce")
-        total = float(kg.sum()) or 1.0
-        d.setdefault("heavy_share", float(kg[vc == 3].sum()) / total)
-
-    for col, key in (("flag_dup", "dup_rows"),
-                     ("flag_anomaly", "anomaly_rows"),
-                     ("flag_basis", "basis_rows"),
-                     ("flag_estimated", "estimated_rows")):
-        if _has(seg, col):
-            d.setdefault(key, int(pd.to_numeric(seg[col], errors="coerce").fillna(0).sum()))
-
-    band = od_band()
-    if not band.empty and "ratio" in band.columns:
-        d.setdefault("od_ratio_median", float(pd.to_numeric(band["ratio"], errors="coerce").median()))
-        d.setdefault("od_pairs", int(len(band)))
-
-    schemes = scenarios()
-    if not schemes.empty and "is_main" in schemes.columns and "reduction_pct" in schemes.columns:
-        main = schemes[schemes["is_main"] == True]
-        if not main.empty:
-            d.setdefault("main_reduction_pct", float(main.iloc[0]["reduction_pct"]))
-
-    return d
+    D4：原函数在缺 kpi.json 时从段表自算 sum/mean/占比——那正是“前端第二套口径”，
+    已删除。缺文件时返回空 dict，页面显示“—”并提示重跑 pipeline，不编数字。
+    """
+    return dict(_read_json(RESULT_FILES["kpi"]))
 
 
 def flag_counts() -> Dict[str, int]:
-    """四类 FLAG 的计数：优先质量报告（去重后口径），再退回 kpi / 段表。"""
+    """四类 FLAG 的计数：唯一来源是 data_quality.json（pipeline 预计算）。
+
+    D4：原实现在缺键时回退到段表 sum——前端第二套口径，已删除；
+    缺键返回 0，页面显示空态而不是自算。
+    """
     q = quality()
     k = kpis()
-    wide_df = wide()
-    seg = segments()
 
-    def pick(qkey: str, kkey: str, col: str, df: pd.DataFrame, default: int = 0) -> int:
+    def pick(qkey: str, kkey: str, default: int = 0) -> int:
         for value in (q.get(qkey), k.get(kkey)):
             try:
                 if value is not None:
                     return int(value)
             except (TypeError, ValueError):
                 pass
-        if _has(df, col):
-            return int(pd.to_numeric(df[col], errors="coerce").fillna(0).sum())
         return default
 
     return {
-        "rows_wide": int(q.get("rows_wide") or k.get("rows_wide") or len(wide_df) or 0),
-        "rows_dedup": int(q.get("rows_dedup") or k.get("segments") or len(seg) or 0),
-        "dup_rows": pick("dup_rows", "dup_rows", "flag_dup", wide_df),
-        "anomaly_rows": pick("anomaly_rows", "anomaly_rows", "flag_anomaly", seg),
-        "basis_rows": pick("basis_rows", "basis_rows", "flag_basis", seg),
-        "estimated_rows": pick("estimated_rows", "estimated_rows", "flag_estimated", seg),
+        "rows_wide": pick("rows_wide", "rows_wide"),
+        "rows_dedup": pick("rows_dedup", "segments"),
+        "dup_rows": pick("dup_rows", "dup_rows"),
+        "anomaly_rows": pick("anomaly_rows", "anomaly_rows"),
+        "basis_rows": pick("basis_rows", "basis_rows"),
+        "estimated_rows": pick("estimated_rows", "estimated_rows"),
     }
 
 

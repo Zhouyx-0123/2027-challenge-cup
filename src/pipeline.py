@@ -15,6 +15,7 @@ G5 一键入口：python -m src.pipeline
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import sys
 import time
@@ -47,6 +48,8 @@ RUN_LOG_PATH = PROCESSED / "run_log.json"
 SOURCE_PATH = PROCESSED / "_source.json"
 MOCK_FLAG = PROCESSED / "_mock.flag"
 FLEET_STATS_PATH = PROCESSED / "fleet_stats.json"
+# D4 · 第 5 页 E₀ 构成下钻（月份子集 × 车型大类子集的预计算）
+COMPOSITION_PATH = PROCESSED / "composition.json"
 
 # T7 · 路线情景（可选段，docs/23 §6.3）
 ROUTE_PATH = PROCESSED / "route_od.parquet"
@@ -326,6 +329,11 @@ def build_kpi(seg: pd.DataFrame, wide: pd.DataFrame, schemes: pd.DataFrame,
     clean = valid & speed.between(1, 100)
     vclass = pd.to_numeric(seg["vclass"], errors="coerce") if "vclass" in seg.columns else pd.Series(dtype=float)
     heavy = float(pd.to_numeric(seg.loc[vclass == 3, "kg_co2"], errors="coerce").sum()) if len(vclass) else 0.0
+    # 第 2 页“超长途（>500 km）碳占比”：原页面公式，D4 迁入 kpi（口径只有这一份）
+    longhaul = 0.0
+    if "dist_km" in seg.columns:
+        dist = pd.to_numeric(seg["dist_km"], errors="coerce")
+        longhaul = float(pd.to_numeric(seg.loc[dist > 500, "kg_co2"], errors="coerce").sum())
     band_ratio = _num(band["ratio"].median()) if not band.empty and "ratio" in band.columns else None
     band_kg = float(pd.to_numeric(band["kg_t"], errors="coerce").sum()) * 1000.0 if not band.empty else 0.0
     main = schemes[schemes["is_main"]] if schemes is not None and not schemes.empty else pd.DataFrame()
@@ -342,6 +350,10 @@ def build_kpi(seg: pd.DataFrame, wide: pd.DataFrame, schemes: pd.DataFrame,
         "avg_speed": None if not valid.any() else float(speed[valid].mean()),
         "avg_speed_clean": None if not clean.any() else float(speed[clean].mean()),
         "heavy_share": (heavy / total_kg) if total_kg > 0 else None,
+        "longhaul_share": (longhaul / total_kg) if total_kg > 0 else None,
+        # 第 5 页“年度化排放”展示值：原页面 E₀ × 年化系数，D4 迁入 kpi
+        "annual_emission_t": (total_kg / 1000.0 * evaluator.ANNUALIZATION_FACTOR),
+        "annualization_factor": float(evaluator.ANNUALIZATION_FACTOR),
         "dup_rows": int(quality.get("dup_rows", 0) or 0),
         "anomaly_rows": int(quality.get("anomaly_rows", 0) or 0),
         "basis_rows": int(quality.get("basis_rows", 0) or 0),
@@ -417,6 +429,103 @@ def build_fleet_stats(seg: pd.DataFrame, source: str) -> Dict[str, Any]:
         "total_load_tkm": round(load_tkm, 1),
         "diesel_ttw_kg_per_l": diesel_ttw,
         "note": "运单为抽样数据：不推导年均里程/车；该默认值见 config/calc_factors.json（假设值）",
+    }
+
+
+# ---------------------------------------------------------------------------
+# G4.5 · E₀ 构成下钻（第 5 页“E₀ 由哪些车、哪几个月堆出来”，D4 迁入）
+# ---------------------------------------------------------------------------
+
+def _subset_key(subset: List[int], universe: List[int]) -> str:
+    """组合键：全集记 all，否则按升序逗号连接（页面按同一规则查表）。"""
+    return "all" if list(subset) == list(universe) else ",".join(str(int(x)) for x in subset)
+
+
+def build_composition(seg: pd.DataFrame, max_combos: int = 800) -> Dict[str, Any]:
+    """E₀ 构成预计算：按“月份子集 × 车型大类子集”把构成逐组算好。
+
+    D4：原第 5 页在页面上做 groupby sum / 占比 / idxmax，全部迁到这里——
+    页面只按组合键查表显示，不做任何聚合与比率。
+    组合空间 = (2^月份数 − 1) × (2^车型数 − 1)；真实与演示数据都是 4 个月份 → 105 组。
+    月份过多时（>6）退化为“单月 + 全月”，避免组合爆炸。
+    """
+    empty: Dict[str, Any] = {"generated_at": _now(), "e0_t": 0.0, "months": [],
+                             "vclasses": [], "month_rows": {}, "combos": {}}
+    if seg is None or seg.empty or "kg_co2" not in seg.columns:
+        return empty
+
+    frame = seg.copy()
+    frame["_kg"] = pd.to_numeric(frame["kg_co2"], errors="coerce").fillna(0.0)
+    total_kg = float(frame["_kg"].sum()) or 1.0
+    months = (sorted(int(m) for m in pd.to_numeric(frame["month"], errors="coerce").dropna().unique())
+              if "month" in frame.columns else [])
+    vclasses = (sorted(int(v) for v in pd.to_numeric(frame["vclass"], errors="coerce").dropna().unique())
+                if "vclass" in frame.columns else [])
+    if not months or not vclasses:
+        return {**empty, "months": months, "vclasses": vclasses}
+
+    if len(months) <= 6:
+        month_subsets = [list(c) for r in range(1, len(months) + 1)
+                         for c in itertools.combinations(months, r)]
+    else:  # 组合爆炸保护：只保留单月与全月
+        month_subsets = [[m] for m in months] + [months]
+    vclass_subsets = [list(c) for r in range(1, len(vclasses) + 1)
+                      for c in itertools.combinations(vclasses, r)]
+    if len(month_subsets) * len(vclass_subsets) > max_combos:
+        month_subsets = [[m] for m in months] + [months]
+
+    m_num = pd.to_numeric(frame["month"], errors="coerce") if "month" in frame.columns else None
+    v_num = pd.to_numeric(frame["vclass"], errors="coerce") if "vclass" in frame.columns else None
+    e_num = (pd.to_numeric(frame["flag_estimated"], errors="coerce").fillna(0)
+             if "flag_estimated" in frame.columns else pd.Series(0, index=frame.index))
+
+    combos: Dict[str, Any] = {}
+    for ms in month_subsets:
+        mmask = m_num.isin(ms) if m_num is not None else pd.Series(True, index=frame.index)
+        for vs in vclass_subsets:
+            vmask = v_num.isin(vs) if v_num is not None else pd.Series(True, index=frame.index)
+            sub = frame[mmask & vmask]
+            if sub.empty:
+                continue
+            sub_kg = float(sub["_kg"].sum())
+            share = (lambda v: round(100.0 * float(v) / sub_kg, 3)) if sub_kg > 0 else (lambda v: None)
+            by_month: List[Dict[str, Any]] = []
+            peak_month = None
+            if m_num is not None:
+                g = sub.assign(_m=pd.to_numeric(sub["month"], errors="coerce")).groupby("_m")["_kg"].sum().sort_index()
+                by_month = [{"month": int(m), "kg": round(float(v), 2), "share_pct": share(v)}
+                            for m, v in g.items()]
+                peak_month = int(g.idxmax()) if len(g) else None
+            top_vehicles: List[Dict[str, Any]] = []
+            if "vehicle_type" in sub.columns:
+                tv = (sub.assign(_vt=sub["vehicle_type"].astype(str))
+                      .groupby("_vt").agg(kg=("_kg", "sum"), n=("_kg", "size"))
+                      .sort_values(["kg", "_vt"], ascending=[False, True]).head(10))
+                top_vehicles = [{"vehicle_type": str(k), "kg": round(float(r["kg"]), 2),
+                                 "share_pct": share(r["kg"]), "n": int(r["n"])}
+                                for k, r in tv.iterrows()]
+            combos[_subset_key(ms, months) + "|" + _subset_key(vs, vclasses)] = {
+                "months": [int(m) for m in ms],
+                "vclasses": [int(v) for v in vs],
+                "segments": int(len(sub)),
+                "kg": round(sub_kg, 2),
+                "share_pct": share(sub_kg),
+                "est_rows": int(pd.to_numeric(sub["flag_estimated"], errors="coerce").fillna(0).sum())
+                if "flag_estimated" in sub.columns else 0,
+                "by_month": by_month,
+                "peak_month": peak_month,
+                "top_vehicles": top_vehicles,
+            }
+
+    month_rows = ({str(int(m)): int(n) for m, n in m_num.value_counts().items()}
+                  if m_num is not None else {})
+    return {
+        "generated_at": _now(),
+        "e0_t": round(total_kg / 1000.0, 3),
+        "months": months,
+        "vclasses": vclasses,
+        "month_rows": month_rows,
+        "combos": combos,
     }
 
 
@@ -569,6 +678,23 @@ def _structural_items(wide: pd.DataFrame, seg: pd.DataFrame, schemes: pd.DataFra
 
     check("schemes", "方案表可对账", _schemes)
 
+    def _scheme_emission() -> Tuple[bool, str]:
+        # 每个方案的排放必须对回 E₀ × (1 − 减排率)（原第 4 页的页面级自校验，
+        # D4 迁入闸门：页面不再自算，改读本项结论）。
+        if schemes is None or schemes.empty:
+            return False, "方案表为空"
+        if not {"emission_t", "reduction_pct"}.issubset(schemes.columns):
+            return False, "缺列：emission_t / reduction_pct"
+        e0_t = float(kpi.get("total_kg") or 0) / 1000.0
+        red = pd.to_numeric(schemes["reduction_pct"], errors="coerce")
+        em = pd.to_numeric(schemes["emission_t"], errors="coerce")
+        expect = e0_t * (1.0 - red / 100.0)
+        drift = float((em - expect).abs().max()) if len(schemes) else 0.0
+        return (drift <= 0.01,
+                "%d 个方案排放全部对回 E₀ × (1 − 减排率)，最大偏差 %.4f t" % (len(schemes), drift))
+
+    check("scheme_emission", "方案排放对回 E₀", _scheme_emission)
+
     def _scheme_boundary() -> Tuple[bool, str]:
         if schemes is None or schemes.empty or "boundary" not in schemes.columns:
             return False, "方案表缺 boundary 列"
@@ -609,6 +735,22 @@ def _structural_items(wide: pd.DataFrame, seg: pd.DataFrame, schemes: pd.DataFra
     check("od_band", "同线带宽非空",
           lambda: (not band.empty and "ratio" in band.columns,
                    "可比较 OD %d 条" % len(band)))
+
+    def _composition_total() -> Tuple[bool, str]:
+        # E₀ 构成下钻表（第 5 页）：全量组合的碳排必须对回 kpi 总碳，
+        # 否则页面下钻出来的数会与第 1 页对不上。
+        comp = _read_json(COMPOSITION_PATH)
+        combos = comp.get("combos") or {}
+        full = combos.get("all|all")
+        if not full:
+            return False, "构成表缺 all|all 组合"
+        total = float(pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0).sum())
+        drift = abs(float(full.get("kg") or 0.0) - total)
+        return (drift <= 1.0,
+                "全量组合 %.2f kg vs 段表 %.2f kg（偏差 %.4f）｜组合 %d 组"
+                % (float(full.get("kg") or 0.0), total, drift, len(combos)))
+
+    check("composition_total", "E₀ 构成下钻对回总碳", _composition_total)
     check("source", "数据来源标记",
           lambda: (source in ("real", "demo"), "source = " + str(source)))
 
@@ -848,9 +990,18 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
             traceback.print_exc()
             _write_json(FLEET_STATS_PATH, {"source": source, "error": "fleet_stats 聚合失败",
                                            "note": "第 7/8 页将退回口径配置假设值"})
+        # E₀ 构成下钻（第 5 页）：失败不阻断主口径（页面退回空态提示）
+        try:
+            composition = build_composition(seg)
+            _write_json(COMPOSITION_PATH, composition)
+        except Exception:
+            traceback.print_exc()
+            _write_json(COMPOSITION_PATH, {"source": source, "error": "composition 聚合失败",
+                                           "combos": {}})
         seconds = time.perf_counter() - t0
-        print("      [OK] %.2f s｜台账 %d 行｜披露 %d 要素｜kpi %d 项"
-              % (seconds, len(ledger), len(SIX_DISCLOSURE), len(kpi)))
+        print("      [OK] %.2f s｜台账 %d 行｜披露 %d 要素｜kpi %d 项｜构成组合 %d 组"
+              % (seconds, len(ledger), len(SIX_DISCLOSURE), len(kpi),
+                 len(composition.get("combos") or {})))
         run_log["stages"].append({
             "key": "reports", "name": "④ 报表段（G3 台账 + G4 披露）",
             "status": "ok", "seconds": round(seconds, 3), "error": "",

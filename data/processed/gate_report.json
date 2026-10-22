@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-22T08:47:48",
+  "generated_at": "2026-10-22T09:47:52",
   "source": "real",
   "mode": "real",
   "passed": true,
@@ -161,6 +161,12 @@
       "detail": "减排 0.0–77.4%｜回本 0.0–9.6 年"
     },
     {
+      "id": "scheme_emission",
+      "label": "方案排放对回 E₀",
+      "status": "PASS",
+      "detail": "7 个方案排放全部对回 E₀ × (1 − 减排率)，最大偏差 0.0004 t"
+    },
+    {
       "id": "scheme_boundary",
       "label": "参数化方案边界一致",
       "status": "PASS",
@@ -183,6 +189,12 @@
       "label": "同线带宽非空",
       "status": "PASS",
       "detail": "可比较 OD 310 条"
+    },
+    {
+      "id": "composition_total",
+      "label": "E₀ 构成下钻对回总碳",
+      "status": "PASS",
+      "detail": "全量组合 4502042.41 kg vs 段表 4502042.41 kg（偏差 0.0007）｜组合 216 组"
     },
     {
       "id": "source",
@@ -215,7 +227,7 @@
     }
   ],
   "counts": {
-    "pass": 24,
+    "pass": 26,
     "fail": 0,
     "skip": 0
   }

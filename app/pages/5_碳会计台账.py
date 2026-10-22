@@ -4,9 +4,13 @@
 - ledger.parquet：三行结论账 × 六字段（pipeline G3）
 - disclosure.json：披露六要素（pipeline G4）
 - gate_report.json：一致性闸门（ledger_total / kpi_total / disclosure_six）
+- kpi.json：E₀、年度化排放、段数、总里程（pipeline 预计算）
+- composition.json：E₀ 构成下钻（月份子集 × 车型大类子集预计算，D4）
+- data_quality.json：源行号可回查率等数据层审计指标
 - baseline_carbon.parquet：33,214 段级明细（追溯终点）
 
-页面口径：年度化换算（E₀ × 3.0417）为展示口径，第 1 页 E₀ 是数据期口径、不乘。
+页面口径：年度化换算（E₀ × 3.0417）的**结果值**由 pipeline 写进 kpi.json，
+第 1 页 E₀ 是数据期口径、不乘；两个口径不能混。
 """
 
 import sys
@@ -60,20 +64,16 @@ e0_t = float(k.get("e0_t") or 0.0)
 annual_factor = float(disc.get("annual_factor") or 0.0)
 
 # ---- 数据可追溯（DA 增量） ----
-seg = services.segments()
 q = services.quality() or {}
-trace_rate = None
-if "source_waybill_row" in seg.columns:
-    trace = pd.to_numeric(seg["source_waybill_row"], errors="coerce")
-    trace_rate = float((trace > 0).mean() * 100.0)
+trace_rate = q.get("trace_rate")
 order_rate = 100.0 * float(q.get("order_match_rate", q.get("match_rate", 1.0)) or 0.0)
 vehicle_rate = 100.0 * float(q.get("vehicle_match_rate", 1.0) or 0.0)
 
 cards.panel_head("数据可追溯", "台账每个数都能回到 33,214 段中的具体一行", "DA · docs/07")
 cards.stats([
     {"label": "台账行", "value": services.fmt(len(led)), "tone": "mint", "sub": "三行结论账"},
-    {"label": "源行号可回查", "value": (("%.1f%%" % trace_rate) if trace_rate is not None else "—"),
-     "tone": "mint", "sub": "source_waybill_row"},
+    {"label": "源行号可回查", "value": (("%.1f%%" % (100 * trace_rate)) if trace_rate is not None else "—"),
+     "tone": "mint", "sub": "source_waybill_row（data_quality.json 预计算）"},
     {"label": "估算 / 代理", "value": "%s 段" % services.fmt(q.get("estimated_rows")),
      "tone": "coral", "sub": "全表 %s 行（含重复）" % services.fmt(q.get("estimated_rows_wide"))},
     {"label": "订单 / 车型匹配", "value": "%.0f%% / %.0f%%" % (order_rate, vehicle_rate),
@@ -145,14 +145,15 @@ for i in range(0, len(elements), 3):
 st.markdown("")
 layout.section("年度化与一致性", "两个口径不能混：第 1 页 E₀ 是数据期口径，年度化只在披露时乘")
 
-annual_t = e0_t * annual_factor if annual_factor else None
+annual_t = k.get("annual_emission_t")
+annual_factor = k.get("annualization_factor") or float(disc.get("annual_factor") or 0.0)
 cards.formula(
     "年度化排放 = E₀ × 年化系数 = <span class='hl'>" + services.fmt(e0_t, 2)
     + " t × " + ("%.4f" % annual_factor if annual_factor else "—") + "</span>"
     " = <span class='hl2'>" + (services.fmt(annual_t, 1) if annual_t else "—")
     + " tCO₂e/年</span>（展示口径）<br>"
     "<span class='dim'>台账与第 1 页用数据期口径；乘年化只在“年度化披露”时发生，"
-    "两个口径不能混——docs/15 §3.1。</span>")
+    "两个口径不能混——docs/15 §3.1。结果值由 pipeline 写进 kpi.json，页面不重算。</span>")
 
 gate_items = []
 for t in (gate.get("targets") or []):
@@ -219,61 +220,75 @@ if seg.empty or "kg_co2" not in seg.columns:
 else:
     st.markdown("")
     cards.panel_head("第 2 跳 · E₀ 构成", "基准碳排由哪些车、哪几个月堆出来的",
-                     "展示口径 · 段表分组汇总")
-    seg = seg.copy()
-    seg["_kg"] = pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0.0)
+                     "预计算口径 · composition.json")
 
-    f1, f2 = st.columns([0.9, 0.9])
-    with f1:
-        months = sorted([int(m) for m in seg["month"].dropna().unique()])
-        picked_months = st.multiselect("月份", months, default=months, key="p5_months",
-                                       placeholder="全月")
-    with f2:
-        cls_opts = ["轻型", "中型", "重型"]
-        picked_cls = st.multiselect("车型大类", cls_opts, placeholder="全部", key="p5_cls")
-    view = seg.copy()
-    if picked_months and "month" in view.columns:
-        view = view[view["month"].isin(picked_months)]
-    if picked_cls and "vclass" in view.columns:
-        name2cls = {"轻型": 1, "中型": 2, "重型": 3}
-        view = view[view["vclass"].isin([name2cls[c] for c in picked_cls])]
-    if view.empty:
-        st.info("当前筛选下没有路段。")
+    comp = services.composition()
+    comp_months = [int(m) for m in (comp.get("months") or [])]
+    month_rows = comp.get("month_rows") or {}
+    if not comp_months:
+        cards.empty_state("E₀ 构成表还没生成",
+                          "重跑  python -m src.pipeline  生成 composition.json"
+                          "（月份 × 车型组合的预计算，页面只查表不聚合）。")
     else:
-        total_kg = float(view["_kg"].sum()) or 1.0
-        cards.stats([
-            {"label": "筛选后路段", "value": services.fmt(len(view))},
-            {"label": "筛选后碳排", "value": services.fmt(total_kg / 1000.0, 2) + " t", "tone": "mint"},
-            {"label": "占基准 E₀", "value": "%.2f%%" % (100.0 * total_kg / (e0_t * 1000.0 or 1.0)),
-             "tone": "amber"},
-            {"label": "估算值行", "value": services.fmt(int(pd.to_numeric(
-                view.get("flag_estimated"), errors="coerce").fillna(0).sum())) if "flag_estimated" in view.columns else "—"},
-        ], cols=4)
+        f1, f2 = st.columns([0.9, 0.9])
+        with f1:
+            picked_months = st.multiselect("月份", comp_months, default=comp_months,
+                                           key="p5_months", placeholder="全月")
+        with f2:
+            cls_opts = ["轻型", "中型", "重型"]
+            picked_cls = st.multiselect("车型大类", cls_opts, placeholder="全部", key="p5_cls")
+        name2cls = {"轻型": 1, "中型": 2, "重型": 3}
+        picked_vclasses = [name2cls[c] for c in picked_cls]
+        combo = services.composition_combo(picked_months, picked_vclasses)
+        if not combo:
+            st.info("这个月份 × 车型组合没有预计算记录（可能该组合下没有路段）。")
+        else:
+            cards.stats([
+                {"label": "筛选后路段", "value": services.fmt(combo.get("segments"))},
+                {"label": "筛选后碳排", "value": services.fmt(combo.get("kg"), 2) + " kg",
+                 "tone": "mint"},
+                {"label": "占基准 E₀", "value": services.fmt(combo.get("share_pct"), 2) + "%",
+                 "tone": "amber"},
+                {"label": "估算值行", "value": services.fmt(combo.get("est_rows"))},
+            ], cols=4)
 
-        top_types = (view.groupby("vehicle_type", as_index=False)["_kg"].sum()
-                         .sort_values("_kg", ascending=False).head(10))
-        top_types["占比"] = top_types["_kg"] / total_kg * 100.0
-        rows = [[str(r["vehicle_type"]), services.fmt(r["_kg"], 1),
-                 "%.2f%%" % float(r["占比"])] for _, r in top_types.iterrows()]
-        cards.htable(["TOP 车型", "碳排(kg)", "占比(%)"], rows, num_cols=[1, 2])
-        charts.hbar(top_types.rename(columns={"vehicle_type": "车型", "_kg": "碳排kg"}),
-                    "车型", "碳排kg", title="TOP 10 车型碳排（kg）", height=360)
+            top_vehicles = combo.get("top_vehicles") or []
+            if top_vehicles:
+                tv = pd.DataFrame(top_vehicles)
+                cards.htable(["TOP 车型", "碳排(kg)", "占比(%)", "段数"],
+                             [[str(r["vehicle_type"]), services.fmt(r["kg"], 1),
+                               services.fmt(r["share_pct"], 2), services.fmt(r["n"])]
+                              for _, r in tv.iterrows()],
+                             num_cols=[1, 2, 3])
+                charts.hbar(tv.rename(columns={"vehicle_type": "车型", "kg": "碳排kg"}),
+                            "车型", "碳排kg", title="TOP 10 车型碳排（kg）", height=360)
 
-        by_month = (view.groupby("month", as_index=False)["_kg"].sum().sort_values("month"))
-        charts.vbar_target(by_month, "month", "_kg", title="月度碳排（kg）", height=300)
-        n_mar = int((seg["month"] == 3).sum()) if "month" in seg.columns else 0
-        if not by_month.empty:
-            peak_m = int(by_month.loc[by_month["_kg"].idxmax(), "month"])
-            cards.note("%d 月碳排最高（春节前运力高峰）；数据期以 1/2/11/12 月为主，"
-                       "另有 %d 条 3 月记录保留计碳（披露附注已注明）。" % (peak_m, n_mar))
+            by_month = pd.DataFrame(combo.get("by_month") or [])
+            if not by_month.empty:
+                charts.vbar_target(by_month, "month", "kg", title="月度碳排（kg）", height=300)
+                peak = combo.get("peak_month")
+                extra = month_rows.get("3", 0)
+                if peak is not None:
+                    cards.note("%d 月碳排最高（春节前运力高峰）；数据期以 1/2/11/12 月为主，"
+                               "另有 %s 条 3 月记录保留计碳（披露附注已注明）。"
+                               "构成数字全部来自 composition.json 预计算，页面不聚合。"
+                               % (int(peak), services.fmt(extra)))
 
         st.markdown("")
         cards.panel_head("第 3 跳 · 段级明细", "追到具体运单：黄框行 = 估算值，灰底 = 重复",
                          "按碳排降序，前 50 行")
-        cols = [c for c in ["waybill_no", "plate", "vehicle_type", "od_pair", "dist_km",
-                            "factor_gkm", "kg_co2", "delta_pct", "month"] if c in view.columns]
-        flags.flagged_table(view.sort_values("_kg", ascending=False),
-                            columns=cols, max_rows=50, show_legend=True)
+        view = seg.copy()
+        if picked_months and "month" in view.columns:
+            view = view[view["month"].isin(picked_months)]
+        if picked_cls and "vclass" in view.columns:
+            view = view[view["vclass"].isin(picked_vclasses)]
+        if view.empty:
+            st.info("当前筛选下没有路段。")
+        else:
+            cols = [c for c in ["waybill_no", "plate", "vehicle_type", "od_pair", "dist_km",
+                                "factor_gkm", "kg_co2", "delta_pct", "month"] if c in view.columns]
+            flags.flagged_table(view.sort_values("kg_co2", ascending=False),
+                                columns=cols, max_rows=50, show_legend=True)
 
 # ================= E · 制度对标 =================
 st.markdown("")

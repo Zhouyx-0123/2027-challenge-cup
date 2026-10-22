@@ -35,6 +35,13 @@ data/processed/*
 !data/processed/route_select.parquet
 !data/processed/route_candidates.parquet
 !data/processed/route_candidate_carbon.parquet
+# D4/D5 预计算表（页面只读不算的取数来源，须随结果一起入库）
+!data/processed/lambda_curve.parquet
+!data/processed/od_vehicle_mix.parquet
+!data/processed/route_carbon_od.parquet
+!data/processed/composition.json
+# O6 方案 × 线路约束表（第 3 页逐线结论的取数来源）
+!data/processed/scenario_route_constraint.parquet
 data/processed/route_geo.parquet
 
 # ===== 离线包与产物 =====

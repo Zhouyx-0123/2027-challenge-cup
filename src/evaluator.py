@@ -24,7 +24,7 @@ import time
 from dataclasses import dataclass, fields, replace
 from numbers import Real
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -982,6 +982,71 @@ def build_schemes(
     return table
 
 
+def build_lambda_curve(
+    schemes: pd.DataFrame, settings: FinanceSettings | None = None,
+    grid: Tuple[float, float, float] = (0.0, 3000.0, 5.0),
+) -> pd.DataFrame:
+    """λ 敏感性曲线（D5 闭环）：回本年限 × λ 的全网格**预计算**，页面只读不再自算。
+
+    年节省口径与 ``evaluate_scenario`` 的内部估值完全一致：
+    年节省 = 运营节省 + **年度**减排量 × λ（年度减排 = 数据期减排 × 年化系数）。
+    legacy 行用同一公式（carbon_saving_t × 年化系数）——**公式全项目只有这一份**，
+    页面不能再实现第二套（旧第 4 页用数据期减排 × λ，与 evaluator 的 NPV 口径不一致）。
+
+    ``is_fastest`` = 该 λ 下回本最快（capex>0 的方案集合内，并列取 order 最小），
+    供页面渲染"推荐翻转点"，不在页面重扫。
+    """
+    if schemes is None or schemes.empty or "scenario" not in schemes.columns:
+        return pd.DataFrame()
+    if "capex_wan" not in schemes.columns or "opex_save_wan" not in schemes.columns:
+        return pd.DataFrame()
+
+    def _num(value: Any, default: float = 0.0) -> float:
+        """None / NaN / 非数字一律回落默认值——不能用 ``or``（NaN 是 truthy）。"""
+        try:
+            out = float(value)
+        except (TypeError, ValueError):
+            return default
+        return out if pd.notna(out) else default
+
+    factor = float(settings.annualization_factor) if settings is not None else ANNUALIZATION_FACTOR
+    start, stop, step = (float(grid[0]), float(grid[1]), float(grid[2]))
+    if not (stop > start and step > 0):
+        raise ValueError("λ 网格必须满足 stop > start 且 step > 0")
+    lambdas = np.arange(start, stop + step / 2.0, step)
+    alt = schemes[(pd.to_numeric(schemes["capex_wan"], errors="coerce") > 0)
+                  & (pd.to_numeric(schemes["reduction_pct"], errors="coerce") > 0)].copy()
+    alt = alt.sort_values("order").reset_index(drop=True)
+    rows: List[Dict[str, Any]] = []
+    for _, r in alt.iterrows():
+        capex = _num(r["capex_wan"])
+        opex = _num(r.get("opex_save_wan"))
+        annual_carbon = _num(r.get("annual_carbon_saving_t"))
+        if annual_carbon <= 0:  # legacy 行没有年化减排列：用同一口径补算
+            annual_carbon = _num(r.get("carbon_saving_t")) * factor
+        for lam in lambdas:
+            annual = opex + annual_carbon * float(lam) / 10000.0
+            payback = capex / annual if annual > 0 else float("inf")
+            rows.append({
+                "scenario": str(r["scenario"]), "order": int(r["order"]),
+                "lambda_yuan_t": float(lam),
+                "annual_save_wan": annual, "payback_years": payback,
+                "annual_carbon_t": annual_carbon,
+                "capex_wan": capex, "opex_save_wan": opex,
+                "meets_target": bool(r.get("meets_target")),
+                "reduction_pct": _num(r.get("reduction_pct")),
+                "is_main": bool(r.get("is_main")),
+                "calculation_mode": str(r.get("calculation_mode") or "legacy_calibration"),
+            })
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    # 每个 λ 取回本最快者；并列时 order 小者优先（与旧页面扫描口径一致）。
+    out["_rank"] = out.groupby("lambda_yuan_t")["payback_years"].rank(method="first")
+    out["is_fastest"] = out["_rank"] == 1
+    return out.drop(columns="_rank").reset_index(drop=True)
+
+
 def build_od_band(seg: pd.DataFrame) -> pd.DataFrame:
     """按网点 OD 优先、城市 OD 兜底分组；未知 OD 不互相拼成一条线路。"""
     required = {"factor_gkm", "vehicle_type", "od_pair", "kg_co2"}
@@ -1024,6 +1089,38 @@ def build_od_band(seg: pd.DataFrame) -> pd.DataFrame:
     return result.round({key: 4 for key in ("fmin", "fmax", "ratio", "kg_t", "coverage_pct")})
 
 
+def build_od_vehicle_mix(seg: pd.DataFrame, band: pd.DataFrame) -> pd.DataFrame:
+    """可比较 OD 的逐车型构成（D4）：第 3 页“下钻 · 这条线实际跑了哪些车”的预计算。
+
+    原页面在页面上做 groupby sum / mean / 占比，全部迁到这里——页面按 od_key 查表显示。
+    只覆盖同线带宽表里的 OD（下钻入口就是那张表），行数 = OD 数 × 车型数。
+    """
+    if seg is None or seg.empty or band is None or band.empty:
+        return pd.DataFrame()
+    if "od_site" not in seg.columns or "od_site" not in band.columns:
+        return pd.DataFrame()
+    keys = band["od_site"].astype(str).unique().tolist()
+    sub = seg[seg["od_site"].astype(str).isin(keys)]
+    if sub.empty:
+        return pd.DataFrame()
+    need = {"vehicle_type", "kg_co2"}
+    if not need.issubset(sub.columns):
+        return pd.DataFrame()
+    frame = sub.copy()
+    frame["_kg"] = pd.to_numeric(frame["kg_co2"], errors="coerce").fillna(0.0)
+    agg: Dict[str, Any] = {"段数": ("_kg", "size"), "碳排kg": ("_kg", "sum")}
+    if "load_t" in frame.columns:
+        agg["平均载重"] = ("load_t", "mean")
+    if "factor_gkm" in frame.columns:
+        agg["因子"] = ("factor_gkm", "mean")
+    g = (frame.assign(_vt=frame["vehicle_type"].astype(str), _od=frame["od_site"].astype(str))
+         .groupby(["_od", "_vt"], as_index=False).agg(**agg))
+    g["占比"] = g["碳排kg"] / g.groupby("_od")["碳排kg"].transform("sum") * 100.0
+    g = g.rename(columns={"_od": "od_site", "_vt": "vehicle_type"})
+    g = g.sort_values(["od_site", "碳排kg"], ascending=[True, False]).reset_index(drop=True)
+    return g.round({"平均载重": 3, "因子": 3, "碳排kg": 3, "占比": 3})
+
+
 def build_analysis(
     *, baseline_path: Path | str | None = None, output_dir: Path | str | None = None,
     write: bool = True, cost_scenarios: tuple[ScenarioInput, ...] | None = None,
@@ -1046,11 +1143,15 @@ def build_analysis(
         cost_scenarios, settings = build_cost_scenarios(seg, source)
     hotspots = build_hotspots(seg)
     band = build_od_band(seg)
+    od_mix = build_od_vehicle_mix(seg, band)
     schemes = build_schemes(seg, source, cost_scenarios, settings)
     route_table, verdict = build_route_constraints(seg, cost_scenarios or (), source)
+    curve = build_lambda_curve(schemes, settings)
     if write:
         for frame, name in ((hotspots, "hotspots.parquet"), (band, "od_band.parquet"),
-                            (schemes, "final_report.parquet")):
+                            (schemes, "final_report.parquet"),
+                            (curve, "lambda_curve.parquet"),
+                            (od_mix, "od_vehicle_mix.parquet")):
             _save_parquet(frame, output_dir / name)
         if not route_table.empty:
             _save_parquet(route_table, output_dir / "scenario_route_constraint.parquet")
@@ -1063,7 +1164,7 @@ def build_analysis(
     print(f"[E1] 四维热点 {len(hotspots)} 行；[E2] 同线带宽 {len(band)} 条，覆盖 {coverage:.1f}%")
     print(f"[E3/E4] {len(schemes)} 个方案；模式：{mode}"
           f"（参数化 {n_parameterized} 行 / 历史标定 {len(schemes) - n_parameterized} 行）；"
-          f"{'已写四表' if write else '只读检查，未写文件'}")
+          f"{'已写五表' if write else '只读检查，未写文件'}")
     if mode == "legacy_calibration":
         print("注意：4809 万/77.4%/9.6 年仍为历史标定，不代表底稿复核或运营约束通过。")
     elif not route_table.empty:
@@ -1071,6 +1172,8 @@ def build_analysis(
               "场景裁决 operational_feasible=%s"
               % (len(route_table), verdict.get("single_trip_km_pct") or 0.0,
                  verdict.get("trunk_km_pct") or 0.0, verdict.get("operational_feasible")))
+    print("      [D5] λ 曲线 %d 行（0–3000 元/t，步长 5；年节省含年度减排 × λ）" % len(curve))
+    print("      [D4] OD 车型构成 %d 行（可比较 OD %d 条的逐车型预计算）" % (len(od_mix), len(band)))
     return {
         "od_ratio_median": median, "od_pairs": int(len(band)), "od_coverage_pct": coverage,
         "e0_t": total_kg / 1000,
@@ -1078,6 +1181,8 @@ def build_analysis(
         "scenarios": int(len(schemes)), "calculation_mode": mode, "written": write,
         "parameterized_rows": n_parameterized,
         "route_constraint_rows": int(len(route_table)),
+        "lambda_curve_rows": int(len(curve)),
+        "od_vehicle_mix_rows": int(len(od_mix)),
         "operational_feasible": verdict.get("operational_feasible"),
         "single_trip_km_pct": verdict.get("single_trip_km_pct"),
         "trunk_km_pct": verdict.get("trunk_km_pct"),
@@ -1285,6 +1390,43 @@ def self_test() -> bool:
                                     (replace(main_spec, operational_feasible=None),), self.settings)
             self.assertFalse(pending["is_main"].any())
             self.assertFalse(pending[pending["order"] == 5].iloc[0]["decision_eligible"])
+
+        def test_lambda_curve_matches_evaluate_and_marks_fastest(self):
+            """D5：λ 曲线口径必须与 evaluate_scenario 逐点一致，且翻转点只在表内标记。"""
+            schemes = build_schemes(self.seg, "test", (self.spec,), self.settings)
+            row = schemes[schemes["order"] == 1].iloc[0]
+            curve = build_lambda_curve(schemes, self.settings, grid=(0.0, 100.0, 50.0))
+            own = curve[curve["order"] == 1]
+            self.assertEqual(len(own), 3)  # 混合表：参数化行 3 个网格点
+            at_zero = own[own["lambda_yuan_t"] == 0.0].iloc[0]
+            self.assertAlmostEqual(at_zero["payback_years"], row["payback_years"], places=9)
+            self.assertAlmostEqual(at_zero["annual_save_wan"], row["opex_save_wan"], places=9)
+            at_hundred = own[own["lambda_yuan_t"] == 100.0].iloc[0]
+            expect_annual = row["opex_save_wan"] + row["annual_carbon_saving_t"] * 100.0 / 10000.0
+            self.assertAlmostEqual(at_hundred["annual_save_wan"], expect_annual, places=9)
+            self.assertAlmostEqual(at_hundred["payback_years"], row["capex_wan"] / expect_annual, places=9)
+            # 每个 λ 只标一个最快者
+            for lam in (0.0, 50.0, 100.0):
+                self.assertEqual(int((curve[curve["lambda_yuan_t"] == lam]["is_fastest"]).sum()), 1)
+            # legacy 行没有年化减排列：用 carbon_saving_t × 年化系数补，且不得出 NaN/inf
+            mixed = build_schemes(self.seg, "test",
+                                  (replace(self.spec, order=5, operational_feasible=True,
+                                           constraint_summary={"status": "pass"}),), self.settings)
+            curve2 = build_lambda_curve(mixed, self.settings, grid=(0.0, 50.0, 50.0))
+            self.assertFalse(curve2["annual_save_wan"].isna().any())
+            self.assertFalse(np.isinf(curve2["payback_years"].to_numpy(dtype=float)).any())
+            legacy = mixed[mixed["calculation_mode"] == "legacy_calibration"].iloc[0]
+            legacy_curve = curve2[(curve2["scenario"] == legacy["scenario"])
+                                 & (curve2["lambda_yuan_t"] == 0.0)].iloc[0]
+            self.assertAlmostEqual(legacy_curve["annual_carbon_t"],
+                                   legacy["carbon_saving_t"] * self.settings.annualization_factor,
+                                   places=9)
+            # legacy 行 payback_years 是历史标定的三位小数 verbatim 值，曲线按同一公式重算，
+            # 允许 <0.001 年的显示级差异（不悄悄改历史数字）。
+            self.assertAlmostEqual(legacy_curve["payback_years"], legacy["payback_years"], places=3)
+            # 网格参数非法要报错，不静默出空表
+            with self.assertRaises(ValueError):
+                build_lambda_curve(schemes, self.settings, grid=(0.0, 0.0, 5.0))
 
     result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(EvaluatorTests))
     return result.wasSuccessful()

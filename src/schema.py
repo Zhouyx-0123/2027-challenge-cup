@@ -35,11 +35,17 @@ RESULT_FILES: Dict[str, str] = {
     "scenarios": "final_report.parquet",
     "hotspots": "hotspots.parquet",
     "od_band": "od_band.parquet",
+    # D4 · 可比较 OD 的逐车型构成（第 3 页下钻预计算）
+    "od_vehicle_mix": "od_vehicle_mix.parquet",
+    # D5 · λ 敏感性曲线（回本年限 × λ 预计算网格，第 4 页只读）
+    "lambda_curve": "lambda_curve.parquet",
     # O6 · 方案 × 哪条线（逐线路 C1–C5 结论；仅参数化方案产出）
     "route_constraints": "scenario_route_constraint.parquet",
     "ledger": "ledger.parquet",
     "disclosure": "disclosure.json",
     "kpi": "kpi.json",
+    # D4 · E₀ 构成下钻（月份子集 × 车型大类子集预计算，第 5 页只读）
+    "composition": "composition.json",
     "quality": "data_quality.json",
     "gate": "gate_report.json",
     "run_log": "run_log.json",
@@ -49,6 +55,7 @@ RESULT_FILES: Dict[str, str] = {
     # T7 · 路线情景（可选；缺失时页面自动回退离线模式）
     "routes": "route_od.parquet",
     "route_carbon": "route_carbon.parquet",
+    "route_carbon_od": "route_carbon_od.parquet",
     "route_select": "route_select.parquet",
     "route_candidates": "route_candidates.parquet",
     "route_candidate_carbon": "route_candidate_carbon.parquet",

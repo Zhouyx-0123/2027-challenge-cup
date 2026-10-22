@@ -1295,6 +1295,20 @@ def quality_report(wide: pd.DataFrame, raw_rows: int, source: str, reason: str) 
 
     order_unmatched = ~order_matched
     vehicle_unmatched = ~vehicle_matched
+
+    # 第 1/5 页“源行号可回查”：原页面 (source_waybill_row > 0).mean()，D4 迁入质量报告
+    trace_rate = None
+    if "source_waybill_row" in unique.columns:
+        trace_num = pd.to_numeric(unique["source_waybill_row"], errors="coerce")
+        trace_rate = float((trace_num > 0).mean()) if len(unique) else None
+    # 第 1 页“估算原因拆分”：原页面 value_counts(estimate_note)，D4 迁入质量报告
+    estimate_reason_counts: Dict[str, int] = {}
+    if "estimate_note" in unique.columns:
+        reasons = (unique["estimate_note"].astype(str)
+                   .str.split("；").explode().str.strip())
+        reasons = reasons[reasons != ""]
+        estimate_reason_counts = {str(k): int(v) for k, v in reasons.value_counts().items()}
+
     return {
         "source": source,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -1339,6 +1353,8 @@ def quality_report(wide: pd.DataFrame, raw_rows: int, source: str, reason: str) 
         "valid_speed_rows": int(valid_speed.sum()),
         "avg_speed": None if avg_speed is None else round(avg_speed, 4),
         "avg_speed_1_100": None if avg_speed_1_100 is None else round(avg_speed_1_100, 4),
+        "trace_rate": None if trace_rate is None else round(trace_rate, 6),
+        "estimate_reason_counts": estimate_reason_counts,
         "speed_method_counts": speed_method_counts,
         "total_km": round(float(pd.to_numeric(unique["dist_km"], errors="coerce").fillna(0).sum()), 4),
         "order_matched_rows": int(order_matched.sum()),

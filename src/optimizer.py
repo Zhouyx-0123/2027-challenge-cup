@@ -731,6 +731,58 @@ def constraint_self_test() -> List[Tuple[str, bool, str]]:
     return out
 
 
+def build_route_carbon_od(enriched: pd.DataFrame) -> pd.DataFrame:
+    """O8 附产：OD 级路线口径碳合计（D4 前端零计算的最后一公里）。
+
+    decision_panel 过去在浏览器端按 od_site 对 kg_co2_route_legal 求和，
+    再当"路线碳排"指标卡展示——那是碳口径求和，违反前端只读铁律。
+    这里按 OD 预计算落表，前端只做行选取。
+
+    行 = od_site；列 = 段数 + 路线口径碳合计（legal/phys）+ 路线里程合计。
+    """
+    cols = ["od_site", "segments", "kg_co2_route_legal",
+            "kg_co2_route_phys", "route_km"]
+    if enriched is None or enriched.empty or "od_site" not in enriched.columns:
+        return pd.DataFrame(columns=cols)
+    frame = enriched.copy()
+    for col in ("kg_co2_route_legal", "kg_co2_route_phys", "route_km"):
+        if col not in frame.columns:
+            frame[col] = 0.0
+        frame[col] = pd.to_numeric(frame[col], errors="coerce").fillna(0.0)
+    out = (frame.groupby(frame["od_site"].astype(str), as_index=False)
+           .agg(segments=("kg_co2_route_legal", "size"),
+                kg_co2_route_legal=("kg_co2_route_legal", "sum"),
+                kg_co2_route_phys=("kg_co2_route_phys", "sum"),
+                route_km=("route_km", "sum")))
+    return out[cols]
+
+
+def route_carbon_od_self_test() -> List[Tuple[str, bool, str]]:
+    """D4 自测：OD 级路线碳合计——纯合成样例，不碰项目数据。"""
+    frame = pd.DataFrame({
+        "od_site": ["A|B", "A|B", "C|D", "C|D"],
+        "kg_co2_route_legal": [10.0, 20.5, 4.25, float("nan")],
+        "kg_co2_route_phys": [9.0, 18.0, 4.0, float("nan")],
+        "route_km": [100.0, 120.0, 80.0, 0.0],
+    })
+    out = build_route_carbon_od(frame)
+    a = out[out["od_site"] == "A|B"]
+    c = out[out["od_site"] == "C|D"]
+    return [
+        ("每 OD 一行", len(out) == 2, "得到 %d 行" % len(out)),
+        ("OD 合计对回（A|B）",
+         len(a) == 1 and abs(float(a.iloc[0]["kg_co2_route_legal"]) - 30.5) < 1e-9,
+         "期望 30.5，实得 %s" % (a.iloc[0]["kg_co2_route_legal"] if len(a) else "—")),
+        ("NaN 段计 0 不计 NaN（C|D）",
+         len(c) == 1 and abs(float(c.iloc[0]["kg_co2_route_legal"]) - 4.25) < 1e-9,
+         "期望 4.25，实得 %s" % (c.iloc[0]["kg_co2_route_legal"] if len(c) else "—")),
+        ("段数按行计（C|D = 2）",
+         len(c) == 1 and int(c.iloc[0]["segments"]) == 2,
+         "期望 2，实得 %s" % (c.iloc[0]["segments"] if len(c) else "—")),
+        ("空表不炸", build_route_carbon_od(pd.DataFrame()).empty, "空入空出"),
+    ]
+
+
 def build_routes() -> pd.DataFrame:
     """O8 落库：读 route_od.parquet + 段表 → route_carbon.parquet + route_select.parquet。
 
@@ -752,6 +804,14 @@ def build_routes() -> pd.DataFrame:
     sel_path = PROCESSED_DIR / "route_select.parquet"
     if not selected.empty:
         _save_parquet(selected, sel_path)
+
+    # OD 级路线口径碳合计（D4）：decision_panel 原来在浏览器端按 od_site
+    # sum kg_co2_route_legal——那是碳口径求和，必须落表，前端只读行。
+    od_carbon = build_route_carbon_od(enriched)
+    od_path = PROCESSED_DIR / "route_carbon_od.parquet"
+    if not od_carbon.empty:
+        _save_parquet(od_carbon, od_path)
+        print("  [D4] OD 路线碳合计落盘：%s（%d 个 OD）" % (od_path.name, len(od_carbon)))
 
     # 候选路线 × 策略的碳账（可选；route_candidates.parquet 存在才跑）
     if ROUTE_CANDIDATES_PATH.exists():
@@ -800,6 +860,16 @@ if __name__ == "__main__":
         failed += 0 if ok else 1
     print("  约束用例 %d/%d 通过" % (len(constraint_self_test()) - failed,
                                      len(constraint_self_test())))
+
+    print("-" * 78)
+    print("D4 · OD 路线碳合计自测")
+    failed = 0
+    for name, ok, detail in route_carbon_od_self_test():
+        print("  [%s] %s%s" % ("PASS" if ok else "FAIL", name,
+                               "" if ok else "  ← " + detail))
+        failed += 0 if ok else 1
+    print("  用例 %d/%d 通过" % (len(route_carbon_od_self_test()) - failed,
+                                len(route_carbon_od_self_test())))
 
     print("-" * 78)
     build_baseline()

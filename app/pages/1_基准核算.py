@@ -1,4 +1,15 @@
-"""第 1 页 · 基准核算：碳排了多少、从哪来、数据有多脏。"""
+"""第 1 页 · 基准核算：碳排了多少、从哪来、数据有多脏。
+
+数据契约（只读，不重算，D4）：
+- kpi.json：总碳 / 总里程 / 段数 / 均速 / 重型占比 / 估算占比（全量锁定口径）
+- hotspots.parquet：车型碳排排行（dimension=车型）
+- data_quality.json：四类 FLAG 计数、源行号可回查率、估算原因拆分
+- gate_report.json：八项对拍目标（本页只展示）
+- baseline_carbon.parquet：段级明细（地图 / 直方图 / 明细表直接画原始列）
+
+页面口径：KPI 与排行榜为**全量锁定口径**，不随本页筛选变化——
+筛选只影响地图、速度分布与段级明细；这样任何筛选下的数字都与闸门对得上。
+"""
 
 import sys
 from pathlib import Path
@@ -71,29 +82,27 @@ if view.empty:
     st.info("当前筛选条件下没有数据。")
     st.stop()
 
-kg = pd.to_numeric(view["kg_co2"], errors="coerce").fillna(0.0)
-total_t = float(kg.sum()) / 1000.0
-dist_km = float(pd.to_numeric(view["dist_km"], errors="coerce").fillna(0.0).sum())
-heavy_share = float(kg[view["vclass"] == 3].sum()) / (float(kg.sum()) or 1.0) if "vclass" in view.columns else None
-speed = pd.to_numeric(view["speed_kmh"], errors="coerce") if "speed_kmh" in view.columns else pd.Series(dtype=float)
-speed_valid = speed[speed > 0]
-avg_speed = float(speed_valid.mean()) if len(speed_valid) else None
-speed_clean = speed_valid[speed_valid.between(1, 100)]
-avg_speed_clean = float(speed_clean.mean()) if len(speed_clean) else None
-est_share = float(pd.to_numeric(view["flag_estimated"], errors="coerce").fillna(0).mean()) if "flag_estimated" in view.columns else None
+# ---- KPI 行：全部读 kpi.json（pipeline 预计算，全量锁定口径） ----
+k = services.kpis()
+heavy_share = k.get("heavy_share")
+est_share = k.get("estimated_rows")
+est_share_pct = (est_share / k["segments"]) if (est_share is not None and k.get("segments")) else None
 
 layout.kpi_row([
-    {"label": "总碳排放（tCO₂e）", "value": services.fmt(total_t, 1), "help": "段级碳排逐段累加；重复行已剔除"},
-    {"label": "总里程（万 km）", "value": services.fmt(dist_km / 10000.0, 1)},
-    {"label": "运输段数", "value": services.fmt(len(view))},
-    {"label": "门到门均速（km/h）", "value": services.fmt(avg_speed, 2),
+    {"label": "总碳排放（tCO₂e）", "value": services.fmt(k.get("e0_t"), 1),
+     "help": "段级碳排逐段累加；重复行已剔除。全量锁定口径，不随筛选变化"},
+    {"label": "总里程（万 km）", "value": services.fmt((k.get("total_km") or 0) / 10000.0, 1)},
+    {"label": "运输段数", "value": services.fmt(k.get("segments"))},
+    {"label": "门到门均速（km/h）", "value": services.fmt(k.get("avg_speed"), 2),
      "help": "有效速度样本均值，口径与闸门一致；>100 km/h 的异常段保留计碳"},
     {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—")},
-    {"label": "估算值占比", "value": (("%.2f%%" % (100 * est_share)) if est_share is not None else "—"),
+    {"label": "估算值占比", "value": (("%.2f%%" % (100 * est_share_pct)) if est_share_pct is not None else "—"),
      "help": "黄框标出的行；只填补、不删除"},
 ], per_row=6)
 st.caption("剔除 >100 km/h 的时间戳异常后均速 %s km/h；异常段保留计碳，只影响速度统计。"
-           % services.fmt(avg_speed_clean, 2))
+           "KPI 为 pipeline 出口锁定的全量口径（kpi.json），筛选只影响下方地图、"
+           "速度分布与段级明细——避免筛选后的数字与闸门对不上。"
+           % services.fmt(k.get("avg_speed_clean"), 2))
 
 # ---------------- 对拍口径 ----------------
 st.markdown("")
@@ -130,26 +139,21 @@ else:
     fig = mapview.flow_map(view)
 mapview.render(fig)
 
-origin_counts = view["origin"].astype(str).value_counts()
-if len(origin_counts):
-    top_name = origin_counts.index[0]
-    top_share = origin_counts.iloc[0] / len(view) * 100.0
-    st.caption("原始订单发货地集中：%s 占 %.1f%% 段；收货地覆盖 %d 个城市。"
-               "默认按收货地看全国分布，切到发货地看上海枢纽。"
-               % (top_name, top_share, view["dest"].nunique()))
+origin_note = ("地图默认按收货地看全国分布，切到发货地看上海枢纽；"
+               "发货地 / 线路的碳排集中度见第 2 页四维热点。")
+st.caption(origin_note)
 
 # ---------------- 排行 + 速度分布 ----------------
 left, right = st.columns([0.56, 0.44])
 with left:
-    layout.section("车型排行", "碳排最高的 10 个车型")
-    if "vehicle_type" in view.columns:
-        top = (view.assign(t=kg / 1000.0)
-                   .groupby("vehicle_type", as_index=False)["t"].sum()
-                   .sort_values("t", ascending=False).head(10)
-                   .rename(columns={"vehicle_type": "车型", "t": "碳排放(t)"}))
-        charts.hbar(top, "车型", "碳排放(t)", height=360)
+    layout.section("车型排行", "碳排最高的 10 个车型（全量锁定口径，读 hotspots 预计算表）")
+    hot = services.hotspots("车型")
+    if hot.empty:
+        st.caption("车型热点表未生成：先运行 python -m src.pipeline")
     else:
-        st.caption("缺 vehicle_type 列")
+        top = hot.sort_values("metric_t", ascending=False).head(10)
+        charts.hbar(top, "value", "metric_t", height=360)
+        st.caption("占比为该车型碳排占基准碳排的比例（hotspots.share_pct，pipeline 预计算）。")
 with right:
     layout.section("速度分布", "异常段保留计碳，但不参与均速")
     charts.hist(view, "speed_kmh", height=360, bins=36, x_label="门到门均速（km/h）")
@@ -165,19 +169,19 @@ flags.flag_legend()
 # ---- 数据层审计（DA 增量：61 字段数据字典 + 逐行可追溯 + 重复组冲突） ----
 q = services.quality() or {}
 
+
 def _fmtq(key: str) -> str:
     value = q.get(key)
     return services.fmt(value) if value is not None else "—"
 
-trace_rate = None
-if "source_waybill_row" in seg.columns:
-    trace = pd.to_numeric(seg["source_waybill_row"], errors="coerce")
-    trace_rate = float((trace > 0).mean() * 100.0)
+
+trace_rate = q.get("trace_rate")
+reason_counts = q.get("estimate_reason_counts") or {}
 
 cards.panel_head("数据层审计", "61 字段数据字典 + 逐行可追溯 + 重复组冲突标记", "DA · docs/07")
 cards.stats([
-    {"label": "源行号可回查", "value": (("%.1f%%" % trace_rate) if trace_rate is not None else "—"),
-     "tone": "mint", "sub": "source_waybill_row"},
+    {"label": "源行号可回查", "value": (("%.1f%%" % (100 * trace_rate)) if trace_rate is not None else "—"),
+     "tone": "mint", "sub": "source_waybill_row（data_quality.json 预计算）"},
     {"label": "重复组冲突", "value": "%s / %s" % (
         _fmtq("vehicle_name_conflict_groups"), _fmtq("emission_factor_input_conflict_groups")),
      "tone": "amber", "sub": "车型 / 因子输入"},
@@ -200,19 +204,18 @@ cards.note("DA 本轮把订单号代理、包裹数缺失、城市网点前缀�
            % (_fmtq("estimated_rows"), _fmtq("estimated_rows_wide"),
               _fmtq("emission_factor_input_conflict_groups")))
 
-est_rows = view[view["flag_estimated"] == 1] if "flag_estimated" in view.columns else view.iloc[0:0]
-if not est_rows.empty:
-    reasons = (est_rows["estimate_note"].astype(str)
-               .str.split("；").explode().str.strip())
-    reasons = reasons[reasons != ""].value_counts().head(8).reset_index()
-    reasons.columns = ["估算原因", "行数"]
+if reason_counts:
+    reasons = pd.DataFrame(
+        [{"估算原因": str(k), "行数": int(v)} for k, v in reason_counts.items()]
+    ).sort_values("行数", ascending=False).head(8).reset_index(drop=True)
     c1, c2 = st.columns([0.45, 0.55])
     with c1:
         st.dataframe(reasons, width="stretch", hide_index=True)
     with c2:
         st.caption("填补顺序：同线历史均值 → 行业绕行系数 → 全样本中位数；"
                    "车型找不到按载重推断；发票匹配不上按同类别历史均价。"
-                   "每一种填补都写进 estimate_note，前端黄框标出。")
+                   "每一种填补都写进 estimate_note，前端黄框标出。"
+                   "（原因拆分为全量口径，读 data_quality.json 预计算，不随筛选变化。）")
 
 flags.estimated_panel(view, n=8)
 

@@ -1,4 +1,10 @@
-"""第 2 页 · 高排放诊断：排放集中在哪，同一条线还能省多少。"""
+"""第 2 页 · 高排放诊断：排放集中在哪，同一条线还能省多少。
+
+数据契约（只读，不重算，D4）：
+- kpi.json：重型车碳占比 / 超长途碳占比 / 同线带宽中位 / 可比较线路数 / 覆盖率
+- hotspots.parquet：四维热点（车型 / 线路 / 月份 / 里程段）
+- od_band.parquet：同线带宽（evaluator 预计算）
+"""
 
 import sys
 from pathlib import Path
@@ -35,28 +41,19 @@ if mock:
     layout.demo_note(str(src.get("reason", "")))
 
 k = services.kpis()
-kg = pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0.0)
-total = float(kg.sum()) or 1.0
-heavy_share = None
-if "vclass" in seg.columns:
-    vc = pd.to_numeric(seg["vclass"], errors="coerce")
-    heavy_share = float(kg[vc == 3].sum()) / total
-longhaul_share = None
-if "dist_km" in seg.columns:
-    dist = pd.to_numeric(seg["dist_km"], errors="coerce")
-    longhaul_share = float(kg[dist > 500].sum()) / total
+heavy_share = k.get("heavy_share")
+longhaul_share = k.get("longhaul_share")
 band = services.od_band()
 ratio_median = k.get("od_ratio_median")
-if ratio_median is None and not band.empty and "ratio" in band.columns:
-    ratio_median = float(pd.to_numeric(band["ratio"], errors="coerce").median())
 od_pairs = k.get("od_pairs") or (len(band) if not band.empty else 0)
 coverage = k.get("od_coverage_pct")
 
 layout.kpi_row([
     {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—"),
-     "help": "重型车是电动化瓶颈"},
+     "help": "重型车是电动化瓶颈（kpi.json 预计算）"},
     {"label": "超长途（>500km）碳占比",
-     "value": (("%.1f%%" % (100 * longhaul_share)) if longhaul_share is not None else "—")},
+     "value": (("%.1f%%" % (100 * longhaul_share)) if longhaul_share is not None else "—"),
+     "help": "kpi.json 预计算（原页面公式已迁入 pipeline）"},
     {"label": "同线碳强度差（中位）", "value": (("%.2f×" % ratio_median) if ratio_median else "—"),
      "help": "同一 OD 上不同车型的最大/最小因子比"},
     {"label": "可比较线路数", "value": services.fmt(od_pairs)},

@@ -568,6 +568,34 @@ div[data-testid="stMultiSelect"] span[data-baseweb="tag"] { background: rgba(94,
   .cm-npv { padding: 14px 14px 12px 14px; }
 }
 
+/* ---------- 浮动产品顶栏（Coolors 式卡片） ---------- */
+div[class*="st-key-cm_header_card"] {
+  position: relative; isolation: isolate; overflow: hidden;
+  margin: 8px 0 16px 0; padding: 11px 16px 10px 16px;
+  border: 1px solid rgba(255,255,255,0.10); border-radius: 22px;
+  background:
+    radial-gradient(650px 130px at 10% 0%, rgba(94,231,255,0.10), transparent 70%),
+    linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018)),
+    rgba(10,12,17,0.82);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.06);
+  backdrop-filter: blur(18px);
+}
+div[class*="st-key-cm_header_card"]:before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; z-index: 0;
+  background: linear-gradient(90deg, #5EE7FF 0%, #2DD4A7 24%, #FFC46B 55%, #FF7A5C 76%, #8FB8FF 100%);
+  opacity: 0.92;
+}
+div[class*="st-key-cm_header_card"] [data-testid="stHorizontalBlock"] { position: relative; z-index: 1; align-items: center; }
+div[class*="st-key-cm_header_card"] div[class*="st-key-cm_nav_row"] {
+  border: none; background: transparent; padding: 0; border-radius: 0;
+}
+.cm-head-status { display: flex; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.cm-head-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); font-family: var(--mono); font-size: 8px;
+  letter-spacing: 0.04em; white-space: nowrap; background: rgba(255,255,255,0.022); }
+.cm-head-pill.live { color: var(--tide); border-color: rgba(94,231,255,0.24); }
+.cm-head-pill.ok { color: var(--tide-2); border-color: rgba(45,212,167,0.28); }
+
 /* ---------- 按钮 / 导航 / 控制台精修 ---------- */
 /* 原生 page_link 导航：保留胶囊视觉，但走 Streamlit 客户端路由 */
 div[data-testid="stPageLink"] { display: inline-flex; margin: 0 !important; }
@@ -695,7 +723,8 @@ div[data-testid="stStatusWidget"] * { display: none !important; }
   div[data-testid="stExpander"] summary p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cm-nav { gap: 8px; }
   .cm-nav-links { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; margin-left: 0; padding-bottom: 2px; }
-  .cm-nav-status { display: none; }
+  .cm-nav-status, .cm-head-status { display: none; }
+  div[class*="st-key-cm_header_card"] { padding: 10px 12px 9px 12px; border-radius: 18px; }
   div[class*="st-key-cm_nav_row"] { flex-wrap: nowrap; overflow-x: auto; width: 100%; border-radius: 16px; }
   div[class*="st-key-cm_nav_row"]::-webkit-scrollbar { display: none; }
   div[data-testid="stPageLink"] { flex: 0 0 auto; }
@@ -758,69 +787,57 @@ def _href(path: str) -> str:
 
 
 def top_nav(current: str = "", source_name: str = "", gate: Optional[Dict[str, Any]] = None) -> None:
-    """顶部公告条 + 原生 page_link 导航。
+    """浮动产品顶栏：品牌 + 原生 page_link 导航 + 实时状态。
 
-    页面链接必须走 st.page_link：Streamlit 客户端路由，不整页重载，
-    不会出现切页时旧页面残留/闪回；同时 session_state 里的 λ 也不会丢。
+    不用通栏公告条；整块收进一张玻璃卡片，顶部用一条多色 palette 条
+    做 Coolors 式产品视觉。页面链接走 st.page_link，客户端路由不重载。
     """
     current = str(current or "0")
-    source = "REAL DATA" if source_name == "real" else "DEMO DATA"
-    if gate and gate.get("passed"):
-        gate_text = "GATE PASS"
-    elif gate:
-        gate_text = "GATE CHECK"
-    else:
-        gate_text = "GATE —"
-    announce = (
-        "<div class='cm-announce'>"
-        "<span class='a-dot'></span><span>2027 CHALLENGE CUP · 主体赛 A 类</span>"
-        "<span class='a-mid'>碳慧智算 / CARBON INTELLIGENCE</span>"
-        "<span class='a-right'>" + source + " · " + gate_text + "</span>"
-        "</div>"
-    )
-    st.markdown(announce, unsafe_allow_html=True)
+    source = "REAL" if source_name == "real" else "DEMO"
+    gate_text = "GATE PASS" if gate and gate.get("passed") else ("GATE CHECK" if gate else "GATE —")
 
-    c_brand, c_links, c_status = st.columns([0.17, 0.75, 0.08], gap="small",
-                                            vertical_alignment="center")
-    with c_brand:
-        st.markdown(
-            "<div class='cm-brand'>"
-            "<span class='mark'>碳</span>"
-            "<span><span class='word'>碳慧<em>智算</em></span>"
-            "<span class='sub'>CARBON INTELLIGENCE</span></span>"
-            "</div>", unsafe_allow_html=True,
-        )
-    with c_links:
-        with st.container(horizontal=True, gap="small", key="cm_nav_row"):
-            for item in PAGES:
-                if item["id"] == "0":
-                    # Streamlit page_link 不支持主页路径；概览保留为普通链接。
-                    cls = "cm-nav-link on" if current == "0" else "cm-nav-link"
-                    st.markdown(
-                        "<a class='" + cls + "' href='/' target='_top'>概览</a>",
-                        unsafe_allow_html=True,
-                    )
-                    continue
-                try:
-                    st.page_link(
-                        item["path"],
-                        label=item["label"],
-                        disabled=(item["id"] == current),
-                    )
-                except Exception:
-                    # AppTest 把单个页面当 entrypoint 时找不到 pages/ 路径；
-                    # 真实 app 不会走这里。兜底用普通链接，保证测试不红。
-                    on = " on" if item["id"] == current else ""
-                    st.markdown(
-                        "<a class='cm-nav-link" + on + "' href='"
-                        + _href(item["href"]) + "' target='_top'>"
-                        + _esc(item["label"]) + "</a>",
-                        unsafe_allow_html=True,
-                    )
-    with c_status:
-        st.markdown("<div style='text-align:right'><span class='cm-nav-status'>READ-ONLY</span></div>",
-                    unsafe_allow_html=True)
-    st.markdown("<div class='cm-nav-rule'></div>", unsafe_allow_html=True)
+    with st.container(key="cm_header_card"):
+        c_brand, c_links, c_status = st.columns([0.18, 0.68, 0.14], gap="small",
+                                                vertical_alignment="center")
+        with c_brand:
+            st.markdown(
+                "<div class='cm-brand'>"
+                "<span class='mark'>碳</span>"
+                "<span><span class='word'>碳慧<em>智算</em></span>"
+                "<span class='sub'>CARBON INTELLIGENCE</span></span>"
+                "</div>", unsafe_allow_html=True,
+            )
+        with c_links:
+            with st.container(horizontal=True, gap="small", key="cm_nav_row"):
+                for item in PAGES:
+                    if item["id"] == "0":
+                        cls = "cm-nav-link on" if current == "0" else "cm-nav-link"
+                        st.markdown(
+                            "<a class='" + cls + "' href='/' target='_top'>概览</a>",
+                            unsafe_allow_html=True,
+                        )
+                        continue
+                    try:
+                        st.page_link(
+                            item["path"],
+                            label=item["label"],
+                            disabled=(item["id"] == current),
+                        )
+                    except Exception:
+                        on = " on" if item["id"] == current else ""
+                        st.markdown(
+                            "<a class='cm-nav-link" + on + "' href='"
+                            + _href(item["href"]) + "' target='_top'>"
+                            + _esc(item["label"]) + "</a>",
+                            unsafe_allow_html=True,
+                        )
+        with c_status:
+            st.markdown(
+                "<div class='cm-head-status'>"
+                "<span class='cm-head-pill live'>● " + source + "</span>"
+                "<span class='cm-head-pill ok'>" + gate_text + "</span>"
+                "</div>", unsafe_allow_html=True,
+            )
 
 
 def hero(title: str, subtitle: str, kicker: str = "CARBON LEDGER",

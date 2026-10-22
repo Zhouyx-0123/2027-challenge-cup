@@ -59,6 +59,9 @@ RESULT_FILES: Dict[str, str] = {
     "route_select": "route_select.parquet",
     "route_candidates": "route_candidates.parquet",
     "route_candidate_carbon": "route_candidate_carbon.parquet",
+    # 上海—北京 OSM 碳基线（docs/35 D2/D3）：非实时 · 固定因子 · 道路等级 proxy
+    "route_baseline_steps": "route_baseline_sh_bj_steps.parquet",
+    "route_baseline_summary": "route_baseline_sh_bj_summary.json",
 }
 
 # --------------------------------------------------------------------------
@@ -113,6 +116,15 @@ ROUTE_CONSTRAINT_COLUMNS: List[str] = [
     "avg_speed_kmh", "max_cargo_t", "usable_range_km", "deploy_tier",
     "c1_range_ok", "c2_window_ok", "c3_capacity_ok", "c4_charging_ok", "c5_winter_ok",
     "constraint_status", "constraint_note", "km_share_pct",
+]
+
+#: 上海—北京 OSM 碳基线 · 逐 step 表契约列（docs/35 §5.1）
+BASELINE_STEP_COLUMNS: List[str] = [
+    "od_key", "provider", "traffic_mode", "step_index", "distance_km",
+    "duration_min", "speed_kmh", "road_name", "road_ref", "road_class",
+    "road_class_source", "road_class_confidence", "toll_flag", "toll_yuan",
+    "traffic_lights", "carbon_kg", "factor_version", "factor_mode", "vehicle",
+    "load_t", "geometry_geojson",
 ]
 
 #: 台账六字段（docs/15 §2，顺序即表格顺序）

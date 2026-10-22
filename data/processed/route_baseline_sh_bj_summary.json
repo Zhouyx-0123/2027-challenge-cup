@@ -1,0 +1,76 @@
+{
+  "od_key": "sh_chedun__bj_tongzhou",
+  "distance_km": 1189.974,
+  "duration_min": 816.2,
+  "carbon_kg": 1256.553,
+  "carbon_t": 1.256553,
+  "road_class_share": {
+    "motorway": 86.29,
+    "trunk": 11.24,
+    "urban": 0.91,
+    "secondary": 0.88,
+    "ramp": 0.67
+  },
+  "road_class_count": {
+    "motorway": 17,
+    "trunk": 15,
+    "ramp": 13,
+    "urban": 11,
+    "secondary": 9
+  },
+  "road_class_distance_km": {
+    "motorway": 1026.869,
+    "trunk": 133.764,
+    "urban": 10.887,
+    "secondary": 10.482,
+    "ramp": 7.972
+  },
+  "road_class_unknown_pct": 0.0,
+  "step_count": 65,
+  "provider": "osrm_public",
+  "traffic_mode": "freeflow",
+  "factor_version": "JCB2023-BASE-v1",
+  "factor_mode": "fixed_50",
+  "vehicle": "30t_tractor",
+  "load_t": 30.0,
+  "ef_base_gkm": 1055.95,
+  "base_speed_kmh": 50.0,
+  "generated_at": "2026-10-22T23:48:32+08:00",
+  "points": 7118,
+  "input_coord": "gcj02",
+  "input_origin": {
+    "lng": 121.315087,
+    "lat": 31.014995
+  },
+  "input_dest": {
+    "lng": 116.664264,
+    "lat": 39.909698
+  },
+  "wgs_origin": {
+    "lng": 121.310616,
+    "lat": 31.016848
+  },
+  "wgs_dest": {
+    "lng": 116.658934,
+    "lat": 39.908604
+  },
+  "snap_distance_m": {
+    "origin": 24.54,
+    "dest": 47.89
+  },
+  "sum_check": {
+    "step_distance_km": 1189.974,
+    "route_distance_km": 1189.974,
+    "distance_delta_pct": 0.0,
+    "step_duration_min": 816.2,
+    "route_duration_min": 816.2,
+    "duration_delta_pct": -0.0
+  },
+  "disclaimer": {
+    "real_time": false,
+    "fixed_factor": true,
+    "road_class_is_proxy": true,
+    "note": "非实时 · 固定因子（fixed_50）· 道路等级为 proxy，不代表实测碳账。"
+  },
+  "attribution": "路线几何与道路等级来自 OpenStreetMap（© OpenStreetMap contributors），经 OSRM 公共服务计算。"
+}

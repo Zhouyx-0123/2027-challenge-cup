@@ -4,6 +4,8 @@ config/amap_js_key.txt
 config/amap_js_code.txt
 config/*.key
 config/*_secret.txt
+# 天地图 token（底图用）：永不入库
+config/tianditu_token.txt
 
 # ===== 原始数据：永不入库 =====
 data/raw/
@@ -43,11 +45,16 @@ data/processed/*
 # O6 方案 × 线路约束表（第 3 页逐线结论的取数来源）
 !data/processed/scenario_route_constraint.parquet
 data/processed/route_geo.parquet
+# 上海—北京 OSM 碳基线（docs/35 D2/D3）：非实时 · 固定因子 · 道路等级 proxy
+!data/processed/route_baseline_sh_bj_steps.parquet
+!data/processed/route_baseline_sh_bj_summary.json
 
 # ===== 离线包与产物 =====
 wheels/
 outputs/figures/
 outputs/tables/
+# OSRM 原始响应（复核用，1 MB 起，不进 Git —— docs/35 §9 第 11 条）
+outputs/route_baseline/
 db/
 data/interim/
 

@@ -18,12 +18,20 @@
 
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
+# Windows GBK 控制台兜底（python -m src.optimizer 独立运行时）。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except Exception:
+        pass
 
 ROOT = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = ROOT / "data" / "processed"
@@ -190,7 +198,7 @@ def build_baseline() -> pd.DataFrame:
     total_km = float(out["dist_km"].sum())
     med = float(out["delta_pct"].median()) if len(out) else 0.0
     print("  [O4] 段级碳排落盘：%s（%d 段）" % (BASELINE_PATH.name, len(out)))
-    print("       E₀ = %s tCO₂e｜总里程 = %s km｜双轨偏差中位 = %+.2f%%"
+    print("       E0 = %s tCO2e | 总里程 = %s km | 双轨偏差中位 = %+.2f%%"
           % (format(total_t, ",.2f"), format(total_km, ",.2f"), med))
     print("       因子表版本 %s（%s）" % (FACTOR_VERSION, FACTOR_SOURCE))
 

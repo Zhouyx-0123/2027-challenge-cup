@@ -27,6 +27,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
 
+# Windows GBK 控制台兜底：E₀/CO₂ 等 Unicode 下标无法编码时替换为 ?，
+# 而不是让整条 pipeline 在打印阶段崩掉（pytest 子进程也会走这里）。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except Exception:
+        pass
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))

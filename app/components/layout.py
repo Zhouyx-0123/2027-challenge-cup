@@ -111,29 +111,22 @@ def sidebar_params(source_name: str = "unknown",
     basis0 = st.session_state.get("basis", "赛题口径")
 
     theme.top_nav(current=current, source_name=source_name, gate=gate)
-    label = "控制台 / CONTROL DECK　·　λ / 成本口径"
-    with st.expander(label, expanded=False):
-        c1, c2, c3 = st.columns([0.32, 0.46, 0.22])
-        with c1:
-            lam = st.number_input(
-                "内部碳价 λ（元/吨 CO₂e）",
-                min_value=0.0, max_value=1000.0, value=lam0, step=10.0,
-                help="全站唯一的定价旋钮，第 3–5 页共用。",
-            )
-        with c2:
-            basis = st.radio(
-                "成本口径", ["赛题口径", "碳价延展口径"],
-                index=0 if basis0 == "赛题口径" else 1, horizontal=True,
-                help="赛题口径＝购置+能耗+维护−补贴；延展口径＝排放量 × λ。",
-            )
-        with c3:
-            st.markdown("<div style='height:26px'></div>", unsafe_allow_html=True)
-            if st.button("刷新结果表", width="stretch",
-                         help="只清缓存、重新读表；不会调用任何算法。"):
-                st.cache_data.clear()
-                st.rerun()
-        st.caption("数据：%s　｜　%s　｜　只读 data/processed；页面不调用核心算法、不做碳/成本计算。"
-                   % (src_text, gate_text))
+    with st.popover("控制台 / CONTROL DECK　·　λ / 成本口径"):
+        lam = st.number_input(
+            "内部碳价 λ（元/吨）",
+            min_value=0.0, max_value=1000.0, value=lam0, step=10.0,
+            help="全站唯一的定价旋钮，第 3–5 页共用。",
+        )
+        basis = st.radio(
+            "成本口径", ["赛题口径", "碳价延展口径"],
+            index=0 if basis0 == "赛题口径" else 1, horizontal=True,
+            help="赛题口径＝购置+能耗+维护−补贴；延展口径＝排放量 × λ。",
+        )
+        if st.button("刷新结果表", width="content",
+                     help="只清缓存、重新读表；不会调用任何算法。"):
+            st.cache_data.clear()
+            st.rerun()
+        st.caption("数据：%s　｜　%s　｜　只读结果表" % (src_text, gate_text))
     st.session_state["lam"] = float(lam)
     st.session_state["basis"] = basis
     try:

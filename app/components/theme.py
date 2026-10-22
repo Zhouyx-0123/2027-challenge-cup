@@ -462,6 +462,78 @@ div[data-testid="stMultiSelect"] span[data-baseweb="tag"] { background: rgba(94,
 [data-testid="stMarkdownContainer"] a { color: var(--tide); }
 [data-testid="stMarkdownContainer"] code { color: var(--foam); background: rgba(94,231,255,0.08); border-radius: 5px; padding: 1px 5px; }
 
+/* ---------- 按钮 / 导航 / 控制台精修 ---------- */
+.cm-nav-links { gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.018); }
+.cm-nav-link { font-size: 11.5px; font-weight: 600; padding: 7px 11px; border: 1px solid transparent; }
+.cm-nav-link.on { background: linear-gradient(100deg, var(--tide), #8FB8FF); color: #04121F; box-shadow: 0 0 20px rgba(94,231,255,0.26); }
+
+/* 控制台收成一枚右上角胶囊；点开是浮层参数卡 */
+div[data-testid="stLayoutWrapper"]:has(div[data-testid="stPopover"]) { margin-left: auto; }
+div[data-testid="stElementContainer"]:has(div[data-testid="stPopover"]) { display: flex; justify-content: flex-end; }
+div[data-testid="stPopover"] { display: flex; justify-content: flex-end; margin: -2px 0 18px auto !important; width: fit-content !important; }
+div[data-testid="stPopover"] > button {
+  border-radius: 999px !important; border: 1px solid rgba(94,231,255,0.28) !important;
+  background: rgba(94,231,255,0.065) !important; color: var(--foam) !important;
+  padding: 8px 16px !important; min-height: 36px; font-family: var(--mono);
+  font-size: 9.5px !important; letter-spacing: 0.03em; box-shadow: 0 0 22px rgba(94,231,255,0.08);
+}
+div[data-testid="stPopover"] > button:hover { border-color: rgba(94,231,255,0.55) !important; background: rgba(94,231,255,0.10) !important; }
+div[data-testid="stPopoverBody"] div[data-testid="stButton"] { display: flex; justify-content: flex-end; }
+div[data-testid="stPopoverBody"] button { width: auto !important; }
+div[data-testid="stPopoverBody"] {
+  background: #11151C !important; border: 1px solid rgba(94,231,255,0.24) !important;
+  border-radius: 18px !important; box-shadow: 0 24px 70px rgba(0,0,0,0.55) !important;
+  padding: 16px !important; min-width: 330px;
+}
+div[data-testid="stExpander"] { max-width: 100%; margin: 0 0 14px 0; }
+div[data-testid="stExpander"] details { border-radius: 999px; background: rgba(94,231,255,0.055); border: 1px solid rgba(94,231,255,0.22); overflow: hidden; }
+div[data-testid="stExpander"] summary { padding: 8px 15px; color: var(--foam); font-size: 9.5px; letter-spacing: 0.03em; }
+div[data-testid="stExpander"] summary:hover { color: #fff; background: rgba(94,231,255,0.06); }
+div[data-testid="stExpander"] details[open] { border-radius: 18px; background: var(--panel); border-color: rgba(94,231,255,0.26); }
+div[data-testid="stExpander"] details[open] summary { border-bottom: 1px solid var(--line); border-radius: 18px 18px 0 0; }
+
+/* 所有 Streamlit 按钮统一胶囊；主按钮走潮汐渐变 */
+button[data-testid="stBaseButton-primary"], button[kind="primary"],
+button[data-testid="stBaseButton-secondary"], button[kind="secondary"],
+div[data-testid="stDownloadButton"] button {
+  min-height: 38px; border-radius: 999px !important; padding: 8px 18px !important;
+  font-size: 12px !important; font-weight: 700 !important; letter-spacing: 0.01em;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+button[data-testid="stBaseButton-primary"], button[kind="primary"] {
+  background: linear-gradient(100deg, var(--tide), var(--tide-2)) !important;
+  color: #04121F !important; border: none !important;
+  box-shadow: 0 8px 28px rgba(94,231,255,0.24) !important;
+}
+button[data-testid="stBaseButton-primary"]:hover, button[kind="primary"]:hover {
+  transform: translateY(-1px); box-shadow: 0 12px 34px rgba(94,231,255,0.34) !important;
+}
+button[data-testid="stBaseButton-secondary"], button[kind="secondary"], div[data-testid="stDownloadButton"] button {
+  background: rgba(255,255,255,0.035) !important; border: 1px solid var(--line-2) !important; color: var(--text) !important;
+}
+div[data-testid="stDownloadButton"] { display: flex; }
+div[data-testid="stDownloadButton"] button { width: auto !important; min-width: 168px; max-width: 240px; }
+button[data-testid="stBaseButton-secondary"]:hover, div[data-testid="stDownloadButton"] button:hover {
+  transform: translateY(-1px); border-color: rgba(94,231,255,0.55) !important; background: rgba(94,231,255,0.07) !important;
+}
+
+/* radio 做成胶囊分段控件 */
+div[data-testid="stRadio"] div[role="radiogroup"] { gap: 7px; flex-wrap: wrap; }
+div[data-testid="stRadio"] label {
+  margin: 0 !important; padding: 6px 11px 6px 9px; border: 1px solid var(--line);
+  border-radius: 999px; background: rgba(255,255,255,0.028); transition: all .18s ease;
+}
+div[data-testid="stRadio"] label:has(input:checked) {
+  border-color: rgba(94,231,255,0.55); background: rgba(94,231,255,0.11);
+  box-shadow: 0 0 18px rgba(94,231,255,0.12);
+}
+div[data-testid="stRadio"] label p { font-size: 11.5px !important; }
+div[data-testid="stRadio"] label:hover { border-color: rgba(94,231,255,0.35); }
+
+/* tabs 也做成小胶囊 */
+button[data-testid="stTab"] { padding: 7px 13px !important; border-radius: 999px !important; border: 1px solid transparent !important; }
+button[data-testid="stTab"][aria-selected="true"] { background: rgba(94,231,255,0.10) !important; border-color: rgba(94,231,255,0.30) !important; }
+
 /* ---------- 动效 ---------- */
 @keyframes cmDrift { 0% { transform: translate3d(-3%, -2%, 0) scale(1); } 100% { transform: translate3d(4%, 3%, 0) scale(1.08); } }
 @keyframes cmFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(16px); } }
@@ -517,11 +589,13 @@ PAGES: List[Dict[str, str]] = [
 
 
 def inject() -> None:
-    """注入全局样式。每个页面在 setup() 之后调用一次，重复调用无副作用。"""
-    if st.session_state.get("_cm_css_injected"):
-        return
+    """注入全局样式。
+
+    不做 session_state 去重：浏览器刷新/重连后 DOM 会重建，但 session_state
+    可能还在；一旦跳过注入，首屏就会退化成无 CSS 的裸 HTML。CSS 每次 rerun
+    重新注入的成本很低，稳定优先。
+    """
     st.markdown(CSS, unsafe_allow_html=True)
-    st.session_state["_cm_css_injected"] = True
 
 
 def _esc(value: Any) -> str:

@@ -43,7 +43,17 @@ echo [2/4] 检查依赖包（缺什么装什么）...
 %PY% -c "import streamlit, pandas, numpy, pyarrow, plotly" >nul 2>&1
 if errorlevel 1 (
     echo     正在安装依赖，首次约需 1-3 分钟...
-    %PY% -m pip install -r requirements.txt --quiet --disable-pip-version-check
+    REM 优先离线 wheels/：断网的答辩现场也能装；没有 wheels 或离线装不上再联网
+    if exist "wheels\*.whl" (
+        echo     发现 wheels\ 离线包，先试离线安装...
+        %PY% -m pip install --no-index --find-links=wheels -r requirements.txt --quiet --disable-pip-version-check
+        if errorlevel 1 (
+            echo     离线安装失败，回退联网安装...
+            %PY% -m pip install -r requirements.txt --quiet --disable-pip-version-check
+        )
+    ) else (
+        %PY% -m pip install -r requirements.txt --quiet --disable-pip-version-check
+    )
     if errorlevel 1 (
         echo     [X] 依赖安装失败。可手动执行：
         echo         %PY% -m pip install -r requirements.txt

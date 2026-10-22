@@ -37,7 +37,9 @@ WARN = "!"
 BAD = "[X]"
 
 # 前端只读铁律：这些必须成立
-GATE_EXPECT_PASS = 22
+# 闸门当前 26 项（8 目标 + 18 结构）；pipeline 的 passed 标志才是权威，
+# 这里只作参考值，不对具体 PASS 数做硬编码断言（结构项还会增长）。
+GATE_EXPECT_PASS = 26
 
 
 def _print_header(title: str) -> None:
@@ -80,7 +82,7 @@ def check_data() -> Tuple[bool, str]:
 
 
 def check_gate() -> Tuple[bool, str]:
-    """闸门：PASS 22｜FAIL 0 才算健康。"""
+    """闸门：passed 为真且 FAIL=0 才算健康（当前 26 项：8 目标 + 18 结构）。"""
     import json
     path = PROCESSED / "gate_report.json"
     if not path.exists():

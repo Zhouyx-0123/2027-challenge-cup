@@ -44,6 +44,12 @@ CORE_COLUMNS: List[str] = schema.CORE_COLUMNS
 
 SCENARIO_COLUMNS: List[str] = schema.SCENARIO_COLUMNS
 
+#: O6 约束结论列：唯一来源是 src/schema.py（页面 3 按契约渲染，不猜列名）
+CONSTRAINT_COLUMNS: List[str] = schema.CONSTRAINT_COLUMNS
+
+#: 方案 × 线路约束表契约列（scenario_route_constraint.parquet）
+ROUTE_CONSTRAINT_COLUMNS: List[str] = schema.ROUTE_CONSTRAINT_COLUMNS
+
 LEDGER_COLUMNS: List[str] = schema.LEDGER_COLUMNS
 
 DISCLOSURE_KEYS: List[str] = schema.DISCLOSURE_KEYS
@@ -109,10 +115,6 @@ def scenarios() -> pd.DataFrame:
 # ---------------- 运营约束（O6 契约式读取，可选） ----------------
 # 规则文本见 docs/20 §7：C1 续航衰减 / C2 14h 窗口 / C3 运力匹配 / C4 补能可达 / C5 冬季山区。
 # O6 未接表前，页面 3 只展示规则框架；约束结论列写进结果表后，页面按约定自动渲染。
-CONSTRAINT_COLUMNS = [
-    "constraint_status", "constraint_note",
-    "c1_range_ok", "c2_window_ok", "c3_capacity_ok", "c4_charging_ok", "c5_winter_ok",
-]
 
 
 def constraint_contract() -> Dict[str, Any]:
@@ -125,6 +127,37 @@ def constraint_contract() -> Dict[str, Any]:
         return {"available": False, "columns": [], "rows": []}
     rows = df[["scenario"] + cols].to_dict(orient="records")
     return {"available": True, "columns": cols, "rows": rows}
+
+
+def route_constraints() -> pd.DataFrame:
+    """方案 × 哪条线：scenario_route_constraint.parquet（逐线路 C1–C5 结论）。
+
+    一行一个 (方案, 类别, 线路)；只有参数化方案才有行。缺失/旧结果表返回空表。
+    """
+    return _read_parquet(RESULT_FILES["route_constraints"])
+
+
+def route_constraint_contract() -> Dict[str, Any]:
+    """线路级约束表契约探测：{available, columns, rows, summary}。
+
+    summary 由段表级 verdict 列聚合不出（它在 final_report 的 note 里），
+    页面直接展示逐线表 + 表级状态分布即可，不在这里做二次统计口径。
+    """
+    df = route_constraints()
+    if df.empty:
+        return {"available": False, "columns": [], "rows": [], "summary": {}}
+    cols = [c for c in ROUTE_CONSTRAINT_COLUMNS if c in df.columns]
+    if not cols:
+        return {"available": False, "columns": [], "rows": [], "summary": {}}
+    summary: Dict[str, Any] = {"rows": int(len(df))}
+    if "deploy_tier" in df.columns:
+        summary["by_tier"] = {str(k): int(v) for k, v in
+                              df["deploy_tier"].value_counts().items()}
+    if "constraint_status" in df.columns:
+        summary["by_status"] = {str(k): int(v) for k, v
+                                in df["constraint_status"].value_counts().items()}
+    return {"available": True, "columns": cols,
+            "rows": df[cols].to_dict(orient="records"), "summary": summary}
 
 
 def hotspots(dim: str | None = None) -> pd.DataFrame:

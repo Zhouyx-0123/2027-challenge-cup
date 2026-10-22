@@ -1,6 +1,6 @@
 {
   "source": "real",
-  "generated_at": "2026-10-20T16:29:33",
+  "generated_at": "2026-10-22T08:47:48",
   "total_kg": 4502042.41069416,
   "e0_t": 4502.042410694159,
   "total_km": 4690435.81,
@@ -20,6 +20,8 @@
   "od_ratio_median": 1.498,
   "od_pairs": 310,
   "od_coverage_pct": 83.76242060808474,
-  "main_reduction_pct": 77.4,
+  "main_reduction_pct": 77.37645382140694,
+  "main_calculation_mode": "parameterized",
+  "main_decision_eligible": true,
   "factor_version": "JCB2023-BASE-v1"
 }

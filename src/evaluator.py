@@ -6,6 +6,13 @@
 CLI 默认只读：python -m src.evaluator
 纯计算自测：python -m src.evaluator --self-test
 详细输入单位、公式和接线说明见 docs/08_口径与假设清单.md 的 COST 节。
+
+E4 接线（2026-10-22）：真实数据（_source.json = real）时，build_cost_scenarios
+由段表实时派生主推方案 S5 的逐车组参数（底稿 表14/表18/表19 链），
+build_schemes 输出**混合表**——参数化行 + 未取得车组底稿的历史标定行
+（decision_eligible=False、约束列"未评估"）；同时产出
+scenario_route_constraint.parquet（方案 × 哪条线，O6 逐线 C1–C5 结论）。
+演示/未知来源一律回退历史标定，不用演示数据冒充参数化结果。
 """
 from __future__ import annotations
 
@@ -143,34 +150,57 @@ def build_hotspots(seg: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _legacy_row(spec: Dict[str, Any], e0_t: float, source: str,
+                mark_constraints: bool = False) -> Dict[str, Any]:
+    """单行历史标定：无底稿车组拆分的方案保留原值，并明确标记未核验、未过约束。
+
+    mark_constraints=True 时补 O6 约束列（混合表用：参数化行有结论，历史行显式"未评估"）；
+    纯 legacy 表不加这些列，页面据此继续只展示规则框架（与接线前行为一致）。
+    """
+    reduction = float(spec["reduction_pct"])
+    emission = e0_t * (1.0 - reduction / 100.0)
+    capex = float(spec["capex_wan"])
+    opex = float(spec["opex_save_wan"])
+    saving = e0_t - emission
+    payback = _payback(capex, opex)
+    unit = (capex * 10000.0 / saving) if saving > 0 else 0.0
+    row = {
+        "order": int(spec["order"]),
+        "scenario": spec["scenario"],
+        "emission_t": round(emission, 3),
+        "reduction_pct": reduction,
+        "carbon_saving_t": round(saving, 3),
+        "capex_wan": round(capex, 2),
+        "opex_save_wan": round(opex, 2),
+        "payback_years": round(payback, 3),
+        "unit_cost_yuan_t": round(unit, 2),
+        "meets_target": bool(reduction >= TARGET_REDUCTION_PCT),
+        # 混合表（mark_constraints=True）里 is_main 只由"达标且过运营约束"的胜者产生，
+        # 历史标定行的原主推标签必须清零，不能把未核验方案伪装成决策推荐。
+        "is_main": False if mark_constraints else bool(spec["is_main"]),
+        "basis": (spec["basis"] + "；历史代码标定，未核验原底稿；is_main 仅为原主推标签"),
+        "data_source": source,
+        "e0_t": round(e0_t, 3),
+        "calculation_mode": "legacy_calibration",
+        "parameter_status": "unverified_legacy_totals",
+        "operational_status": "pending",
+        "decision_eligible": False,
+        "boundary": "未逐方案核实，禁止直接跨边界排名",
+    }
+    if mark_constraints:
+        row.update({
+            "constraint_status": "未评估",
+            "constraint_note": "历史标定行：未做逐车组/逐线路约束评估，不可作为决策依据",
+            "c1_range_ok": None, "c2_window_ok": None, "c3_capacity_ok": None,
+            "c4_charging_ok": None, "c5_winter_ok": None,
+        })
+    return row
+
+
 def _build_calibrated_schemes(seg: pd.DataFrame, source: str) -> pd.DataFrame:
     e0_t = float(seg["kg_co2"].sum()) / 1000.0
-    rows = []
-    for spec in SCENARIOS:
-        reduction = float(spec["reduction_pct"])
-        emission = e0_t * (1.0 - reduction / 100.0)
-        capex = float(spec["capex_wan"])
-        opex = float(spec["opex_save_wan"])
-        saving = e0_t - emission
-        payback = _payback(capex, opex)
-        unit = (capex * 10000.0 / saving) if saving > 0 else 0.0
-        rows.append({
-            "order": int(spec["order"]),
-            "scenario": spec["scenario"],
-            "emission_t": round(emission, 3),
-            "reduction_pct": reduction,
-            "carbon_saving_t": round(saving, 3),
-            "capex_wan": round(capex, 2),
-            "opex_save_wan": round(opex, 2),
-            "payback_years": round(payback, 3),
-            "unit_cost_yuan_t": round(unit, 2),
-            "meets_target": bool(reduction >= TARGET_REDUCTION_PCT),
-            "is_main": bool(spec["is_main"]),
-            "basis": spec["basis"],
-            "data_source": source,
-        })
+    rows = [_legacy_row(spec, e0_t, source) for spec in SCENARIOS]
     out = pd.DataFrame(rows).sort_values("order").reset_index(drop=True)
-    out["e0_t"] = round(e0_t, 3)
     return out
 
 
@@ -186,6 +216,11 @@ class VehicleGroup:
     两个排放量均为整个车组的数据期 tCO2e，须由上游在相同边界计算。
     purchase 为替换购置支出；若基准本就需要购车，应仅填增量购置支出。
     额外设施费在 ScenarioInput 填一次；期末残值为相对基准的净回收额。
+
+    ``baseline_yuan_per_km`` / ``target_yuan_per_km`` 为可选的**直接元/km 口径**：
+    赛题表 1 与底稿表 19 的能耗单价就是元/km（电动 0.35/0.48、氢能 1.05、
+    柴油 0.75/0.95/1.20），填了它就优先用它算能耗成本，``units/price`` 两列留空。
+    维护费同样支持元/km 直填；底稿给的是万/辆/年，由调用方按单车年里程折算。
     """
 
     group_id: str
@@ -205,6 +240,9 @@ class VehicleGroup:
     baseline_period_emission_t: float
     target_period_emission_t: float
     source: str
+    # 可选直接元/km 口径（None = 用 units/price 路径，保持旧行为不变）
+    baseline_yuan_per_km: float | None = None
+    target_yuan_per_km: float | None = None
 
 
 @dataclass(frozen=True)
@@ -220,6 +258,9 @@ class ScenarioInput:
     source: str
     # None 表示未收到 optimizer 的运营约束结论，不能当作通过。
     operational_feasible: bool | None = None
+    # O6 约束结论摘要（build_route_constraint_verdict 的产出）；None = 未评估。
+    # 落列为 constraint_status / constraint_note / c1–c5，供页面按契约渲染。
+    constraint_summary: Dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -239,6 +280,366 @@ class FinanceSettings:
 # 不在模块 import 时读文件，也不把下方 self_test 的虚构样例作为项目参数。
 COST_SCENARIOS: tuple[ScenarioInput, ...] = ()
 FINANCE_SETTINGS: FinanceSettings | None = None
+
+
+# ---------------------------------------------------------------------------
+# E4 · 逐车组成本模型（2026-10-22 录入；底稿链见各常量 source）
+# ---------------------------------------------------------------------------
+# 边界必须与 pipeline.BOUNDARY 一致；pipeline 结构闸门有漂移检查（scheme_boundary）。
+E4_BOUNDARY = "自营公路运输 · 范围一（移动源燃烧）"
+
+ANNUALIZATION_FACTOR = 3.0417      # 365/120：底稿 §8.2 年化系数（与 pipeline.ANNUAL_FACTOR 同值）
+FLEET_WORK_HOURS_PER_DAY = 8.0     # 底稿 表18：每车年运力 = 速度中位数 × 8 h × 300 天
+FLEET_WORK_DAYS_PER_YEAR = 300
+FLEET_HORIZON_YEARS = 10           # 底稿 §8.4：10 年全周期成本对照
+DISCOUNT_RATE = 0.06               # config/calc_factors.json finance.discount_rate
+LAMBDA_YUAN_T = 100.0              # app 侧栏「内部碳价」默认值（第 3–5 页共用旋钮）
+TARGET_REDUCTION_PCT = 70.0        # 赛题要求：2026 年底减排 70%
+
+# 电动化目标排放率（g/km）：《新能源碳排放对比计算结果.xlsx》「分车型明细」，μ=0.565。
+# 轻型取 4.2 米厢式、中型取 9.6 米厢式——底稿 表14 替换矩阵的代表车型。
+ELECTRIC_TARGET_GKM: Dict[int, float] = {1: 166.33, 2: 540.02}
+DIESEL_BASE_GKM: Dict[int, float] = {1: 394.56, 2: 759.24}
+GRID_MU = 0.565                    # 电网排放因子基准（同上「计算依据」，温惠英等式）
+GRID_MU_CLEAN = 0.50               # 2026 电网清洁化情景（完整方案 §5.3 敏感性）
+HYDROGEN_WTW_RATE: Dict[str, float] = {"gray": 0.30, "blue": 0.68, "green": 0.87}
+
+#: 车队替换矩阵：底稿 表14（车型替换）+ 表19（分车型成本）+ 赛题表 1（VEHICLE_SPECS）。
+#: 重型按使用端零排放口径（底稿 §5.2：氢气不含碳，题目未给制氢侧参数，预期口径即使用端）。
+FLEET_PLAN: Dict[int, Dict[str, Any]] = {
+    1: {
+        "label": "轻型", "vehicle": "比亚迪T5/吉利远程 E200", "target_energy": "electricity",
+        "purchase_wan": 18.0, "subsidy_wan": 2.0,
+        "new_energy_yuan_km": 0.35, "diesel_energy_yuan_km": 0.75,
+        "new_maint_wan_year": 1.2, "diesel_maint_wan_year": 1.5,
+        "target_rate": 1.0 - ELECTRIC_TARGET_GKM[1] / DIESEL_BASE_GKM[1],
+        "source": "底稿表14/表19：电动 3-5t（比亚迪T5）18−2 万、0.35 元/km、维护 1.2 万/辆/年；"
+                  "柴油分档 0.75 元/km、1.5 万/辆/年；减排率 57.84% 出 新能源碳排放对比计算结果.xlsx"
+                  " 分车型明细（4.2 米，μ=0.565）",
+    },
+    2: {
+        "label": "中型", "vehicle": "南京金龙 D10/东风凯普特 e星", "target_energy": "electricity",
+        "purchase_wan": 28.0, "subsidy_wan": 2.0,
+        "new_energy_yuan_km": 0.48, "diesel_energy_yuan_km": 0.95,
+        "new_maint_wan_year": 1.8, "diesel_maint_wan_year": 2.5,
+        "target_rate": 1.0 - ELECTRIC_TARGET_GKM[2] / DIESEL_BASE_GKM[2],
+        "source": "底稿表14/表19：电动 8-10t（南京金龙D10）28−2 万、0.48 元/km、维护 1.8 万/辆/年；"
+                  "柴油分档 0.95 元/km、2.5 万/辆/年；减排率 28.87% 出 新能源碳排放对比计算结果.xlsx"
+                  " 分车型明细（9.6 米，μ=0.565）",
+    },
+    3: {
+        "label": "重型", "vehicle": "上汽红岩氢燃料重卡", "target_energy": "hydrogen",
+        "purchase_wan": 95.0, "subsidy_wan": 20.0,
+        "new_energy_yuan_km": 1.05, "diesel_energy_yuan_km": 1.20,
+        "new_maint_wan_year": 3.5, "diesel_maint_wan_year": 4.0,
+        "target_rate": 1.0,
+        "source": "底稿表14/表19：氢能 12-15t（上汽红岩）95−20 万、1.05 元/km、维护 3.5 万/辆/年；"
+                  "柴油分档 1.20 元/km、4.0 万/辆/年；减排率 100% 为使用端零排放口径（底稿 §5.2）",
+    },
+}
+
+MAIN_SCENARIO_NAME = "S5 轻中电 + 重氢（主推）"
+MAIN_SCENARIO_ORDER = 5
+
+
+def default_finance_settings() -> FinanceSettings:
+    """E4 默认财务设置：年化/期限/折现率/λ 全部有出处，调用方也可显式覆盖。"""
+    return FinanceSettings(
+        annualization_factor=ANNUALIZATION_FACTOR,
+        horizon_years=FLEET_HORIZON_YEARS,
+        discount_rate=DISCOUNT_RATE,
+        lambda_yuan_t=LAMBDA_YUAN_T,
+        target_reduction_pct=TARGET_REDUCTION_PCT,
+        boundary=E4_BOUNDARY,
+        source="底稿 §8.2/§8.4（年化 3.0417、10 年全周期）+ config/calc_factors.json"
+               "（discount 0.06）+ app 侧栏默认 λ=100 元/t + 赛题 70% 目标",
+    )
+
+
+def _od_group_labels(frame: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    """OD 分组标签与显示名：od_site（网点级）→ od_key（城市级）→ od_pair，与 build_od_band 同口径。"""
+    label = pd.Series("", index=frame.index, dtype="object")
+    display = pd.Series("", index=frame.index, dtype="object")
+    for key in ("od_site", "od_key", "od_pair"):
+        if key not in frame:
+            continue
+        raw = frame[key].fillna("").astype(str).str.strip()
+        usable = ~raw.str.lower().isin(["", "nan", "none", "null", "<na>"])
+        choose = label.eq("") & usable
+        label[choose] = key + ":" + raw[choose]
+        display[choose] = raw[choose]
+    return label, display
+
+
+def _class_speed_median(seg: pd.DataFrame) -> Dict[int, float]:
+    """类别实测速度中位数（底稿 表18 同口径：>1 且 ≤130 km/h 的有效速度）。"""
+    out: Dict[int, float] = {}
+    for vclass in (1, 2, 3):
+        sub = seg[pd.to_numeric(seg["vclass"], errors="coerce") == vclass]
+        speed = pd.to_numeric(sub["speed_kmh"], errors="coerce") if "speed_kmh" in sub.columns else pd.Series(dtype=float)
+        speed = speed[(speed > 1.0) & (speed <= 130.0)]
+        out[vclass] = float(speed.median()) if speed.notna().any() else 0.0
+    return out
+
+
+def build_cost_scenarios(
+    seg: pd.DataFrame, source: str,
+) -> tuple[tuple[ScenarioInput, ...] | None, FinanceSettings | None]:
+    """由段表**实时派生**主推方案（S5）的车组与财务设置。
+
+    车组口径与底稿 表18/表19 逐项对应：年里程 = 数据期里程 × 3.0417；每车年运力 =
+    类别速度中位数 × 8 h × 300 天；车辆数 = ceil(年里程 ÷ 每车年运力)（34/40/43 = 117 辆）；
+    购置/补贴/能耗（元/km）/维护（万/辆/年 折 元/km）按底稿 表19 录入；目标排放率按
+    表14 替换矩阵（轻 57.84% / 中 28.87% / 重 100% 使用端零排放）。
+
+    段表缺 vclass/speed 等列（演示数据）或任一类为空时返回 (None, None)，
+    调用方据此回退 legacy_calibration，**不用演示数据冒充参数化结果**。
+    """
+    needed = {"vclass", "dist_km", "kg_co2", "speed_kmh"}
+    if seg is None or seg.empty or not needed.issubset(seg.columns):
+        return None, None
+    if str(source) != "real":
+        # 演示/未知来源一律回退历史标定：参数化数字只能来自真实附件的段表。
+        return None, None
+    verdict = build_route_constraint_verdict(seg)
+    groups: List[VehicleGroup] = []
+    fleet: Dict[int, Any] = {}
+    for vclass in (1, 2, 3):
+        sub = seg[pd.to_numeric(seg["vclass"], errors="coerce") == vclass]
+        if sub.empty:
+            return None, None
+        km = float(pd.to_numeric(sub["dist_km"], errors="coerce").fillna(0).sum())
+        kg = float(pd.to_numeric(sub["kg_co2"], errors="coerce").fillna(0).sum())
+        speed = pd.to_numeric(sub["speed_kmh"], errors="coerce")
+        speed = speed[(speed > 1.0) & (speed <= 130.0)]
+        med_speed = float(speed.median()) if speed.notna().any() else 0.0
+        if km <= 0 or kg <= 0 or med_speed <= 0:
+            return None, None
+        plan = FLEET_PLAN[vclass]
+        annual_km = km * ANNUALIZATION_FACTOR                     # 底稿 表18
+        capacity = med_speed * FLEET_WORK_HOURS_PER_DAY * FLEET_WORK_DAYS_PER_YEAR
+        count = int(np.ceil(annual_km / capacity))                # 最少车辆数
+        per_vehicle_km = annual_km / count
+        # 维护 万/辆/年 → 元/km（按单车年里程折算，保持底稿 表19 的按车口径）
+        new_maint_yuan_km = plan["new_maint_wan_year"] * 1e4 / per_vehicle_km
+        diesel_maint_yuan_km = plan["diesel_maint_wan_year"] * 1e4 / per_vehicle_km
+        rate = float(plan["target_rate"])
+        groups.append(VehicleGroup(
+            group_id="%s（vclass %d）" % (plan["label"], vclass),
+            vehicle_count=count,
+            annual_km_per_vehicle=per_vehicle_km,
+            purchase_yuan_per_vehicle=plan["purchase_wan"] * 1e4,
+            subsidy_yuan_per_vehicle=plan["subsidy_wan"] * 1e4,
+            disposal_yuan_per_vehicle=0.0,
+            baseline_energy="diesel",
+            target_energy=plan["target_energy"],
+            baseline_units_per_100km=0.0, target_units_per_100km=0.0,
+            baseline_price_yuan_per_unit=0.0, target_price_yuan_per_unit=0.0,
+            baseline_yuan_per_km=plan["diesel_energy_yuan_km"],
+            target_yuan_per_km=plan["new_energy_yuan_km"],
+            baseline_maintenance_yuan_per_km=diesel_maint_yuan_km,
+            target_maintenance_yuan_per_km=new_maint_yuan_km,
+            baseline_period_emission_t=kg / 1000.0,
+            target_period_emission_t=kg / 1000.0 * (1.0 - rate),
+            source=plan["source"],
+        ))
+        fleet[vclass] = {
+            "label": plan["label"], "vehicle": plan["vehicle"],
+            "period_km": km, "period_kg": kg, "median_speed_kmh": med_speed,
+            "annual_km": annual_km, "capacity_km": capacity,
+            "vehicle_count": count, "target_rate": rate,
+        }
+    spec = ScenarioInput(
+        order=MAIN_SCENARIO_ORDER, scenario=MAIN_SCENARIO_NAME,
+        groups=tuple(groups),
+        infrastructure_yuan=0.0, other_capex_yuan=0.0,
+        other_annual_saving_yuan=0.0, terminal_residual_yuan=0.0,
+        boundary=E4_BOUNDARY,
+        source="完整方案.md §8 表18/表19/表14（京彩杯底稿）；车组由段表实时派生",
+        # None = 未评估（直传，勿转 False：False 语义是"已评估未通过"）
+        operational_feasible=verdict.get("operational_feasible"),
+        constraint_summary=verdict,
+    )
+    return (spec,), default_finance_settings()
+
+
+# ---------------------------------------------------------------------------
+# O6 · 方案 × 哪条线：逐线路 C1–C5 评估与场景级裁决（docs/08 §8、docs/20 §7）
+# ---------------------------------------------------------------------------
+# 判定口径（写进 docs/08 §8 与披露，答辩按这个说）：
+#   tier「单程」  route_km ≤ 可用续航（标称 × 0.8）：一次出车、两端配送中心补能，
+#                C1–C5 直接判定；任何一条不过即给出缺口。
+#   tier「班次化」route_km > 可用续航：单程必然不过 C1/C2；按底稿 §6.5 以
+#                「干线班次化」运营——多日行程、单日 ≤14 h 窗口、沿线补能 1–2 次。
+#                沿线补能站是**未核实的实施假设**（底稿 §6.5 引社会加氢站 542 座），
+#                故 C4 按「无站」计，条件写入 note 与披露，不冒充已验证。
+#   行驶速度取**类别**速度中位数（底稿 表18 同口径）：段级 door-to-door 均速含
+#                装卸等待，城市段会低到 1–5 km/h，不能当行驶速度用。
+#   货重取该线**实际单票货重**（附件1 实测）：底稿 §6.4 论证轻抛小件（均值 1.42 kg、
+#                最大 51.6 kg），载重远非约束；绝不能用旧车额定载重（load_t）比新车额定。
+#   season=winter：数据期为 1/2/11/12 月，C5 按 −10 ℃ 折减复检（假设待实测，单独披露）。
+# 场景级裁决：operational_feasible = 全部「单程」线路通过 C1–C4
+#   （C5 冬季复检不通过的线路只是冬季转入班次化层，属信息项，不当一票否决）；
+#   「班次化」层的条件可行性与「仅配送中心补能」反事实一并写入 note 与披露。
+ROUTE_TIER_SINGLE = "单程"
+ROUTE_TIER_TRUNK = "干线班次化"
+TRUNK_DEPLOY_NOTE = ("单程不可行；按底稿 §6.5 干线班次化运营（多日行程、单日 ≤14 h、"
+                     "沿线补能 1–2 次）——沿线补能网络为必要外部条件，未核实")
+
+
+def _evaluate_fleet_routes(seg: pd.DataFrame) -> pd.DataFrame:
+    """车队级逐线评估：一行一个 (vclass, OD)；不含方案列（所有参数化方案共用车队）。"""
+    from src.optimizer import VEHICLE_SPECS, route_constraint
+
+    labels, displays = _od_group_labels(seg)
+    frame = seg.assign(_od_group=labels, _od_display=displays)
+    speeds = _class_speed_median(seg)
+    total_km = float(pd.to_numeric(frame["dist_km"], errors="coerce").fillna(0).sum())
+    has_cargo = "cargo_weight_kg" in frame.columns
+    rows: List[Dict[str, Any]] = []
+    for vclass in (1, 2, 3):
+        sub = frame[pd.to_numeric(frame["vclass"], errors="coerce") == vclass]
+        if sub.empty:
+            continue
+        plan = FLEET_PLAN[vclass]
+        vehicle_spec = VEHICLE_SPECS[plan["vehicle"]]
+        usable = float(vehicle_spec["range_km"]) * 0.8
+        for od, group in sub.groupby("_od_group", sort=True):
+            if not str(od):
+                continue
+            route_km = float(pd.to_numeric(group["dist_km"], errors="coerce").median())
+            cargo_t = None
+            if has_cargo:
+                cargo = pd.to_numeric(group["cargo_weight_kg"], errors="coerce")
+                if cargo.notna().any():
+                    cargo_t = float(cargo.max()) / 1000.0
+            result = route_constraint(
+                route_km, vehicle_spec["range_km"], charging_ok=False,
+                cargo_t=cargo_t, payload_t=vehicle_spec["payload_t"],
+                avg_speed_kmh=speeds.get(vclass) or 50.0, season="winter",
+            )
+            tier = ROUTE_TIER_SINGLE if route_km <= usable else ROUTE_TIER_TRUNK
+            note = result["constraint_note"]
+            if tier == ROUTE_TIER_TRUNK:
+                note = note + "｜" + TRUNK_DEPLOY_NOTE
+            rows.append({
+                "vclass": vclass, "vclass_label": plan["label"], "vehicle": plan["vehicle"],
+                "od_key": str(od), "od_label": str(group["_od_display"].iloc[0]),
+                "n_seg": int(len(group)),
+                "km": float(pd.to_numeric(group["dist_km"], errors="coerce").fillna(0).sum()),
+                "kg": float(pd.to_numeric(group["kg_co2"], errors="coerce").fillna(0).sum()),
+                "route_km": route_km, "avg_speed_kmh": speeds.get(vclass),
+                "max_cargo_t": cargo_t, "usable_range_km": usable,
+                "deploy_tier": tier,
+                "c1_range_ok": result["c1_range_ok"],
+                "c2_window_ok": result["c2_window_ok"],
+                "c3_capacity_ok": result["c3_capacity_ok"],
+                "c4_charging_ok": result["c4_charging_ok"],
+                "c5_winter_ok": result["c5_winter_ok"],
+                "constraint_status": result["constraint_status"],
+                "constraint_note": note,
+            })
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    out["km_share_pct"] = out["km"] / total_km * 100.0 if total_km > 0 else 0.0
+    return out.sort_values(["vclass", "km"], ascending=[True, False]).reset_index(drop=True)
+
+
+def build_route_constraint_verdict(seg: pd.DataFrame) -> Dict[str, Any]:
+    """场景级 O6 裁决摘要（写进 final_report 的 constraint_* 列与披露）。"""
+    routes = _evaluate_fleet_routes(seg)
+    if routes.empty:
+        return {"operational_feasible": None, "status": "pending",
+                "note": "段表无法按 OD 分组，约束未评估", "route_rows": 0}
+    total_km = float(routes["km"].sum())
+    total_kg = float(routes["kg"].sum())
+    single = routes[routes["deploy_tier"] == ROUTE_TIER_SINGLE]
+    trunk = routes[routes["deploy_tier"] == ROUTE_TIER_TRUNK]
+    # C1/C2/C4 必判；C3 未提供货重时为 None（未评估，不计 fail）
+    hard_mask = (single["c1_range_ok"].fillna(True).eq(False)
+                 | single["c2_window_ok"].fillna(True).eq(False)
+                 | single["c4_charging_ok"].fillna(True).eq(False)
+                 | single["c3_capacity_ok"].fillna(True).eq(False))
+    hard_fail = single[hard_mask]
+    winter_fail = single[single["c5_winter_ok"].fillna(True).eq(False)]
+    # 仅配送中心补能的反事实：班次化层全部保留柴油，单程层按类别减排率
+    depot_saving_t = 0.0
+    for vclass in (1, 2, 3):
+        part = single[single["vclass"] == vclass]
+        if not part.empty:
+            depot_saving_t += float(part["kg"].sum()) / 1000.0 * float(FLEET_PLAN[vclass]["target_rate"])
+    depot_pct = depot_saving_t / (total_kg / 1000.0) * 100.0 if total_kg > 0 else None
+    feasible = bool(hard_fail.empty) and not single.empty
+    if single.empty:
+        note = ("无单程层线路（全部 route_km 超可用续航）：%.1f%% 里程按底稿 §6.5 "
+                "干线班次化运营，依赖沿线补能网络（未核实，最大外部依赖）；"
+                "无单程层达标证据，场景级运营可行判 fail；"
+                "若仅允许配送中心补能，减排率仅 %.1f%%（远不达标）"
+                % (trunk["km"].sum() / total_km * 100.0,
+                   depot_pct if depot_pct is not None else float("nan")))
+    else:
+        note = ("单程层 %d 条线路（%.1f%% 里程、%.1f%% 碳排）C1–C4 全部通过；"
+                "班次化层 %.1f%% 里程按底稿 §6.5 干线班次化运营，依赖沿线补能网络（未核实，最大外部依赖）；"
+                "冬季复检 %.1f%% 里程不达标，冬季转入班次化层；"
+                "若仅允许配送中心补能，减排率仅 %.1f%%（远不达标）"
+                % (len(single), single["km"].sum() / total_km * 100.0,
+                   single["kg"].sum() / total_kg * 100.0,
+                   trunk["km"].sum() / total_km * 100.0,
+                   winter_fail["km"].sum() / total_km * 100.0,
+                   depot_pct if depot_pct is not None else float("nan")))
+    if not hard_fail.empty:
+        note = ("单程层有 %d 条线路未过 C1–C4（%.2f%% 里程）："
+                % (len(hard_fail), hard_fail["km"].sum() / total_km * 100.0)) + note
+    return {
+        "operational_feasible": feasible,
+        "status": "pass" if feasible else "fail",
+        "note": note,
+        "route_rows": int(len(routes)),
+        "single_trip_routes": int(len(single)),
+        "single_trip_km_pct": round(single["km"].sum() / total_km * 100.0, 2),
+        "single_trip_carbon_pct": round(single["kg"].sum() / total_kg * 100.0, 2),
+        "trunk_km_pct": round(trunk["km"].sum() / total_km * 100.0, 2),
+        "trunk_carbon_pct": round(trunk["kg"].sum() / total_kg * 100.0, 2),
+        "winter_c5_fail_km_pct": round(winter_fail["km"].sum() / total_km * 100.0, 2),
+        "depot_only_reduction_pct": round(depot_pct, 2) if depot_pct is not None else None,
+        "hard_fail_routes": int(len(hard_fail)),
+        "c1_range_ok": bool(single["c1_range_ok"].fillna(False).all()) if not single.empty else None,
+        "c2_window_ok": bool(single["c2_window_ok"].fillna(False).all()) if not single.empty else None,
+        "c3_capacity_ok": (bool(single["c3_capacity_ok"].fillna(True).all())
+                           if not single.empty else None),
+        "c4_charging_ok": bool(single["c4_charging_ok"].fillna(False).all()) if not single.empty else None,
+        "c5_winter_ok": bool(single["c5_winter_ok"].fillna(False).all()) if not single.empty else None,
+        "rule": ("单程层（route_km ≤ 标称续航 ×0.8）全部通过 C1–C4；"
+                 "班次化层按底稿 §6.5 干线班次化运营（条件可行，依赖沿线补能网络）；"
+                 "C5 冬季复检为信息项，不达标线路冬季转入班次化层"),
+        "basis": "docs/20 §7 规则文本 + optimizer.route_constraint + 底稿 §6.4/§6.5",
+    }
+
+
+def build_route_constraints(
+    seg: pd.DataFrame, specs: tuple[ScenarioInput, ...] = (), source: str = "unknown",
+) -> tuple[pd.DataFrame, Dict[str, Any]]:
+    """方案 × 哪条线：给每个参数化方案打上同一份车队级逐线结论，返回 (表, 裁决)。
+
+    表的一行是 (方案, 类别, 线路)；裁决对所有参数化方案相同（共用同一替换车队），
+    按 order 建索引供 build_schemes 取用。specs 为空（演示/legacy 路径）时返回空表。
+    """
+    if not specs:
+        return pd.DataFrame(), {"operational_feasible": None, "status": "pending",
+                                "note": "未提供参数化方案，约束未评估", "route_rows": 0}
+    routes = _evaluate_fleet_routes(seg)
+    verdict = build_route_constraint_verdict(seg)
+    if routes.empty:
+        return routes, verdict
+    frames = []
+    for spec in specs:
+        part = routes.copy()
+        part.insert(0, "scenario", spec.scenario)
+        part.insert(0, "order", int(spec.order))
+        frames.append(part)
+    out = pd.concat(frames, ignore_index=True)
+    return out, verdict
 
 
 def _number(name: str, value: Any, minimum: float | None = None) -> float:
@@ -300,6 +701,14 @@ def _payback(capex_yuan: float, annual_saving_yuan: float) -> float:
     return capex_yuan / annual_saving_yuan if annual_saving_yuan > 0 else float("inf")
 
 
+def _constraint_field(spec: ScenarioInput, key: str, default: Any = None) -> Any:
+    """从 ScenarioInput.constraint_summary 取 O6 结论字段；未评估时返回默认值。"""
+    if not spec.constraint_summary:
+        return default
+    value = spec.constraint_summary.get(key, default)
+    return default if value is None else value
+
+
 def evaluate_scenario(
     e0_t: float, spec: ScenarioInput, settings: FinanceSettings, source: str = "unknown"
 ) -> Dict[str, Any]:
@@ -333,19 +742,28 @@ def evaluate_scenario(
         seen.add(group.group_id)
         count = _integer("vehicle_count", group.vehicle_count, 1)
         for field in fields(VehicleGroup):
-            if field.name not in {"group_id", "source", "baseline_energy", "target_energy", "vehicle_count"}:
+            if field.name not in {"group_id", "source", "baseline_energy", "target_energy",
+                                  "vehicle_count", "baseline_yuan_per_km", "target_yuan_per_km"}:
                 _number(field.name, getattr(group, field.name), 0)
+        for name in ("baseline_yuan_per_km", "target_yuan_per_km"):
+            direct = getattr(group, name)
+            if direct is not None:
+                _number(name, direct, 0)
         for energy in (group.baseline_energy, group.target_energy):
             if energy not in {"diesel", "electricity", "hydrogen"}:
                 raise ValueError("energy 仅支持 diesel / electricity / hydrogen")
         km = count * group.annual_km_per_vehicle
+        base_energy = (km * group.baseline_yuan_per_km if group.baseline_yuan_per_km is not None
+                       else km / 100 * group.baseline_units_per_100km * group.baseline_price_yuan_per_unit)
+        target_energy_cost = (km * group.target_yuan_per_km if group.target_yuan_per_km is not None
+                              else km / 100 * group.target_units_per_100km * group.target_price_yuan_per_unit)
         components.append({
             "group_id": group.group_id, "vehicle_count": count,
             "purchase_yuan": count * group.purchase_yuan_per_vehicle,
             "subsidy_yuan": count * group.subsidy_yuan_per_vehicle,
             "disposal_yuan": count * group.disposal_yuan_per_vehicle,
-            "baseline_energy_yuan_year": km / 100 * group.baseline_units_per_100km * group.baseline_price_yuan_per_unit,
-            "target_energy_yuan_year": km / 100 * group.target_units_per_100km * group.target_price_yuan_per_unit,
+            "baseline_energy_yuan_year": base_energy,
+            "target_energy_yuan_year": target_energy_cost,
             "baseline_maintenance_yuan_year": km * group.baseline_maintenance_yuan_per_km,
             "target_maintenance_yuan_year": km * group.target_maintenance_yuan_per_km,
             "baseline_period_emission_t": group.baseline_period_emission_t,
@@ -393,7 +811,7 @@ def evaluate_scenario(
         "meets_target": bool(reduction >= settings.target_reduction_pct),
         "is_main": False, "e0_t": e0_t, "data_source": source,
         "basis": "参数化计算；输入依据待团队复核：" + spec.source,
-        "calculation_mode": "parameterized", "parameter_status": "caller_supplied_unreviewed",
+        "calculation_mode": "parameterized", "parameter_status": "draft_sourced_pending_review",
         "boundary": settings.boundary, "vehicle_count": sum(c["vehicle_count"] for c in components),
         "annualization_factor": settings.annualization_factor,
         "annual_carbon_saving_t": annual_carbon, "lambda_yuan_t": settings.lambda_yuan_t,
@@ -407,6 +825,14 @@ def evaluate_scenario(
         "cash_payback_within_horizon": bool(payback <= years),
         "cost_components_json": json.dumps(breakdown, ensure_ascii=False, allow_nan=False),
         "settings_source": settings.source,
+        # O6 约束结论列（app/services.CONSTRAINT_COLUMNS 契约；None = 未评估）
+        "constraint_status": _constraint_field(spec, "status", "pending"),
+        "constraint_note": _constraint_field(spec, "note", "未做逐线路约束评估"),
+        "c1_range_ok": _constraint_field(spec, "c1_range_ok"),
+        "c2_window_ok": _constraint_field(spec, "c2_window_ok"),
+        "c3_capacity_ok": _constraint_field(spec, "c3_capacity_ok"),
+        "c4_charging_ok": _constraint_field(spec, "c4_charging_ok"),
+        "c5_winter_ok": _constraint_field(spec, "c5_winter_ok"),
     }
 
 
@@ -499,21 +925,19 @@ def build_schemes(
     cost_scenarios: tuple[ScenarioInput, ...] | None = None,
     settings: FinanceSettings | None = None,
 ) -> pd.DataFrame:
-    """保留旧签名；参数齐全时使用车组模型，否则明确输出历史标定表。"""
+    """保留旧签名；参数齐全时输出**混合表**：参数化行 + 未取得车组底稿的历史标定行。
+
+    混合纪律：只有拿到逐车组底稿的方案才参数化（calculation_mode=parameterized），
+    其余方案保留历史标定并明确标记（legacy_calibration / decision_eligible=False），
+    绝不让"部分参数化"伪装成"全部已核验"。
+    """
     _validate_seg(seg)
     specs = COST_SCENARIOS if cost_scenarios is None else cost_scenarios
     settings = FINANCE_SETTINGS if settings is None else settings
     if not specs:
         if settings is not None:
             raise ValueError("提供了财务设置却没有车组方案，拒绝静默回退")
-        out = _build_calibrated_schemes(seg, source)
-        out["calculation_mode"] = "legacy_calibration"
-        out["parameter_status"] = "unverified_legacy_totals"
-        out["operational_status"] = "pending"
-        out["decision_eligible"] = False
-        out["boundary"] = "未逐方案核实，禁止直接跨边界排名"
-        out["basis"] = out["basis"] + "；历史代码标定，未核验原底稿；is_main 仅为原主推标签"
-        return out
+        return _build_calibrated_schemes(seg, source)
     if settings is None:
         raise ValueError("参数化方案必须提供 FinanceSettings，不能猜测年化/期限/边界")
     if len({s.order for s in specs}) != len(specs) or len({s.scenario for s in specs}) != len(specs):
@@ -527,7 +951,7 @@ def build_schemes(
         "opex_save_wan": 0.0, "payback_years": 0.0, "unit_cost_yuan_t": 0.0,
         "meets_target": settings.target_reduction_pct == 0, "is_main": False,
         "basis": "同数据期、同边界基准", "data_source": source, "e0_t": e0_t,
-        "calculation_mode": "parameterized", "parameter_status": "caller_supplied_unreviewed",
+        "calculation_mode": "parameterized", "parameter_status": "draft_sourced_pending_review",
         "boundary": settings.boundary, "vehicle_count": 0,
         "annualization_factor": settings.annualization_factor, "annual_carbon_saving_t": 0.0,
         "lambda_yuan_t": settings.lambda_yuan_t, "horizon_years": settings.horizon_years,
@@ -537,14 +961,25 @@ def build_schemes(
         "operational_status": "baseline", "decision_eligible": settings.target_reduction_pct == 0,
         "cash_payback_within_horizon": True, "cost_components_json": "{}",
         "settings_source": settings.source,
+        "constraint_status": "baseline",
+        "constraint_note": "基准行：约束结论只对替代方案有意义",
+        "c1_range_ok": None, "c2_window_ok": None, "c3_capacity_ok": None,
+        "c4_charging_ok": None, "c5_winter_ok": None,
     }
+    # 未取得车组底稿的方案：保留历史标定行，显式标记未评估（混合表纪律）。
+    # order 0（S0 基准）由上方基准行替代，不重复出行。
+    covered = {spec.order for spec in specs}
+    legacy_rows = [_legacy_row(spec, e0_t, source, mark_constraints=True)
+                   for spec in SCENARIOS
+                   if int(spec["order"]) not in covered and int(spec["order"]) != 0]
+    table = pd.DataFrame([baseline, *rows, *legacy_rows]).sort_values("order").reset_index(drop=True)
     # 仅在运营约束明确通过且达标时按内部估值选择；未达标不强推。
     # 全部方案 NPV 为负仍可能是达标约束下的最优，不能称为有利润。
-    candidates = [row for row in [baseline, *rows] if row["decision_eligible"]]
+    candidates = [row for row in table.to_dict(orient="records") if row["decision_eligible"]]
     if candidates:
         winner = max(candidates, key=lambda r: (r["internal_value_npv_wan"], -r["order"]))
-        winner["is_main"] = True
-    return pd.DataFrame([baseline, *rows]).sort_values("order").reset_index(drop=True)
+        table.loc[table["scenario"] == winner["scenario"], "is_main"] = True
+    return table
 
 
 def build_od_band(seg: pd.DataFrame) -> pd.DataFrame:
@@ -594,7 +1029,12 @@ def build_analysis(
     write: bool = True, cost_scenarios: tuple[ScenarioInput, ...] | None = None,
     settings: FinanceSettings | None = None,
 ) -> Dict[str, Any]:
-    """pipeline 的无参调用仍写三表；CLI 默认只读，用 --write 显式落盘。"""
+    """pipeline 的无参调用仍写三表；CLI 默认只读，用 --write 显式落盘。
+
+    cost_scenarios/settings 均为 None 时（pipeline 路径）：真实数据自动派生主推方案
+    车组（build_cost_scenarios），演示数据回退历史标定；同时产出
+    scenario_route_constraint.parquet（方案 × 哪条线，O6 逐线结论）。
+    """
     baseline_path = Path(baseline_path) if baseline_path is not None else BASELINE_PATH
     output_dir = Path(output_dir) if output_dir is not None else PROCESSED_DIR
     if not baseline_path.exists():
@@ -602,27 +1042,46 @@ def build_analysis(
     seg = pd.read_parquet(baseline_path)
     _validate_seg(seg, analysis=True)
     source = _source(baseline_path.parent / "_source.json")
+    if cost_scenarios is None:
+        cost_scenarios, settings = build_cost_scenarios(seg, source)
     hotspots = build_hotspots(seg)
     band = build_od_band(seg)
     schemes = build_schemes(seg, source, cost_scenarios, settings)
+    route_table, verdict = build_route_constraints(seg, cost_scenarios or (), source)
     if write:
         for frame, name in ((hotspots, "hotspots.parquet"), (band, "od_band.parquet"),
                             (schemes, "final_report.parquet")):
             _save_parquet(frame, output_dir / name)
+        if not route_table.empty:
+            _save_parquet(route_table, output_dir / "scenario_route_constraint.parquet")
     total_kg = float(seg["kg_co2"].sum())
     median = float(band["ratio"].median()) if not band.empty else None
     coverage = float(band["kg_t"].sum() * 1000 / total_kg * 100) if total_kg > 0 else 0.0
     main = schemes[schemes["is_main"]]
     mode = str(schemes.iloc[0]["calculation_mode"])
+    n_parameterized = int((schemes["calculation_mode"] == "parameterized").sum())
     print(f"[E1] 四维热点 {len(hotspots)} 行；[E2] 同线带宽 {len(band)} 条，覆盖 {coverage:.1f}%")
-    print(f"[E3/E4] {len(schemes)} 个方案；模式：{mode}；{'已写三表' if write else '只读检查，未写文件'}")
+    print(f"[E3/E4] {len(schemes)} 个方案；模式：{mode}"
+          f"（参数化 {n_parameterized} 行 / 历史标定 {len(schemes) - n_parameterized} 行）；"
+          f"{'已写四表' if write else '只读检查，未写文件'}")
     if mode == "legacy_calibration":
         print("注意：4809 万/77.4%/9.6 年仍为历史标定，不代表底稿复核或运营约束通过。")
+    elif not route_table.empty:
+        print("      [O6] 方案 × 线路约束：%d 行；单程层 %.1f%% 里程 / 班次化层 %.1f%% 里程；"
+              "场景裁决 operational_feasible=%s"
+              % (len(route_table), verdict.get("single_trip_km_pct") or 0.0,
+                 verdict.get("trunk_km_pct") or 0.0, verdict.get("operational_feasible")))
     return {
         "od_ratio_median": median, "od_pairs": int(len(band)), "od_coverage_pct": coverage,
         "e0_t": total_kg / 1000,
         "main_reduction_pct": float(main.iloc[0]["reduction_pct"]) if not main.empty else None,
         "scenarios": int(len(schemes)), "calculation_mode": mode, "written": write,
+        "parameterized_rows": n_parameterized,
+        "route_constraint_rows": int(len(route_table)),
+        "operational_feasible": verdict.get("operational_feasible"),
+        "single_trip_km_pct": verdict.get("single_trip_km_pct"),
+        "trunk_km_pct": verdict.get("trunk_km_pct"),
+        "depot_only_reduction_pct": verdict.get("depot_only_reduction_pct"),
     }
 
 
@@ -737,6 +1196,95 @@ def self_test() -> bool:
             self.assertEqual(row["reduction_pct"], 77.4)
             self.assertEqual(row["calculation_mode"], "legacy_calibration")
             self.assertFalse(row["decision_eligible"])
+
+        # ---------------- E4 逐车组成本模型（合成样例，非项目参数） ----------------
+
+        def test_direct_yuan_per_km_energy_cost(self):
+            group = replace(
+                self.group, baseline_yuan_per_km=0.75, target_yuan_per_km=0.35,
+                # units/price 路径若被误用会得到 20000/100×10×8=16000，与直填 15000 不同。
+                baseline_units_per_100km=10, target_units_per_100km=20,
+                baseline_price_yuan_per_unit=8, target_price_yuan_per_unit=1,
+            )
+            row = evaluate_scenario(100, replace(self.spec, groups=(group,)), self.settings)
+            detail = json.loads(row["cost_components_json"])
+            g = detail["groups"][0]
+            self.assertAlmostEqual(g["baseline_energy_yuan_year"], 20000 * 0.75)
+            self.assertAlmostEqual(g["target_energy_yuan_year"], 20000 * 0.35)
+            # 能耗省 8000 + 维护省 2000 + 其他 1000（self.spec 自带）
+            self.assertAlmostEqual(row["opex_save_wan"], 1.1)
+            self.assertAlmostEqual(row["payback_years"], 200000 / 11000)
+
+        def test_constraint_columns_from_summary(self):
+            summary = {"status": "pass", "note": "合成结论",
+                       "c1_range_ok": True, "c2_window_ok": True, "c3_capacity_ok": None,
+                       "c4_charging_ok": True, "c5_winter_ok": False}
+            row = evaluate_scenario(100, replace(self.spec, constraint_summary=summary), self.settings)
+            self.assertEqual(row["constraint_status"], "pass")
+            self.assertEqual(row["constraint_note"], "合成结论")
+            self.assertTrue(row["c1_range_ok"])
+            self.assertIsNone(row["c3_capacity_ok"])  # 未评估保持 None，不假填
+            self.assertFalse(row["c5_winter_ok"])     # 冬季复检为信息项，也透传
+            bare = evaluate_scenario(100, self.spec, self.settings)
+            self.assertEqual(bare["constraint_status"], "pending")
+            self.assertEqual(bare["constraint_note"], "未做逐线路约束评估")
+            self.assertIsNone(bare["c1_range_ok"])
+
+        def test_cost_scenarios_derivation_from_synthetic_segments(self):
+            seg = pd.DataFrame({
+                "vclass": [1, 1, 2, 2, 3, 3],
+                "dist_km": [50000.0, 50000.0, 100000.0, 100000.0, 150000.0, 150000.0],
+                "kg_co2": [20000.0, 20000.0, 75000.0, 75000.0, 200000.0, 200000.0],
+                "speed_kmh": [40.0, 40.0, 50.0, 50.0, 60.0, 60.0],
+                "od_pair": ["A-B", "A-B", "C-D", "C-D", "E-F", "E-F"],
+                "cargo_weight_kg": [30.0, 30.0, 200.0, 200.0, 5000.0, 5000.0],
+            })
+            specs, settings = build_cost_scenarios(seg, "real")
+            self.assertEqual(len(specs), 1)
+            self.assertEqual(specs[0].scenario, MAIN_SCENARIO_NAME)
+            self.assertEqual(settings, default_finance_settings())
+            counts = [g.vehicle_count for g in specs[0].groups]
+            self.assertEqual(counts, [4, 6, 7])  # ceil(年里程 ÷ (中位速度×8h×300d))
+            row = evaluate_scenario(float(seg["kg_co2"].sum()) / 1000, specs[0], settings, "real")
+            self.assertAlmostEqual(row["capex_wan"], 745.0)            # 4×16+6×26+7×75 万
+            self.assertAlmostEqual(row["opex_save_wan"], 63.34643)
+            self.assertAlmostEqual(row["payback_years"], 11.760726, places=6)
+            self.assertAlmostEqual(row["carbon_saving_t"], 466.448088)
+            self.assertAlmostEqual(row["reduction_pct"], 79.058998)
+            self.assertAlmostEqual(row["unit_cost_yuan_t"], 15971.77, places=1)
+            self.assertEqual(row["vehicle_count"], 17)
+            self.assertEqual(row["calculation_mode"], "parameterized")
+            # 演示/未知来源与缺列段表一律回退，不用演示数据冒充参数化结果
+            self.assertEqual(build_cost_scenarios(seg, "demo"), (None, None))
+            self.assertEqual(build_cost_scenarios(seg[["kg_co2"]], "real"), (None, None))
+
+        def test_mixed_table_marks_legacy_and_requires_constraints(self):
+            main_group = replace(self.group, baseline_period_emission_t=80,
+                                 target_period_emission_t=10)  # 70/100 = 达标线
+            main_spec = replace(
+                self.spec, order=5, scenario="S5 合成主推", groups=(main_group,),
+                operational_feasible=True,
+                constraint_summary={"status": "pass", "note": "合成：全线路通过",
+                                    "c1_range_ok": True, "c2_window_ok": True,
+                                    "c3_capacity_ok": True, "c4_charging_ok": True,
+                                    "c5_winter_ok": True},
+            )
+            out = build_schemes(self.seg, "test", (main_spec,), self.settings)
+            self.assertEqual(len(out), 7)  # 基准 1 + 参数化 1 + 历史标定 5
+            legacy = out[out["calculation_mode"] == "legacy_calibration"]
+            self.assertEqual(len(legacy), 5)
+            self.assertTrue((legacy["constraint_status"] == "未评估").all())
+            self.assertTrue(legacy["c1_range_ok"].isna().all())
+            self.assertFalse(legacy["decision_eligible"].any())
+            row = out[out["order"] == 5].iloc[0]
+            self.assertTrue(row["is_main"])
+            self.assertTrue(row["decision_eligible"])
+            self.assertEqual(row["constraint_status"], "pass")
+            # 未过运营约束（None）时不强推：达标也不当主推
+            pending = build_schemes(self.seg, "test",
+                                    (replace(main_spec, operational_feasible=None),), self.settings)
+            self.assertFalse(pending["is_main"].any())
+            self.assertFalse(pending[pending["order"] == 5].iloc[0]["decision_eligible"])
 
     result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(EvaluatorTests))
     return result.wasSuccessful()

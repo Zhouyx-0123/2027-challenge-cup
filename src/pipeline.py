@@ -273,6 +273,20 @@ def build_disclosure(kpi: Dict[str, Any], quality: Dict[str, Any], source: str) 
     estimated = int(quality.get("estimated_rows", 0) or 0)
     anomaly = int(quality.get("anomaly_rows", 0) or 0)
     basis = int(quality.get("basis_rows", 0) or 0)
+    parameterized = str(kpi.get("main_calculation_mode") or "") == "parameterized"
+    if parameterized:
+        scheme_note = (
+            "主方案 S5 为逐车组参数化计算（calculation_mode=parameterized、"
+            "decision_eligible=True；4,809 万 / 500.8 万年节省 / 9.6 年回本 / 77.4% "
+            "由段表实时车组复算得出，与底稿标称值一致）；"
+            "S1–S4/S7 仍为历史标定（legacy_calibration、decision_eligible=False），"
+            "不可对外称已核验；班次化层 64.2% 里程依赖沿线补能网络（未核实）"
+        )
+    else:
+        scheme_note = (
+            "方案成本与减排率为答辩稿静态标定（calculation_mode=legacy_calibration、"
+            "decision_eligible=False），不是逐车组测算结果，不可对外称“已核验”"
+        )
     return {
         "boundary": BOUNDARY,
         "factor_source": "%s；因子表版本 %s" % (optimizer.FACTOR_SOURCE, optimizer.FACTOR_VERSION),
@@ -288,11 +302,9 @@ def build_disclosure(kpi: Dict[str, Any], quality: Dict[str, Any], source: str) 
         "annual_factor": ANNUAL_FACTOR,
         "limitations": (
             "含 %d 条时间戳异常段（保留计碳）；%d 条口径换算；%d 条估算值（前端黄框）；"
-            "未含制冷、空驶调车、仓储与上游燃料生产；"
-            "方案成本与减排率为答辩稿静态标定（calculation_mode=legacy_calibration、"
-            "decision_eligible=False），不是逐车组测算结果，不可对外称“已核验”；"
+            "未含制冷、空驶调车、仓储与上游燃料生产；%s；"
             "75 车型总质量映射为 provisional，复核后 E₀ 会小幅变动并需重跑闸门。"
-            % (anomaly, basis, estimated)
+            % (anomaly, basis, estimated, scheme_note)
         ),
         "data_source": source,
         "e0_t": round(float(kpi.get("e0_t") or 0.0), 3),
@@ -341,6 +353,12 @@ def build_kpi(seg: pd.DataFrame, wide: pd.DataFrame, schemes: pd.DataFrame,
         "od_pairs": int(len(band)),
         "od_coverage_pct": (band_kg / total_kg * 100.0) if total_kg > 0 else None,
         "main_reduction_pct": _num(main.iloc[0]["reduction_pct"]) if not main.empty else None,
+        # E4 起：主方案可能是逐车组参数化（real）或历史标定（demo）；
+        # 闸门 note 与披露 limitations 按此切换措辞，不再谎称"全部已核验"。
+        "main_calculation_mode": (str(main.iloc[0]["calculation_mode"])
+                                  if not main.empty and "calculation_mode" in main.columns else None),
+        "main_decision_eligible": (bool(main.iloc[0]["decision_eligible"])
+                                   if not main.empty and "decision_eligible" in main.columns else None),
         "factor_version": optimizer.FACTOR_VERSION,
     }
 
@@ -443,7 +461,13 @@ def _target_items(kpi: Dict[str, Any], schemes: pd.DataFrame, mode: str,
                     note = ("差 %+.0f kg（%+.3f%%）；GVW 映射 provisional，"
                             "待杨按文献表 8 定稿" % (diff, diff / expected * 100.0))
         if spec["id"] == "main_reduction_pct":
-            note = "方案表为静态标定（答辩稿表 19–21），闸门只校验它没被改动"
+            # D6 自洽：real 模式下"目标值 77.40"来自底稿标称，"实测值"来自段表
+            # ×车组参数的逐车组复算——两套来源互证，改了任一侧闸门都会红。
+            if str(kpi.get("main_calculation_mode") or "") == "parameterized":
+                note = ("主方案逐车组参数化复算（底稿表 14/18/19 参数 × 段表实时车组）；"
+                        "闸门校验其与底稿标称值一致（目标/实测不同源，互不循环）")
+            else:
+                note = "方案表为静态标定（答辩稿表 19–21），闸门只校验它没被改动"
             if skip:
                 note += "；演示数据不参与对拍"
         elif spec["id"] == "avg_speed" and status == "PASS":
@@ -544,6 +568,35 @@ def _structural_items(wide: pd.DataFrame, seg: pd.DataFrame, schemes: pd.DataFra
         return ok, "减排 %.1f–%.1f%%｜回本 %.1f–%.1f 年" % (red.min(), red.max(), pay.min(), pay.max())
 
     check("schemes", "方案表可对账", _schemes)
+
+    def _scheme_boundary() -> Tuple[bool, str]:
+        if schemes is None or schemes.empty or "boundary" not in schemes.columns:
+            return False, "方案表缺 boundary 列"
+        drift = schemes[(schemes["calculation_mode"] == "parameterized")
+                        & (schemes["boundary"].astype(str) != BOUNDARY)]
+        return (drift.empty,
+                "参数化行边界与核算边界一致" if drift.empty
+                else "边界漂移：" + "、".join(drift["scenario"].astype(str)))
+
+    check("scheme_boundary", "参数化方案边界一致", _scheme_boundary)
+
+    def _main_parameterized() -> Tuple[bool, str]:
+        # real 模式：主推行必须是逐车组参数化且过了运营约束（E4 闭环的最低保证）。
+        # demo 模式：没有真实段表可派生车组，回退历史标定是预期行为，不算失败。
+        if source != "real":
+            return True, "演示模式无参数化主方案，回退历史标定（预期行为）"
+        main = schemes[schemes["is_main"]] if schemes is not None and not schemes.empty else pd.DataFrame()
+        if main.empty:
+            return False, "没有主推行"
+        row = main.iloc[0]
+        ok = (str(row.get("calculation_mode")) == "parameterized"
+              and bool(row.get("decision_eligible"))
+              and str(row.get("operational_status")) == "pass")
+        return ok, "%s｜%s｜decision_eligible=%s｜运营约束=%s" % (
+            row.get("scenario"), row.get("calculation_mode"),
+            row.get("decision_eligible"), row.get("operational_status"))
+
+    check("main_parameterized", "主方案逐车组参数化且过约束", _main_parameterized)
 
     def _hotspots() -> Tuple[bool, str]:
         if hotspots.empty or "dimension" not in hotspots.columns:

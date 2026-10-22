@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-20T16:29:36",
+  "generated_at": "2026-10-22T08:47:48",
   "source": "real",
   "mode": "real",
   "passed": true,
@@ -86,11 +86,11 @@
       "label": "主方案减排率",
       "stage": "evaluator",
       "expected": 77.4,
-      "actual": 77.4,
+      "actual": 77.37645382140694,
       "tol": 0.1,
       "unit": "%",
       "status": "PASS",
-      "note": "方案表为静态标定（答辩稿表 19–21），闸门只校验它没被改动"
+      "note": "主方案逐车组参数化复算（底稿表 14/18/19 参数 × 段表实时车组）；闸门校验其与底稿标称值一致（目标/实测不同源，互不循环）"
     }
   ],
   "structural": [
@@ -161,6 +161,18 @@
       "detail": "减排 0.0–77.4%｜回本 0.0–9.6 年"
     },
     {
+      "id": "scheme_boundary",
+      "label": "参数化方案边界一致",
+      "status": "PASS",
+      "detail": "参数化行边界与核算边界一致"
+    },
+    {
+      "id": "main_parameterized",
+      "label": "主方案逐车组参数化且过约束",
+      "status": "PASS",
+      "detail": "S5 轻中电 + 重氢（主推）｜parameterized｜decision_eligible=True｜运营约束=pass"
+    },
+    {
       "id": "hotspots",
       "label": "四维热点齐全",
       "status": "PASS",
@@ -185,14 +197,14 @@
       "label": "路线距离 vs 实测里程",
       "stage": "route",
       "status": "PASS",
-      "detail": "路线/实测倍数中位 0.97（偏离 17.3%，目标 ≤20%，比对 310 个 OD）"
+      "detail": "路线/实测倍数中位 0.97（偏离 16.6%，目标 ≤20%，比对 310 个 OD）"
     },
     {
       "id": "S2",
       "label": "路线碳 vs 基准碳（无系统漂移）",
       "stage": "route",
       "status": "PASS",
-      "detail": "中位偏差 -0.08%（阈值 ±50%，比对 13493 段）"
+      "detail": "中位偏差 -0.10%（阈值 ±50%，比对 13493 段）"
     },
     {
       "id": "S3",
@@ -203,7 +215,7 @@
     }
   ],
   "counts": {
-    "pass": 22,
+    "pass": 24,
     "fail": 0,
     "skip": 0
   }

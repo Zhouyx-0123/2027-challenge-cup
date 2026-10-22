@@ -35,6 +35,8 @@ RESULT_FILES: Dict[str, str] = {
     "scenarios": "final_report.parquet",
     "hotspots": "hotspots.parquet",
     "od_band": "od_band.parquet",
+    # O6 · 方案 × 哪条线（逐线路 C1–C5 结论；仅参数化方案产出）
+    "route_constraints": "scenario_route_constraint.parquet",
     "ledger": "ledger.parquet",
     "disclosure": "disclosure.json",
     "kpi": "kpi.json",
@@ -81,12 +83,29 @@ CORE_COLUMNS: List[str] = ["waybill_no", "od_pair", "dist_km", "kg_co2"]
 # --------------------------------------------------------------------------
 # 方案表 / 台账 / 披露
 # --------------------------------------------------------------------------
+#: O6 约束结论列（final_report 契约列的子集；None = 未评估）
+CONSTRAINT_COLUMNS: List[str] = [
+    "constraint_status", "constraint_note",
+    "c1_range_ok", "c2_window_ok", "c3_capacity_ok", "c4_charging_ok", "c5_winter_ok",
+]
+
 SCENARIO_COLUMNS: List[str] = [
     "scenario", "emission_t", "reduction_pct", "capex_wan",
     "opex_save_wan", "payback_years", "unit_cost_yuan_t", "meets_target",
     # 口径/资格元数据；旧结果表缺这些列时页面仍可跑
     "data_source", "e0_t", "calculation_mode", "parameter_status",
     "operational_status", "decision_eligible", "boundary",
+    # O6 · 运营约束结论列（None = 未评估；legacy 行为是"未评估"字符串 + None）
+    *CONSTRAINT_COLUMNS,
+]
+
+#: 方案 × 线路约束表（scenario_route_constraint.parquet）契约列
+ROUTE_CONSTRAINT_COLUMNS: List[str] = [
+    "order", "scenario", "vclass", "vclass_label", "vehicle",
+    "od_key", "od_label", "n_seg", "km", "kg", "route_km",
+    "avg_speed_kmh", "max_cargo_t", "usable_range_km", "deploy_tier",
+    "c1_range_ok", "c2_window_ok", "c3_capacity_ok", "c4_charging_ok", "c5_winter_ok",
+    "constraint_status", "constraint_note", "km_share_pct",
 ]
 
 #: 台账六字段（docs/15 §2，顺序即表格顺序）

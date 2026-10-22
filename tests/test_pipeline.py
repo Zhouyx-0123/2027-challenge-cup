@@ -9,7 +9,7 @@
 覆盖 README §四 / docs/27 §2 的两条验收命令：
 1. ``python -m src.pipeline`` → 退出码 0、闸门无 FAIL。
    沙箱没有 ``data/raw``（原始数据永不入库）→ 自动走 6,000 行演示样本，
-   真实数据五项标 SKIP、因子两项 PASS；本机放了附件1/2 后同一命令切真实模式（PASS 22）。
+   真实数据五项标 SKIP、因子两项 PASS；本机放了附件1/2 后同一命令切真实模式（PASS 24）。
 2. ``python -m src.pipeline --simulate-fail 2`` → 退出码 1、打印"第 2 段失败"
    （证明闸门真的会红，不是装饰）。
 """

@@ -109,20 +109,32 @@ const shotDir = process.argv[4] || 'outputs/figures';
     return text;
   };
 
-  // 切到 Tab② 后，OL 的 iframe 要时间初始化（CDN 拉 JS + 渲染）
-  const waitForOl = async () => {
-    for (let i = 0; i < 20; i++) {
-      const ok = await page.evaluate(() => {
-        for (const f of window.frames) {
-          try {
-            const d = f.document;
-            if (d && d.querySelector('#banner') && d.querySelectorAll('#map canvas').length) return true;
-          } catch (e) { /* 跨域忽略 */ }
+  // 切到 Tab② 后，OL 的 iframe 要时间初始化（CDN 拉 JS + 渲染）。
+  // 用 page.frames() 统一探测 —— window.frames 的可见性与 Playwright 的
+  // frame 列表不一定一致，用它会漏掉 srcdoc iframe。
+  //
+  // 为什么要重试：OL 走 CDN，公共 CDN 偶发慢/失败是常态。
+  // **组件本身会降级**（显示可读提示，不留灰块），
+  // 所以这里要区分"CDN 没拉到"与"组件坏了"：
+  // 连续重试若干次仍拉不到，才判失败。
+  const waitForOl = async (attempts = 3) => {
+    for (let round = 0; round < attempts; round++) {
+      for (let i = 0; i < 25; i++) {
+        for (const f of page.frames()) {
+          const ok = await f.evaluate(() => {
+            if (typeof document === 'undefined') return false;
+            return !!(document.querySelector('#banner')
+              && document.querySelectorAll('#map canvas').length);
+          }).catch(() => false);
+          if (ok) return true;
         }
-        return false;
-      }).catch(() => false);
-      if (ok) return true;
-      await page.waitForTimeout(1000);
+        await page.waitForTimeout(1000);
+      }
+      // 重试前把 OL 的 iframe 重新挂一次：切走 Tab① 再切回来，
+      // 触发 Streamlit 重渲染 iframe。
+      result.olRetryRound = (result.olRetryRound || 0) + 1;
+      await clickTab(/① 实时路线/, 'tab1_amap_retry');
+      await clickTab(/碳核算基线/, 'tab2_baseline');
     }
     return false;
   };

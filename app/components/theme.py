@@ -109,7 +109,7 @@ p, li, span, label { color: var(--text); }
 }
 .cm-brand .word { font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: -0.04em; color: var(--text); }
 .cm-brand .word em { font-style: normal; color: var(--tide); }
-.cm-brand .sub { display: block; font-family: var(--mono); font-size: 8px; letter-spacing: 0.16em; color: var(--muted-2); margin-top: 1px; }
+.cm-brand .sub { display: block; font-family: var(--mono); font-size: 7.5px; letter-spacing: 0.10em; color: var(--muted-2); margin-top: 1px; white-space: nowrap; }
 .cm-nav-links { display: flex; align-items: center; gap: 1px; flex-wrap: wrap; margin-left: auto; }
 .cm-nav-link {
   display: inline-flex; align-items: center; padding: 7px 9px; border-radius: 999px;
@@ -774,7 +774,7 @@ def top_nav(current: str = "", source_name: str = "", gate: Optional[Dict[str, A
     announce = (
         "<div class='cm-announce'>"
         "<span class='a-dot'></span><span>2027 CHALLENGE CUP · 主体赛 A 类</span>"
-        "<span class='a-mid'>CARBON TIDE / DECISION OS</span>"
+        "<span class='a-mid'>碳慧智算 / CARBON INTELLIGENCE</span>"
         "<span class='a-right'>" + source + " · " + gate_text + "</span>"
         "</div>"
     )
@@ -785,9 +785,9 @@ def top_nav(current: str = "", source_name: str = "", gate: Optional[Dict[str, A
     with c_brand:
         st.markdown(
             "<div class='cm-brand'>"
-            "<span class='mark'>CT</span>"
-            "<span><span class='word'>carbon <em>tide</em></span>"
-            "<span class='sub'>CARBON DECISION SYSTEM</span></span>"
+            "<span class='mark'>碳</span>"
+            "<span><span class='word'>碳慧<em>智算</em></span>"
+            "<span class='sub'>CARBON INTELLIGENCE</span></span>"
             "</div>", unsafe_allow_html=True,
         )
     with c_links:

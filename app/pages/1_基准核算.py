@@ -110,8 +110,7 @@ layout.section("对拍口径", "闸门在 pipeline 出口自动核对七个数�
 targets = gate.get("targets", []) if gate else []
 if targets:
     tdf = pd.DataFrame(targets)
-    tdf["判定"] = tdf["status"].map(
-        {"PASS": "通过", "FAIL": "未通过", "SKIP": "跳过"}).fillna(tdf["status"])
+    tdf["判定"] = tdf["status"]
     tdf["目标"] = tdf.apply(lambda r: services.fmt(r["expected"], 2) + " " + str(r["unit"]), axis=1)
     tdf["实测"] = tdf.apply(
         lambda r: ("—" if r["actual"] is None else services.fmt(r["actual"], 2)) + " " + str(r["unit"]),

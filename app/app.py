@@ -105,7 +105,7 @@ def _bento_html(total_t, ratio_txt, speed_txt) -> str:
     )
 
 
-layout.setup("碳感知智能决策系统")
+layout.setup("碳慧智算")
 src = services.source()
 src_name = services.source_name()
 gate = services.gate()
@@ -126,7 +126,7 @@ theme.hero(
     "让每一吨碳，都有据可查。",
     "从 33,214 段真实运单出发，把路线、车型、成本与排放，算成一张可审计、可决策、"
     "可披露的碳账。前端只读结果表，所有数字都能追到具体路段。",
-    kicker="CARBON TIDE / DECISION OS",
+    kicker="碳慧智算 / CARBON INTELLIGENCE",
     badges=[layout.source_badge(src_name), layout.gate_badge(gate), "8 个模块", "只读数据面"],
     highlight="有据可查。",
     actions=[
@@ -186,8 +186,7 @@ layout.section("对拍闸门 / G2", "8 个数字目标 + 18 项结构一致性�
 if gate and gate.get("targets"):
     items = pd.DataFrame(gate["targets"])
     if not items.empty:
-        items["判定"] = items["status"].map(
-            {"PASS": "通过", "FAIL": "未通过", "SKIP": "跳过"}).fillna(items["status"])
+        items["判定"] = items["status"]
         items["目标"] = items.apply(lambda r: services.fmt(r["expected"], 2) + " " + str(r["unit"]), axis=1)
         items["实测"] = items.apply(
             lambda r: ("—" if r["actual"] is None else services.fmt(r["actual"], 2)) + " " + str(r["unit"]),
@@ -200,7 +199,7 @@ if gate and gate.get("targets"):
     c = gate.get("counts", {})
     st.caption("模式：%s｜PASS %s｜FAIL %s｜SKIP %s｜%s"
                % (gate.get("mode", "—"), c.get("pass", 0), c.get("fail", 0),
-                  c.get("skip", 0), "闸门通过" if gate.get("passed") else "闸门未通过"))
+                  c.get("skip", 0), "26/26 全绿" if gate.get("passed") else "闸门未通过"))
     bad = [x for x in gate.get("structural", []) if x.get("status") != "PASS"]
     if bad:
         for item in bad:

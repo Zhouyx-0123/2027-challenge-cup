@@ -382,6 +382,31 @@ def route_available() -> bool:
     return not routes().empty
 
 
+# ---------------- 上海—北京 OSM 碳基线（docs/35 D2/D3） ----------------
+# 纪律：**只读不算**。summary 里的所有数字都是 tools/route_baseline.py
+# 预先算好的；页面不重算碳排、不重算占比、不做坐标转换。
+
+
+def route_baseline_steps() -> pd.DataFrame:
+    """OSM 基线逐 step 表 route_baseline_sh_bj_steps.parquet。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_baseline_steps"])
+
+
+def route_baseline_summary() -> Dict[str, Any]:
+    """OSM 基线汇总 route_baseline_sh_bj_summary.json。缺失返回 {}。
+
+    含 disclaimer（非实时 / 固定因子 / 道路等级 proxy），页面必须照着显示。
+    """
+    return _read_json(RESULT_FILES["route_baseline_summary"])
+
+
+def route_baseline_available() -> bool:
+    """基线是否就绪（steps 与 summary 同时存在才算）。"""
+    if not route_baseline_summary():
+        return False
+    return not route_baseline_steps().empty
+
+
 @st.cache_data(show_spinner=False)
 def route_lab_rows() -> pd.DataFrame:
     """路线实验室的展示表：route_od 的几何/端点 + route_select 的碳账与推荐车型。

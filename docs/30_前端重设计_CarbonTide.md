@@ -39,6 +39,8 @@
 
 ![路线实验室](assets/carbon_tide/route_lab.png)
 
+![计算器结果](assets/carbon_tide/calculator.png)
+
 ![移动端](assets/carbon_tide/mobile.png)
 
 ---

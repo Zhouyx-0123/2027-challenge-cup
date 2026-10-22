@@ -11,10 +11,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-import plotly.graph_objects as go
 import streamlit as st
 
-from . import cards, charts
+from . import cards
 
 # 分解图四组件配色（与 theme 的 info/accent/accent-2/coral 对齐）
 _COMP_COLORS = {
@@ -63,37 +62,30 @@ def verdict(text: str, tone: str = "mint") -> None:
 
 def savings_meter(ice_label: str, bev_label: str, ice_value: float,
                   bev_value: float, unit: str = "万元/年") -> None:
-    """节省计量条（ChargeMath live savings meter）：双横条 + 差额标注。
-
-    ice_value / bev_value 为同单位数值（调用方已换算）；差额自动计算。
-    """
-    total = max(abs(ice_value) + abs(bev_value), 1e-9)
-    w_ice = 100.0 * abs(ice_value) / total
-    w_bev = 100.0 * abs(bev_value) / total
+    """节省计量条（ChargeMath live savings meter）：双轨成本对比 + 差额。"""
+    peak = max(abs(ice_value), abs(bev_value), 1e-9)
+    w_ice = 100.0 * abs(ice_value) / peak
+    w_bev = 100.0 * abs(bev_value) / peak
     gap = ice_value - bev_value
     st.markdown(
-        "<div style='margin:8px 0 4px 0'>"
-        "<div style='display:flex;justify-content:space-between;font-size:12px;"
-        "color:var(--muted);margin-bottom:4px'>"
-        "<span>" + cards.esc(ice_label) + "</span><span>"
-        + cards.esc(bev_label) + "</span></div>"
-        "<div style='background:var(--panel-2,rgba(24,32,43,0.88));border-radius:8px;"
-        "padding:10px 12px'>"
-        "<div style='display:flex;align-items:center;gap:10px;margin:4px 0'>"
-        "<div style='flex:1;height:14px;background:rgba(255,138,91,0.18);border-radius:4px;overflow:hidden'>"
-        "<div style='width:%.1f%%;height:100%%;background:var(--coral)'></div></div>"
-        "<div style='width:110px;text-align:right;font-size:13px;color:var(--text)'>%.1f %s</div>"
+        "<div class='cm-savings'>"
+        "<div class='cm-savings-h'><span>年度成本对比 / ANNUAL COST</span>"
+        "<span>单位：%s</span></div>"
+        "<div class='cm-savings-row'>"
+        "<span class='lbl'>%s</span>"
+        "<div class='track'><i class='ice' style='width:%.1f%%'></i></div>"
+        "<span class='val'>%s</span></div>"
+        "<div class='cm-savings-row'>"
+        "<span class='lbl'>%s</span>"
+        "<div class='track'><i class='bev' style='width:%.1f%%'></i></div>"
+        "<span class='val'>%s</span></div>"
+        "<div class='cm-savings-delta'>年差额 <b>%s %s</b>"
+        "<span>（燃油 − 电动；负值代表电动更省）</span></div>"
         "</div>"
-        "<div style='display:flex;align-items:center;gap:10px;margin:4px 0'>"
-        "<div style='flex:1;height:14px;background:rgba(45,212,167,0.16);border-radius:4px;overflow:hidden'>"
-        "<div style='width:%.1f%%;height:100%%;background:var(--accent)'></div></div>"
-        "<div style='width:110px;text-align:right;font-size:13px;color:var(--text)'>%.1f %s</div>"
-        "</div>"
-        "<div style='margin-top:8px;font-size:13px;color:var(--accent-2)'>"
-        "差额 %.1f %s（燃油 − 电动）</div>"
-        "</div></div>"
-        % (w_ice, ice_value, cards.esc(unit), w_bev, bev_value, cards.esc(unit),
-           gap, cards.esc(unit)),
+        % (cards.esc(unit),
+           cards.esc(ice_label), w_ice, cards.esc("%.1f" % ice_value),
+           cards.esc(bev_label), w_bev, cards.esc("%.1f" % bev_value),
+           cards.esc("%+.1f" % gap), cards.esc(unit)),
         unsafe_allow_html=True,
     )
 
@@ -101,46 +93,137 @@ def savings_meter(ice_label: str, bev_label: str, ice_value: float,
 def npv_stacked(npv_by_scenario: Dict[str, Dict[str, float]],
                 labels: Optional[Dict[str, str]] = None,
                 title: str = "NPV 四分解（元/辆）", height: int = 300) -> None:
-    """NPV 分解对比：横向堆叠条（每场景一根：购置净残值/能耗/维护/保险）。"""
+    """NPV 分解对比：纯 HTML 堆叠条（不用 Plotly 默认图，避免工具栏/图例压标题）。"""
     labels = labels or {}
     names = list(npv_by_scenario.keys())
-    fig = go.Figure()
-    for comp in ("vehicle_net_residual", "energy", "maintenance", "insurance"):
-        values = [npv_by_scenario[n].get(comp, 0.0) / 1e4 for n in names]  # 万元
-        fig.add_trace(go.Bar(
-            name=_COMP_NAMES[comp], y=names, x=values, orientation="h",
-            marker_color=_COMP_COLORS[comp],
-            hovertemplate="%{y}｜" + _COMP_NAMES[comp] + "：%{x:.1f} 万元<extra></extra>",
-        ))
-    fig.update_layout(**charts.BASE, height=height, barmode="stack",
-                      legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                                  xanchor="left", x=0, font=dict(size=11)))
-    fig.update_xaxes(**charts.AXIS, title="万元/辆（NPV）")
-    fig.update_yaxes(**charts.AXIS)
-    fig.update_layout(title=dict(text=title, font=dict(size=13, color="#F3F5F8"),
-                                 x=0.01, y=0.97))
-    st.plotly_chart(fig, width="stretch")
+    if not names:
+        st.caption("暂无 NPV 分解")
+        return
+    comps = ("vehicle_net_residual", "energy", "maintenance", "insurance")
+    totals = []
+    for n in names:
+        totals.append(sum(max(float(npv_by_scenario[n].get(c, 0.0)) / 1e4, 0.0) for c in comps))
+    peak = max(totals) if totals else 0.0
+    peak = max(peak, 1e-9)
+    legend = "".join(
+        "<span><i style='background:%s'></i>%s</span>"
+        % (_COMP_COLORS[c], cards.esc(_COMP_NAMES[c])) for c in comps
+    )
+    rows = []
+    for n in names:
+        segs = []
+        total = 0.0
+        for c in comps:
+            v = float(npv_by_scenario[n].get(c, 0.0)) / 1e4
+            total += v
+            w = 100.0 * max(v, 0.0) / peak
+            if w <= 0:
+                continue
+            txt = ("%.1f" % v) if w >= 7 else ""
+            segs.append(
+                "<span class='cm-npv-seg' style='width:%.3f%%;background:%s' "
+                "title='%s：%.2f 万元'>%s</span>"
+                % (w, _COMP_COLORS[c], cards.esc(_COMP_NAMES[c]), v, cards.esc(txt))
+            )
+        rows.append(
+            "<div class='cm-npv-row'><div class='cm-npv-name'>%s</div>"
+            "<div class='cm-npv-track'>%s</div>"
+            "<div class='cm-npv-total'>%s</div></div>"
+            % (cards.esc(labels.get(n, n)), "".join(segs), cards.esc("%.1f" % total))
+        )
+    st.markdown(
+        "<div class='cm-npv'>"
+        "<div class='cm-npv-h'><span>%s</span><span>单位：万元/辆</span></div>"
+        "<div class='cm-npv-legend'>%s</div>%s"
+        "<div class='cm-npv-foot'>总长度按最大总成本归一；四项相加 = 该场景 NPV。"
+        "数值由调用方从 scenarios 结果表带入，页面只展示。</div>"
+        "</div>" % (cards.esc(title), legend, "".join(rows)),
+        unsafe_allow_html=True,
+    )
 
 
 def cumulative_chart(cumulative: List[Dict[str, Any]],
                      name_map: Optional[Dict[str, str]] = None,
                      title: str = "车队累计成本（万元，名义口径）",
                      height: int = 320) -> None:
-    """累计成本曲线（FleetTTO cumulative fleet cost over time）。"""
-    import pandas as pd
-
+    """累计成本曲线：纯 SVG 展示，避免 Plotly 默认坐标轴/工具栏破坏整体视觉。"""
     name_map = name_map or {}
-    rows = []
+    series: Dict[str, Dict[int, float]] = {}
+    years = set()
     for point in cumulative:
+        year = int(point.get("year", 0))
+        years.add(year)
         for key, value in point.items():
             if key == "year":
                 continue
-            rows.append({"year": int(point["year"]),
-                         "key": name_map.get(key, key),
-                         "cost_wan": float(value) / 1e4})
-    df = pd.DataFrame(rows)
-    charts.line_multi(df, x="year", y="cost_wan", color="key",
-                      title=title, height=height)
+            name = name_map.get(key, key)
+            series.setdefault(name, {})[year] = float(value) / 1e4
+    if not series or not years:
+        st.caption("暂无累计成本曲线")
+        return
+    import math
+
+    xs = sorted(years)
+    raw_max = max(max(v.values()) for v in series.values()) or 1.0
+    step = 1000.0 if raw_max >= 4000 else (500.0 if raw_max >= 1500 else (100.0 if raw_max >= 300 else 10.0))
+    ymax = math.ceil(raw_max * 1.08 / step) * step
+    W, H = 900, 250
+    L, R, T, B = 58, 20, 18, 32
+    pw, ph = W - L - R, H - T - B
+
+    def sx(year: int) -> float:
+        if len(xs) == 1:
+            return L + pw / 2.0
+        return L + (year - xs[0]) / float(xs[-1] - xs[0]) * pw
+
+    def sy(value: float) -> float:
+        return T + (ymax - value) / ymax * ph
+
+    colors = ["#5EE7FF", "#FF7A5C", "#FFC46B", "#8FB8FF", "#2DD4A7"]
+    grid = []
+    for i in range(5):
+        gy = T + ph * i / 4.0
+        val = ymax * (4 - i) / 4.0
+        grid.append(
+            "<line x1='%d' y1='%.1f' x2='%d' y2='%.1f' class='cm-line-grid'/>"
+            "<text x='%d' y='%.1f' class='cm-line-ytxt' text-anchor='end'>%s</text>"
+            % (L, gy, W - R, gy, L - 9, gy + 3.5, ("%.0f" % val))
+        )
+    xlab = []
+    for year in xs:
+        xlab.append("<text x='%.1f' y='%d' class='cm-line-xtxt' text-anchor='middle'>%d</text>"
+                    % (sx(year), H - 10, year))
+    paths = []
+    legend = []
+    for idx, (name, vals) in enumerate(series.items()):
+        color = colors[idx % len(colors)]
+        pts = [(sx(y), sy(vals[y])) for y in sorted(vals)]
+        if not pts:
+            continue
+        d = "M " + " L ".join("%.1f %.1f" % p for p in pts)
+        paths.append("<path d='%s' class='cm-line-path' stroke='%s'/>" % (d, color))
+        for (x, y), year in zip(pts, sorted(vals)):
+            paths.append(
+                "<circle cx='%.1f' cy='%.1f' r='3.2' class='cm-line-dot' fill='%s'>"
+                "<title>%s · %d 年：%.0f 万元</title></circle>"
+                % (x, y, color, cards.esc(name), year, vals[year])
+            )
+        lx, ly = pts[-1]
+        paths.append("<text x='%.1f' y='%.1f' class='cm-line-last' fill='%s' text-anchor='end'>%.0f</text>"
+                     % (lx - 2, ly - 8, color, vals[sorted(vals)[-1]]))
+        legend.append("<span><i style='background:%s'></i>%s</span>" % (color, cards.esc(name)))
+
+    st.markdown(
+        "<div class='cm-line'>"
+        "<div class='cm-line-h'><span>%s</span><span>单位：万元 · 名义口径</span></div>"
+        "<div class='cm-line-legend'>%s</div>"
+        "<svg class='cm-line-svg' viewBox='0 0 %d %d'>"
+        "%s%s%s</svg>"
+        "<div class='cm-line-foot'>曲线由 scenarios 结果表带入；页面只展示，不重算。</div></div>"
+        % (cards.esc(title), "".join(legend), W, H,
+           "".join(grid), "".join(xlab), "".join(paths)),
+        unsafe_allow_html=True,
+    )
 
 
 def param_slider(label: str, min_value: float, max_value: float, value: float,

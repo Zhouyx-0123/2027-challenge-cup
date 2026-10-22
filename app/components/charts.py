@@ -22,7 +22,7 @@ BASE = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
     font=dict(size=12, color="#98A3B3", family="Inter, Segoe UI, Microsoft YaHei, sans-serif"),
-    margin=dict(l=8, r=8, t=64, b=8),
+    margin=dict(l=54, r=14, t=64, b=48),
     coloraxis_showscale=False,
     hoverlabel=dict(bgcolor="#11151C", bordercolor="#5EE7FF", font_size=12),
 )

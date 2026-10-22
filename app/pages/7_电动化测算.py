@@ -147,13 +147,13 @@ cards.stats([
 ], cols=5)
 
 calcpanel.savings_meter(
-    "燃油车队 %.1f 万元/年" % (r["annual"]["ice"]["total"] * n_vehicles / 1e4),
-    "电动车队 %.1f 万元/年" % (r["annual"]["bev"]["total"] * n_vehicles / 1e4),
+    "燃油车队",
+    "电动车队",
     r["annual"]["ice"]["total"] * n_vehicles / 1e4,
     r["annual"]["bev"]["total"] * n_vehicles / 1e4)
 
 # ---- NPV 四分解 ----
-layout.section("③ NPV 四分解（元/辆）", "购置净残值 + 能耗 + 维护 + 保险；与 evaluator 公式口径一致")
+layout.section("③ NPV 四分解（万元/辆）", "购置净残值 + 能耗 + 维护 + 保险；与 evaluator 公式口径一致")
 npv_by = {"燃油": {k: r["npv"]["ice"][k] for k in
                   ("vehicle_net_residual", "energy", "maintenance", "insurance")},
           "电动": {k: r["npv"]["bev"][k] for k in

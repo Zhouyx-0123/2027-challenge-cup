@@ -520,6 +520,27 @@ div[data-testid="stMultiSelect"] span[data-baseweb="tag"] { background: rgba(94,
 }
 
 /* ---------- 按钮 / 导航 / 控制台精修 ---------- */
+/* 原生 page_link 导航：保留胶囊视觉，但走 Streamlit 客户端路由 */
+div[data-testid="stPageLink"] { display: inline-flex; margin: 0 !important; }
+div[data-testid="stPageLink"] > div { margin: 0 !important; }
+div[data-testid="stPageLink"] a[data-testid="stPageLink-NavLink"] {
+  display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px;
+  border: 1px solid transparent; text-decoration: none !important; transition: all .18s ease;
+}
+div[data-testid="stPageLink"] a p { margin: 0 !important; font-size: 11.5px !important; font-weight: 600; color: var(--muted); }
+div[data-testid="stPageLink"] a:hover { background: rgba(255,255,255,0.05); }
+div[data-testid="stPageLink"] a:hover p { color: var(--text); }
+div[data-testid="stPageLink"] a[aria-disabled="true"],
+div[data-testid="stPageLink"] a[disabled] {
+  background: linear-gradient(100deg, var(--tide), #8FB8FF) !important;
+  box-shadow: 0 0 20px rgba(94,231,255,0.26); cursor: default;
+}
+div[data-testid="stPageLink"] a[aria-disabled="true"] p,
+div[data-testid="stPageLink"] a[disabled] p { color: #04121F !important; font-weight: 700; }
+div[class*="st-key-cm_nav_row"] { gap: 2px; align-items: center; width: fit-content; max-width: 100%;
+  padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.018); }
+.cm-nav-rule { border-bottom: 1px solid var(--line); margin: -2px 0 14px 0; }
+
 .cm-nav-links { gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.018); }
 .cm-nav-link { font-size: 11.5px; font-weight: 600; padding: 7px 11px; border: 1px solid transparent; }
 .cm-nav-link.on { background: linear-gradient(100deg, var(--tide), #8FB8FF); color: #04121F; box-shadow: 0 0 20px rgba(94,231,255,0.26); }
@@ -617,7 +638,10 @@ button[data-testid="stTab"][aria-selected="true"] { background: rgba(94,231,255,
   div[data-testid="stExpander"] summary p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cm-nav { gap: 8px; }
   .cm-nav-links { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; margin-left: 0; padding-bottom: 2px; }
-  .cm-nav-status { margin-left: auto; }
+  .cm-nav-status { display: none; }
+  div[class*="st-key-cm_nav_row"] { flex-wrap: nowrap; overflow-x: auto; width: 100%; border-radius: 16px; }
+  div[class*="st-key-cm_nav_row"]::-webkit-scrollbar { display: none; }
+  div[data-testid="stPageLink"] { flex: 0 0 auto; }
   .cm-hero { padding: 32px 22px 30px 22px; border-radius: 22px; }
   .cm-display { font-size: clamp(34px, 10vw, 50px); }
   .cm-sub { font-size: 13px; }
@@ -633,15 +657,15 @@ button[data-testid="stTab"][aria-selected="true"] { background: rgba(94,231,255,
 
 
 PAGES: List[Dict[str, str]] = [
-    {"id": "0", "label": "概览", "href": "/"},
-    {"id": "1", "label": "核算", "href": "/基准核算"},
-    {"id": "2", "label": "诊断", "href": "/高排放诊断"},
-    {"id": "3", "label": "方案", "href": "/替代方案"},
-    {"id": "4", "label": "成本", "href": "/成本效益"},
-    {"id": "5", "label": "台账", "href": "/碳会计台账"},
-    {"id": "6", "label": "路线", "href": "/路线实验室"},
-    {"id": "7", "label": "测算", "href": "/电动化测算"},
-    {"id": "8", "label": "TCO", "href": "/车队TCO沙盘"},
+    {"id": "0", "label": "概览", "href": "/", "path": "app.py"},
+    {"id": "1", "label": "核算", "href": "/基准核算", "path": "pages/1_基准核算.py"},
+    {"id": "2", "label": "诊断", "href": "/高排放诊断", "path": "pages/2_高排放诊断.py"},
+    {"id": "3", "label": "方案", "href": "/替代方案", "path": "pages/3_替代方案.py"},
+    {"id": "4", "label": "成本", "href": "/成本效益", "path": "pages/4_成本效益.py"},
+    {"id": "5", "label": "台账", "href": "/碳会计台账", "path": "pages/5_碳会计台账.py"},
+    {"id": "6", "label": "路线", "href": "/路线实验室", "path": "pages/6_路线实验室.py"},
+    {"id": "7", "label": "测算", "href": "/电动化测算", "path": "pages/7_电动化测算.py"},
+    {"id": "8", "label": "TCO", "href": "/车队TCO沙盘", "path": "pages/8_车队TCO沙盘.py"},
 ]
 
 
@@ -677,18 +701,14 @@ def _href(path: str) -> str:
 
 
 def top_nav(current: str = "", source_name: str = "", gate: Optional[Dict[str, Any]] = None) -> None:
-    """顶部公告条 + 品牌导航；替代 Streamlit 默认侧栏导航。"""
+    """顶部公告条 + 原生 page_link 导航。
+
+    页面链接必须走 st.page_link：Streamlit 客户端路由，不整页重载，
+    不会出现切页时旧页面残留/闪回；同时 session_state 里的 λ 也不会丢。
+    """
     current = str(current or "0")
-    links = []
-    for item in PAGES:
-        on = " on" if item["id"] == current else ""
-        links.append(
-            "<a class='cm-nav-link" + on + "' href='" + _href(item["href"]) + "' target='_top'>"
-            + _esc(item["label"]) + "</a>"
-        )
     source = "REAL DATA" if source_name == "real" else "DEMO DATA"
     if gate and gate.get("passed"):
-        gate_text = "GATE %d/%d" % (len(gate.get("targets", [])), len(gate.get("targets", [])))
         gate_text = "GATE PASS"
     elif gate:
         gate_text = "GATE CHECK"
@@ -701,18 +721,49 @@ def top_nav(current: str = "", source_name: str = "", gate: Optional[Dict[str, A
         "<span class='a-right'>" + source + " · " + gate_text + "</span>"
         "</div>"
     )
-    nav = (
-        "<div class='cm-nav'>"
-        "<a class='cm-brand' href='/' target='_top'>"
-        "<span class='mark'>CT</span>"
-        "<span><span class='word'>carbon <em>tide</em></span>"
-        "<span class='sub'>CARBON DECISION SYSTEM</span></span>"
-        "</a>"
-        "<div class='cm-nav-links'>" + "".join(links) + "</div>"
-        "<span class='cm-nav-status'>READ-ONLY</span>"
-        "</div>"
-    )
-    st.markdown(announce + nav, unsafe_allow_html=True)
+    st.markdown(announce, unsafe_allow_html=True)
+
+    c_brand, c_links, c_status = st.columns([0.17, 0.75, 0.08], gap="small",
+                                            vertical_alignment="center")
+    with c_brand:
+        st.markdown(
+            "<div class='cm-brand'>"
+            "<span class='mark'>CT</span>"
+            "<span><span class='word'>carbon <em>tide</em></span>"
+            "<span class='sub'>CARBON DECISION SYSTEM</span></span>"
+            "</div>", unsafe_allow_html=True,
+        )
+    with c_links:
+        with st.container(horizontal=True, gap="small", key="cm_nav_row"):
+            for item in PAGES:
+                if item["id"] == "0":
+                    # Streamlit page_link 不支持主页路径；概览保留为普通链接。
+                    cls = "cm-nav-link on" if current == "0" else "cm-nav-link"
+                    st.markdown(
+                        "<a class='" + cls + "' href='/' target='_top'>概览</a>",
+                        unsafe_allow_html=True,
+                    )
+                    continue
+                try:
+                    st.page_link(
+                        item["path"],
+                        label=item["label"],
+                        disabled=(item["id"] == current),
+                    )
+                except Exception:
+                    # AppTest 把单个页面当 entrypoint 时找不到 pages/ 路径；
+                    # 真实 app 不会走这里。兜底用普通链接，保证测试不红。
+                    on = " on" if item["id"] == current else ""
+                    st.markdown(
+                        "<a class='cm-nav-link" + on + "' href='"
+                        + _href(item["href"]) + "' target='_top'>"
+                        + _esc(item["label"]) + "</a>",
+                        unsafe_allow_html=True,
+                    )
+    with c_status:
+        st.markdown("<div style='text-align:right'><span class='cm-nav-status'>READ-ONLY</span></div>",
+                    unsafe_allow_html=True)
+    st.markdown("<div class='cm-nav-rule'></div>", unsafe_allow_html=True)
 
 
 def hero(title: str, subtitle: str, kicker: str = "CARBON LEDGER",

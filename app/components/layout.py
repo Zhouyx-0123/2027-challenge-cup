@@ -132,11 +132,13 @@ def sidebar_params(source_name: str = "unknown",
     try:
         want_lam = "%g" % float(lam)
         want_basis = str(basis)
-        if (st.query_params.get("lam") != want_lam
-                or st.query_params.get("basis") != want_basis):
+        has_query = ("lam" in st.query_params) or ("basis" in st.query_params)
+        changed = (st.query_params.get("lam") != want_lam
+                   or st.query_params.get("basis") != want_basis)
+        # 首屏默认值不写 query：避免一次加载里连做两次 URL 改写/重载。
+        if changed and (has_query or float(lam) != 100.0 or str(basis) != "赛题口径"):
             st.query_params["lam"] = want_lam
             st.query_params["basis"] = want_basis
-            st.rerun()
     except Exception:
         pass
     return {"lam": float(lam), "basis": basis}

@@ -6,8 +6,6 @@
 
 import sys
 from pathlib import Path
-from urllib.parse import quote
-
 APP_DIR = Path(__file__).resolve().parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
@@ -20,7 +18,7 @@ from components import cards, flags, layout, theme
 
 
 def _h(path: str) -> str:
-    return quote(path, safe="/")
+    return theme._href(path)
 
 
 def _bento_html(total_t, ratio_txt, speed_txt) -> str:

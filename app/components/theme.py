@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import html
 from typing import Any, Dict, Iterable, List, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import streamlit as st
 
@@ -529,7 +529,20 @@ def _esc(value: Any) -> str:
 
 
 def _href(path: str) -> str:
-    return quote(path, safe="/")
+    """页面链接；把 λ / 成本口径带在 query 上，target=_top 全量刷新也不丢参数。"""
+    qs = ""
+    try:
+        lam = st.session_state.get("lam")
+        basis = st.session_state.get("basis")
+        payload = {}
+        if lam is not None:
+            payload["lam"] = "%g" % float(lam)
+        if basis:
+            payload["basis"] = str(basis)
+        qs = urlencode(payload)
+    except Exception:
+        qs = ""
+    return quote(path, safe="/") + (("?" + qs) if qs else "")
 
 
 def top_nav(current: str = "", source_name: str = "", gate: Optional[Dict[str, Any]] = None) -> None:

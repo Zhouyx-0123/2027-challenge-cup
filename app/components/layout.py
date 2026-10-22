@@ -99,11 +99,19 @@ def sidebar_params(source_name: str = "unknown",
     """
     gate_text = gate_badge(gate)
     src_text = source_badge(source_name)
+    # 链接走 target=_top 全量刷新；把 λ / 口径放进 query，跨页不丢参数。
+    try:
+        if "lam" in st.query_params:
+            st.session_state["lam"] = float(st.query_params["lam"])
+        if st.query_params.get("basis") in ("赛题口径", "碳价延展口径"):
+            st.session_state["basis"] = st.query_params["basis"]
+    except Exception:
+        pass
     lam0 = float(st.session_state.get("lam", 100.0))
     basis0 = st.session_state.get("basis", "赛题口径")
 
     theme.top_nav(current=current, source_name=source_name, gate=gate)
-    label = "控制台 / CONTROL DECK　λ=%g 元/t　·　%s" % (lam0, basis0)
+    label = "控制台 / CONTROL DECK　·　λ / 成本口径"
     with st.expander(label, expanded=False):
         c1, c2, c3 = st.columns([0.32, 0.46, 0.22])
         with c1:
@@ -128,4 +136,14 @@ def sidebar_params(source_name: str = "unknown",
                    % (src_text, gate_text))
     st.session_state["lam"] = float(lam)
     st.session_state["basis"] = basis
+    try:
+        want_lam = "%g" % float(lam)
+        want_basis = str(basis)
+        if (st.query_params.get("lam") != want_lam
+                or st.query_params.get("basis") != want_basis):
+            st.query_params["lam"] = want_lam
+            st.query_params["basis"] = want_basis
+            st.rerun()
+    except Exception:
+        pass
     return {"lam": float(lam), "basis": basis}

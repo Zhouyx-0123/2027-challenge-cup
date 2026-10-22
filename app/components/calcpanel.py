@@ -19,8 +19,8 @@ from . import cards, charts
 # 分解图四组件配色（与 theme 的 info/accent/accent-2/coral 对齐）
 _COMP_COLORS = {
     "vehicle_net_residual": "#6FB1FF",
-    "energy": "#2DD4A7",
-    "maintenance": "#F5C86B",
+    "energy": "#5EE7FF",
+    "maintenance": "#FFC46B",
     "insurance": "#FF8A5B",
 }
 _COMP_NAMES = {
@@ -117,7 +117,7 @@ def npv_stacked(npv_by_scenario: Dict[str, Dict[str, float]],
                                   xanchor="left", x=0, font=dict(size=11)))
     fig.update_xaxes(**charts.AXIS, title="万元/辆（NPV）")
     fig.update_yaxes(**charts.AXIS)
-    fig.update_layout(title=dict(text=title, font=dict(size=13, color="#E6EDF3"),
+    fig.update_layout(title=dict(text=title, font=dict(size=13, color="#F3F5F8"),
                                  x=0.01, y=0.97))
     st.plotly_chart(fig, width="stretch")
 

@@ -27,7 +27,7 @@ from components import cards, layout, charts, flags, mapview, theme
 layout.setup("1 基准核算")
 src = services.source()
 gate = services.gate()
-layout.sidebar_params(services.source_name(), gate)
+layout.sidebar_params(services.source_name(), gate, current="1")
 
 seg = services.segments()
 if seg.empty:
@@ -98,7 +98,7 @@ layout.kpi_row([
     {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—")},
     {"label": "估算值占比", "value": (("%.2f%%" % (100 * est_share_pct)) if est_share_pct is not None else "—"),
      "help": "黄框标出的行；只填补、不删除"},
-], per_row=6)
+], per_row=3)
 st.caption("剔除 >100 km/h 的时间戳异常后均速 %s km/h；异常段保留计碳，只影响速度统计。"
            "KPI 为 pipeline 出口锁定的全量口径（kpi.json），筛选只影响下方地图、"
            "速度分布与段级明细——避免筛选后的数字与闸门对不上。"

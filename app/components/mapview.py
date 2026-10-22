@@ -16,8 +16,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-ACCENT = "#2DD4A7"
-ACCENT2 = "#F5C86B"
+ACCENT = "#5EE7FF"
+ACCENT2 = "#FFC46B"
 SCALE = ["#0E3B2E", "#1C8F6B", ACCENT, ACCENT2, "#FF8A5B"]
 
 GEO_LAYOUT = dict(
@@ -147,7 +147,7 @@ def flow_map(
         lon=cities[lon_o], lat=cities[lat_o], mode="markers+text",
         text=cities[city_o], textposition="top center",
         textfont=dict(size=10, color="#8A97A6"),
-        marker=dict(size=5, color="#E6EDF3", opacity=0.75),
+        marker=dict(size=5, color="#F3F5F8", opacity=0.75),
         hoverinfo="skip", showlegend=False,
     ))
 
@@ -232,7 +232,7 @@ def route_preview(row: Any, height: int = 600) -> Optional[go.Figure]:
                     line=dict(width=2, color="#07120F")),
         text=["A · " + origin, "B · " + dest],
         textposition=["top right", "bottom right"],
-        textfont=dict(size=10.5, color="#E6EDF3"),
+        textfont=dict(size=10.5, color="#F3F5F8"),
         hoverinfo="skip", showlegend=False))
 
     km = get("distance_km") or get("km") or 0.0
@@ -252,13 +252,13 @@ def route_preview(row: Any, height: int = 600) -> Optional[go.Figure]:
         align="left", showarrow=False,
         text="<b>OFFLINE SCHEMATIC</b>　离线示意<br>"
              "<span style='font-size:11px;color:#8A97A6'>缓存几何 · 非实时 · 无在线底图</span>",
-        font=dict(size=11, color="#F5C86B"), bgcolor="rgba(8,12,17,0.55)",
+        font=dict(size=11, color="#FFC46B"), bgcolor="rgba(8,12,17,0.55)",
         bordercolor="rgba(245,200,107,0.28)", borderwidth=1, borderpad=8)
     fig.add_annotation(
         x=0.975, y=0.03, xref="paper", yref="paper", xanchor="right", yanchor="bottom",
         align="right", showarrow=False,
         text="{:s} km　·　{:s} min　·　{:s} 元　·　{:s} tCO₂e".format(km_s, min_s, toll_s, co2_s),
-        font=dict(size=11, color="#E6EDF3", family="Consolas, monospace"),
+        font=dict(size=11, color="#F3F5F8", family="Consolas, monospace"),
         bgcolor="rgba(8,12,17,0.62)", bordercolor="rgba(255,255,255,0.10)",
         borderwidth=1, borderpad=7)
     fig.update_xaxes(visible=False, range=[0, 100], fixedrange=True)

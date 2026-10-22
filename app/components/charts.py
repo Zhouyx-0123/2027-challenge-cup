@@ -13,18 +13,18 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-ACCENT = "#2DD4A7"
-ACCENT2 = "#F5C86B"
-SCALE = ["#0E3B2E", "#1C8F6B", ACCENT, ACCENT2, "#FF8A5B"]
+ACCENT = "#5EE7FF"
+ACCENT2 = "#FFC46B"
+SCALE = ["#08252B", "#0E6A78", "#5EE7FF", ACCENT, ACCENT2]
 
 BASE = dict(
     template="plotly_dark",
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(size=12, color="#C9D4E0"),
-    margin=dict(l=8, r=8, t=28, b=8),
+    font=dict(size=12, color="#98A3B3", family="Inter, Segoe UI, Microsoft YaHei, sans-serif"),
+    margin=dict(l=8, r=8, t=64, b=8),
     coloraxis_showscale=False,
-    hoverlabel=dict(bgcolor="#131A23", bordercolor="#2DD4A7", font_size=12),
+    hoverlabel=dict(bgcolor="#11151C", bordercolor="#5EE7FF", font_size=12),
 )
 
 AXIS = dict(
@@ -38,7 +38,7 @@ def _finish(fig: go.Figure, title: Optional[str], height: int) -> go.Figure:
     fig.update_xaxes(**AXIS)
     fig.update_yaxes(**AXIS)
     if title:
-        fig.update_layout(title=dict(text=title, font=dict(size=13, color="#E6EDF3"), x=0.01, y=0.97))
+        fig.update_layout(title=dict(text=title, font=dict(size=13, color="#F3F5F8"), x=0.01, y=0.995, yanchor="top"))
     return fig
 
 
@@ -187,8 +187,8 @@ def line_multi(df: pd.DataFrame, x: str, y: str, color: str, vline_x: Optional[f
     fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02,
                                   xanchor="right", x=1, title_text=""))
     if vline_x is not None:
-        fig.add_vline(x=vline_x, line=dict(color="#E6EDF3", width=1.2, dash="dot"),
-                      annotation_text=vline_label, annotation_font_color="#E6EDF3",
+        fig.add_vline(x=vline_x, line=dict(color="#F3F5F8", width=1.2, dash="dot"),
+                      annotation_text=vline_label, annotation_font_color="#F3F5F8",
                       annotation_position="top")
     if ymax is not None:
         fig.update_yaxes(range=[0, ymax])
@@ -224,7 +224,7 @@ def payback_curve(specs: List[dict], years: int = 15, height: int = 380) -> None
             fig.add_trace(go.Scatter(
                 x=[cross], y=[capex], mode="markers",
                 marker=dict(size=11, color=color, symbol="diamond",
-                            line=dict(width=1.5, color="#0B0F14")),
+                            line=dict(width=1.5, color="#07080A")),
                 name="回本 %.1f 年" % cross, showlegend=False,
                 hovertemplate="回本 %.1f 年<extra></extra>" % cross,
             ))

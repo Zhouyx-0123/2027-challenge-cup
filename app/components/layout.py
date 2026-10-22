@@ -1,4 +1,5 @@
-"""版式组件（A1）：页头、指标卡、结论带、空状态、全局参数。"""
+# -*- coding: utf-8 -*-
+"""版式组件（A1）：顶部导航、页头、指标卡、结论带、空状态、全局参数。"""
 
 from __future__ import annotations
 
@@ -8,9 +9,6 @@ import streamlit as st
 
 from . import theme
 
-ACCENT = "#1F3A5F"
-SOFT = "#F4F7FA"
-
 
 def setup(title: str, icon: str = "📦") -> None:
     """页面配置。每个页面第一行调用，必须在其他 st 调用之前。"""
@@ -18,7 +16,7 @@ def setup(title: str, icon: str = "📦") -> None:
         page_title=title,
         page_icon=icon,
         layout="wide",
-        initial_sidebar_state="expanded",
+        initial_sidebar_state="collapsed",
     )
     theme.inject()
 
@@ -33,7 +31,7 @@ def page_header(title: str, question: Optional[str] = None, badge: Optional[str]
     with right:
         if badge:
             st.markdown(
-                "<div style='text-align:right;color:#7a8794;font-size:12px;padding-top:14px'>"
+                "<div style='text-align:right;color:#98A3B3;font-size:11px;padding-top:14px'>"
                 + badge
                 + "</div>",
                 unsafe_allow_html=True,
@@ -94,35 +92,40 @@ def empty_state(need: List[str]) -> None:
 def sidebar_params(source_name: str = "unknown",
                    gate: Optional[Dict[str, Any]] = None,
                    current: str = "") -> Dict[str, Any]:
-    """全局参数：λ 与成本口径。全站只有这一处，其他页面读 session_state。
+    """顶部导航 + 可折叠控制台。
 
-    current 是页面 3–5 的导航参数；当前布局不强制高亮，保留接口以兼容。
+    所有页面共用的 λ / 成本口径 / 数据状态 / 刷新都在这里；
+    不再使用 Streamlit 侧栏，移动端不会挤压主内容。
     """
-    with st.sidebar:
-        st.markdown("### 全局参数")
-        lam = st.number_input(
-            "内部碳价 λ（元/吨 CO₂e）",
-            min_value=0.0,
-            max_value=1000.0,
-            value=float(st.session_state.get("lam", 100.0)),
-            step=10.0,
-            help="全站唯一的定价旋钮，第 3–5 页共用。",
-        )
-        basis = st.radio(
-            "成本口径",
-            ["赛题口径", "碳价延展口径"],
-            index=0 if st.session_state.get("basis", "赛题口径") == "赛题口径" else 1,
-            help="赛题口径＝购置+能耗+维护−补贴；延展口径＝排放量 × λ。",
-        )
-        st.markdown("---")
-        st.caption("数据源：" + source_badge(source_name))
-        if gate is not None:
-            st.caption(gate_badge(gate))
-        if st.button("刷新结果表", width="stretch",
-                     help="只清缓存、重新读表；不会调用任何算法。"):
-            st.cache_data.clear()
-            st.rerun()
-        st.caption("只读 data/processed；页面不调用核心算法")
-    st.session_state["lam"] = lam
+    gate_text = gate_badge(gate)
+    src_text = source_badge(source_name)
+    lam0 = float(st.session_state.get("lam", 100.0))
+    basis0 = st.session_state.get("basis", "赛题口径")
+
+    theme.top_nav(current=current, source_name=source_name, gate=gate)
+    label = "控制台 / CONTROL DECK　λ=%g 元/t　·　%s" % (lam0, basis0)
+    with st.expander(label, expanded=False):
+        c1, c2, c3 = st.columns([0.32, 0.46, 0.22])
+        with c1:
+            lam = st.number_input(
+                "内部碳价 λ（元/吨 CO₂e）",
+                min_value=0.0, max_value=1000.0, value=lam0, step=10.0,
+                help="全站唯一的定价旋钮，第 3–5 页共用。",
+            )
+        with c2:
+            basis = st.radio(
+                "成本口径", ["赛题口径", "碳价延展口径"],
+                index=0 if basis0 == "赛题口径" else 1, horizontal=True,
+                help="赛题口径＝购置+能耗+维护−补贴；延展口径＝排放量 × λ。",
+            )
+        with c3:
+            st.markdown("<div style='height:26px'></div>", unsafe_allow_html=True)
+            if st.button("刷新结果表", width="stretch",
+                         help="只清缓存、重新读表；不会调用任何算法。"):
+                st.cache_data.clear()
+                st.rerun()
+        st.caption("数据：%s　｜　%s　｜　只读 data/processed；页面不调用核心算法、不做碳/成本计算。"
+                   % (src_text, gate_text))
+    st.session_state["lam"] = float(lam)
     st.session_state["basis"] = basis
-    return {"lam": lam, "basis": basis}
+    return {"lam": float(lam), "basis": basis}

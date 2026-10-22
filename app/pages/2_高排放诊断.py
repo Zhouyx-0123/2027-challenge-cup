@@ -22,7 +22,7 @@ from components import layout, charts, theme
 layout.setup("2 高排放诊断")
 src = services.source()
 gate = services.gate()
-layout.sidebar_params(services.source_name(), gate)
+layout.sidebar_params(services.source_name(), gate, current="2")
 
 seg = services.segments()
 if seg.empty:

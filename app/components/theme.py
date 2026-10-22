@@ -154,7 +154,7 @@ p, li, span, label { color: var(--text); }
   background: radial-gradient(circle, rgba(255,255,255,0.10), transparent 68%);
   filter: blur(4px); z-index: -1; animation: cmFloat 9s ease-in-out infinite;
 }
-.cm-hero-inner { position: relative; z-index: 2; max-width: 1000px; animation: cmReveal .7s ease both; }
+.cm-hero-inner { position: relative; z-index: 2; max-width: 1000px; animation: cmReveal .34s ease both; }
 .cm-kicker {
   display: inline-flex; align-items: center; gap: 9px; color: var(--tide);
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
@@ -466,6 +466,55 @@ div[data-testid="stMultiSelect"] span[data-baseweb="tag"] { background: rgba(94,
 [data-testid="stMarkdownContainer"] a { color: var(--tide); }
 [data-testid="stMarkdownContainer"] code { color: var(--foam); background: rgba(94,231,255,0.08); border-radius: 5px; padding: 1px 5px; }
 
+/* ---------- 数据台账卡（替代 st.dataframe） ---------- */
+.cm-table { border: 1px solid var(--line); border-radius: 20px; overflow: hidden;
+  background: linear-gradient(155deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012));
+  margin: 6px 0 14px 0; box-shadow: 0 18px 50px rgba(0,0,0,0.20); }
+.cm-table-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 14px 17px 11px 17px; border-bottom: 1px solid var(--line); }
+.cm-table-top .t { font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: -0.02em; }
+.cm-table-top .d { color: var(--muted); font-size: 10.5px; margin-left: 8px; }
+.cm-table-top .n { color: var(--muted-2); font-family: var(--mono); font-size: 9px; white-space: nowrap; }
+.cm-table-scroll { overflow: auto; max-height: 540px; }
+.cm-table-grid { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.cm-table-grid thead th { position: sticky; top: 0; z-index: 2; background: #11151C;
+  color: var(--muted); font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em;
+  text-transform: uppercase; font-weight: 400; text-align: left; padding: 10px 12px;
+  border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+.cm-table-grid thead th.num { text-align: right; }
+.cm-table-grid tbody td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.045);
+  color: var(--text); vertical-align: top; }
+.cm-table-grid tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.cm-table-grid tbody tr:last-child td { border-bottom: none; }
+.cm-table-grid tbody tr:hover td { background: rgba(94,231,255,0.038); }
+.cm-table-grid tbody tr.main td { background: rgba(255,196,107,0.065); }
+.cm-table-grid tbody tr.main td:first-child { box-shadow: inset 2px 0 0 var(--amber); }
+.cm-table-grid tbody tr.fail td { background: rgba(255,107,107,0.06); }
+.cm-table-foot { padding: 8px 16px; border-top: 1px solid var(--line); color: var(--muted-2); font-size: 9.5px; }
+.cm-pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px;
+  font-family: var(--mono); font-size: 8.5px; font-weight: 700; letter-spacing: 0.02em; }
+.cm-pill.ok { color: #A7F3DE; background: rgba(45,212,167,0.12); border: 1px solid rgba(45,212,167,0.35); }
+.cm-pill.bad { color: #FFB3B3; background: rgba(255,107,107,0.12); border: 1px solid rgba(255,107,107,0.35); }
+.cm-pill.skip { color: #B7C2CE; background: rgba(152,163,179,0.10); border: 1px solid rgba(152,163,179,0.28); }
+.cm-pill.warn { color: #FFE0A0; background: rgba(255,196,107,0.12); border: 1px solid rgba(255,196,107,0.35); }
+.cm-mut { color: var(--muted-2); }
+
+/* 兼容旧 cards.htable 的台账表：同样走圆角玻璃卡 */
+.cm-table .cm-htable { border: none; border-radius: 0; }
+.cm-table-plain { margin-top: 6px; }
+.cm-htable { border-collapse: separate; border-spacing: 0; width: 100%; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,0.018); font-size: 11.5px; }
+.cm-htable thead th { background: #11151C; color: var(--muted); font-family: var(--mono);
+  font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 400;
+  padding: 10px 12px; border-bottom: 1px solid var(--line-2); }
+.cm-htable tbody td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.045); }
+.cm-htable tbody tr:last-child td { border-bottom: none; }
+.cm-htable tbody tr:hover td { background: rgba(94,231,255,0.038); }
+.cm-htable tbody tr.base td { background: rgba(94,231,255,0.06); }
+.cm-htable tbody tr.main td { background: rgba(255,196,107,0.065); }
+.cm-htable tbody tr.main td:first-child { box-shadow: inset 2px 0 0 var(--amber); }
+.cm-htable tbody tr.fail td { background: rgba(255,107,107,0.06); }
+
 /* ---------- 计算器结果图 ---------- */
 .cm-savings { border: 1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,0.022); padding: 16px 18px 14px 18px; margin: 8px 0 14px 0; }
 .cm-savings-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px;
@@ -611,6 +660,14 @@ div[data-testid="stRadio"] label:hover { border-color: rgba(94,231,255,0.35); }
 /* tabs 也做成小胶囊 */
 button[data-testid="stTab"] { padding: 7px 13px !important; border-radius: 999px !important; border: 1px solid transparent !important; }
 button[data-testid="stTab"][aria-selected="true"] { background: rgba(94,231,255,0.10) !important; border-color: rgba(94,231,255,0.30) !important; }
+
+/* Streamlit 运行态：顶部 2px 潮汐进度条，切页时给即时反馈 */
+div[data-testid="stStatusWidget"] { position: fixed !important; top: 0 !important; left: 0 !important;
+  width: 100% !important; height: 2px !important; z-index: 9999 !important; padding: 0 !important;
+  background: linear-gradient(90deg, var(--tide), var(--tide-2), #8FB8FF, var(--tide));
+  background-size: 300% 100%; animation: cmLoading 1.2s linear infinite; }
+div[data-testid="stStatusWidget"] * { display: none !important; }
+@keyframes cmLoading { from { background-position: 0% 0; } to { background-position: 300% 0; } }
 
 /* ---------- 动效 ---------- */
 @keyframes cmDrift { 0% { transform: translate3d(-3%, -2%, 0) scale(1); } 100% { transform: translate3d(4%, 3%, 0) scale(1.08); } }

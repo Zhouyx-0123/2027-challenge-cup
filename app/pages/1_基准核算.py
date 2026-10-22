@@ -41,7 +41,7 @@ if missing:
     st.warning("缺少字段：" + "、".join(missing))
     st.caption("当前字段：" + "、".join([str(c) for c in seg.columns]))
     with st.expander("先看看现有数据"):
-        st.dataframe(seg.head(20), width="stretch")
+        cards.data_table(seg.head(20), title="现有字段预览", max_rows=20)
     layout.conclusion("数据契约没落地之前，页面不编数字——这是硬规矩。")
     st.stop()
 
@@ -111,15 +111,15 @@ targets = gate.get("targets", []) if gate else []
 if targets:
     tdf = pd.DataFrame(targets)
     tdf["判定"] = tdf["status"].map(
-        {"PASS": "✓ 通过", "FAIL": "✗ 未通过", "SKIP": "⏭ 跳过"}).fillna(tdf["status"])
+        {"PASS": "通过", "FAIL": "未通过", "SKIP": "跳过"}).fillna(tdf["status"])
     tdf["目标"] = tdf.apply(lambda r: services.fmt(r["expected"], 2) + " " + str(r["unit"]), axis=1)
     tdf["实测"] = tdf.apply(
         lambda r: ("—" if r["actual"] is None else services.fmt(r["actual"], 2)) + " " + str(r["unit"]),
         axis=1)
-    st.dataframe(
+    cards.data_table(
         tdf[["label", "stage", "目标", "实测", "判定", "note"]].rename(columns={
             "label": "核对项", "stage": "出处", "note": "说明"}),
-        width="stretch", hide_index=True,
+        title="G2 对拍口径", desc="pipeline 出口锁定，本页只展示", max_rows=20, status_col="判定",
     )
     st.caption("真实数据八项全过：E₀ 4,502,042.41 kg 精确；均速 49.51 对官方 49.57 在 ±0.1 内。"
                "演示模式则跳过依赖真数据的五项。")
@@ -163,7 +163,8 @@ with right:
 st.markdown("")
 layout.section("数据健康", "四类标记：灰底=重复，黄底=异常/口径，黄框=估算")
 counts = services.flag_counts()
-st.dataframe(flags.flag_summary(None, counts), width="stretch", hide_index=True)
+cards.data_table(flags.flag_summary(None, counts), title="数据健康 · 四类标记",
+                 desc="重复 / 异常 / 口径换算 / 估算", max_rows=10)
 flags.flag_legend()
 
 # ---- 数据层审计（DA 增量：61 字段数据字典 + 逐行可追溯 + 重复组冲突） ----
@@ -210,7 +211,7 @@ if reason_counts:
     ).sort_values("行数", ascending=False).head(8).reset_index(drop=True)
     c1, c2 = st.columns([0.45, 0.55])
     with c1:
-        st.dataframe(reasons, width="stretch", hide_index=True)
+        cards.data_table(reasons, title="估算原因", desc="全量口径，不随筛选变化", max_rows=8)
     with c2:
         st.caption("填补顺序：同线历史均值 → 行业绕行系数 → 全样本中位数；"
                    "车型找不到按载重推断；发票匹配不上按同类别历史均价。"

@@ -169,7 +169,78 @@ def htable(headers: List[str], rows: List[List[Any]], row_cls: Optional[List[str
         body.append("<tr" + ((" class='" + cls + "'") if cls else "") + ">"
                     + "".join(tds) + "</tr>")
     st.markdown(
-        "<div style='overflow-x:auto'><table class='cm-htable'><thead><tr>"
-        + head + "</tr></thead><tbody>" + "".join(body) + "</tbody></table></div>",
+        "<div class='cm-table cm-table-plain'><div class='cm-table-scroll'>"
+        "<table class='cm-htable'><thead><tr>"
+        + head + "</tr></thead><tbody>" + "".join(body) + "</tbody></table></div></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def data_table(df, title: str = "", desc: str = "", max_rows: int = 50,
+               numeric: Optional[Iterable[str]] = None,
+               status_col: Optional[str] = None,
+               highlight: Optional[str] = None) -> None:
+    """数据台账卡：替代 st.dataframe 的默认 Excel 框。
+
+    只做展示：df 由调用方传入；这里只格式化、截断和加行状态样式。
+    """
+    import math
+    import streamlit as st
+
+    if df is None or getattr(df, "empty", True):
+        st.caption("暂无数据")
+        return
+    total = len(df)
+    show = df.head(max_rows)
+    numeric = set(numeric or [])
+    cols = list(show.columns)
+    headers = [str(c) for c in cols]
+
+    def cell(value, col):
+        if value is None:
+            return "<span class='cm-mut'>—</span>"
+        if isinstance(value, float) and math.isnan(value):
+            return "<span class='cm-mut'>—</span>"
+        text = str(value)
+        if col == status_col:
+            low = text.strip()
+            tone = {"PASS": "ok", "通过": "ok", "FAIL": "bad", "未通过": "bad",
+                    "SKIP": "skip", "跳过": "skip", "WARN": "warn", "警示": "warn"}.get(low)
+            if tone:
+                return "<span class='cm-pill " + tone + "'>" + _esc(text) + "</span>"
+        return _esc(text)
+
+    head = "".join(
+        "<th class='" + ("num" if h in numeric else "") + "'>" + _esc(h) + "</th>"
+        for h in headers
+    )
+    body = []
+    for _, row in show.iterrows():
+        cls = ""
+        if highlight and highlight in show.columns and bool(row.get(highlight)):
+            cls = " main"
+        tds = []
+        for h, col in zip(headers, cols):
+            v = row.get(col)
+            if str(v).strip() in ("FAIL", "未通过"):
+                cls = " fail"
+            tds.append("<td class='" + ("num" if h in numeric else "") + "'>"
+                       + cell(v, h) + "</td>")
+        body.append("<tr class='" + cls.strip() + "'>" + "".join(tds) + "</tr>")
+
+    top = ""
+    if title or desc:
+        top = ("<div class='cm-table-top'><div><span class='t'>" + _esc(title)
+               + "</span>" + ("<span class='d'>" + _esc(desc) + "</span>" if desc else "")
+               + "</div><span class='n'>" + "{:,}".format(total) + " 行</span></div>")
+    foot = ""
+    if total > len(show):
+        foot = ("<div class='cm-table-foot'>显示前 " + str(len(show)) + " 行 / 共 "
+                + "{:,}".format(total) + " 行；完整数据用下方下载。</div>")
+    st.markdown(
+        "<div class='cm-table'>" + top
+        + "<div class='cm-table-scroll'><table class='cm-table-grid'><thead><tr>"
+        + head + "</tr></thead><tbody>" + "".join(body) + "</tbody></table></div>"
+        + foot + "</div>",
         unsafe_allow_html=True,
     )

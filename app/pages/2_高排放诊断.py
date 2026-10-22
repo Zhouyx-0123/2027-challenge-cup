@@ -17,7 +17,7 @@ import pandas as pd
 import streamlit as st
 
 import services
-from components import layout, charts, theme
+from components import cards, layout, charts, theme
 
 layout.setup("2 高排放诊断")
 src = services.source()
@@ -93,7 +93,7 @@ for tab, (dim, _key, title) in zip(tabs, DIMS):
         charts.hbar(top, "value", "metric_t", title=title, height=380)
         show = top[["value", "metric_t", "share_pct", "n"]].rename(columns={
             "value": "类别", "metric_t": "碳排放(t)", "share_pct": "占比(%)", "n": "段数"})
-        st.dataframe(show, width="stretch", hide_index=True)
+        cards.data_table(show, title=dim + " · TOP12", desc="热点表预计算，前端只展示", max_rows=12)
 
 # ---------------- 同线带宽 ----------------
 st.markdown("---")
@@ -111,7 +111,8 @@ else:
         "od_pair": "线路", "n": "段数", "nt": "车型数", "fmin": "最低因子(g/km)",
         "fmax": "最高因子(g/km)", "ratio": "倍数", "kg_t": "碳排(t)", "coverage_pct": "覆盖率(%)",
     })
-    st.dataframe(table.head(50), width="stretch", hide_index=True)
+    cards.data_table(table.head(50), title="同线带宽 · TOP50",
+                     desc="倍数 = 同 OD 最高/最低碳强度", max_rows=50)
     st.caption("倍数高不代表一定能换：还要过续航、14 小时驾驶窗口、补能与运力匹配四道约束（第 3 页）。"
                "这里的倍数是结构性带宽，不是可立即兑现的减排量。")
 

@@ -179,7 +179,7 @@ layout.section("运行状态 / LIVE STATUS", "前端只读结果表；缺表不�
 status = pd.DataFrame(services.file_status())
 _counts = pd.to_numeric(status["行数"], errors="coerce")
 status["行数"] = _counts.apply(lambda x: "—" if pd.isna(x) else f"{int(x):,}")
-st.dataframe(status, width="stretch", hide_index=True)
+cards.data_table(status, title="结果表清单", desc="data/processed 落盘状态", max_rows=20)
 
 # ---------------- 闸门 ----------------
 layout.section("对拍闸门 / G2", "8 个数字目标 + 18 项结构一致性；超差退出码非 0")
@@ -187,7 +187,7 @@ if gate and gate.get("targets"):
     items = pd.DataFrame(gate["targets"])
     if not items.empty:
         items["判定"] = items["status"].map(
-            {"PASS": "✓ 通过", "FAIL": "✗ 未通过", "SKIP": "⏭ 跳过"}).fillna(items["status"])
+            {"PASS": "通过", "FAIL": "未通过", "SKIP": "跳过"}).fillna(items["status"])
         items["目标"] = items.apply(lambda r: services.fmt(r["expected"], 2) + " " + str(r["unit"]), axis=1)
         items["实测"] = items.apply(
             lambda r: ("—" if r["actual"] is None else services.fmt(r["actual"], 2)) + " " + str(r["unit"]),
@@ -195,7 +195,8 @@ if gate and gate.get("targets"):
         show = items[["label", "stage", "目标", "实测", "判定", "note"]].rename(columns={
             "label": "核对项", "stage": "出处", "note": "说明",
         })
-        st.dataframe(show, width="stretch", hide_index=True)
+        cards.data_table(show, title="G2 对拍明细", desc="8 个数字目标 + 18 项结构校验",
+                         max_rows=30, status_col="判定")
     c = gate.get("counts", {})
     st.caption("模式：%s｜PASS %s｜FAIL %s｜SKIP %s｜%s"
                % (gate.get("mode", "—"), c.get("pass", 0), c.get("fail", 0),
@@ -209,7 +210,8 @@ else:
 
 # ---------------- 数据健康 ----------------
 layout.section("数据健康 / DATA HYGIENE", "四类标记：灰底=重复，黄底=异常/口径，黄框=估算")
-st.dataframe(flags.flag_summary(None, counts), width="stretch", hide_index=True)
+cards.data_table(flags.flag_summary(None, counts), title="四类数据标记",
+                 desc="灰底=重复 / 黄底=异常或口径 / 黄框=估算", max_rows=10)
 flags.flag_legend()
 
 # ---------------- 台账 + 披露 ----------------
@@ -220,7 +222,8 @@ with st.expander("G3 台账六字段 / G4 披露六要素（已生成，可下�
         st.info("台账未生成——先运行 python -m src.pipeline")
     else:
         cols = [c for c in (["scheme"] + services.LEDGER_COLUMNS + ["is_baseline"]) if c in led.columns]
-        st.dataframe(led[cols], width="stretch", hide_index=True)
+        cards.data_table(led[cols], title="G3 台账六字段",
+                         desc="基准 / 主推 / 保守三行结论账", max_rows=5, highlight="is_baseline")
         st.caption("台账基准行的排放量 = 第 1 页 E₀（同一数据源，不二次计算）")
         st.download_button(
             "下载台账 CSV",
@@ -230,9 +233,9 @@ with st.expander("G3 台账六字段 / G4 披露六要素（已生成，可下�
         )
     if disc:
         keys = [k for k in services.DISCLOSURE_KEYS if k in disc]
-        st.dataframe(
+        cards.data_table(
             pd.DataFrame([{"要素": k, "内容": str(disc[k])} for k in keys]),
-            width="stretch", hide_index=True,
+            title="G4 披露六要素", desc="披露口径声明", max_rows=10,
         )
         st.download_button(
             "下载披露 JSON",
@@ -250,8 +253,8 @@ if log:
             stages = stages.rename(columns={
                 "name": "阶段", "status": "状态", "seconds": "耗时(s)", "error": "错误",
             })
-            st.dataframe(stages[["阶段", "状态", "耗时(s)", "错误"]],
-                         width="stretch", hide_index=True)
+            cards.data_table(stages[["阶段", "状态", "耗时(s)", "错误"]],
+                             title="G1 分段耗时", max_rows=10, status_col="状态")
         c1, c2 = st.columns(2)
         c1.metric("总耗时（s）", services.fmt(log.get("total_seconds"), 2))
         c2.metric("退出码", str(log.get("exit_code", "—")))

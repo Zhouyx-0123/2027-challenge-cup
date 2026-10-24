@@ -2,7 +2,7 @@
   "source": "D:\\vsp_delivery",
   "source_file": "improved_model.xlsx",
   "source_sha256": "3a11ebd59a45e56bb92aee19c042e8fc3eb001f84575473374b51441d3f8f980",
-  "generated_at": "2026-10-24T10:51:41+08:00",
+  "generated_at": "2026-10-24T11:08:35+08:00",
   "mode": "audit_only",
   "note": "物理行程审计口径，不替代当前 E0；HYC 是代理因子映射，不是 VSP。",
   "current": {

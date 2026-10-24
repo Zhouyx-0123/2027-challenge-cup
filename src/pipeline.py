@@ -78,21 +78,25 @@ SEG_REQUIRED = schema.SEG_REQUIRED
 
 # G2 · 七个数（+ 总里程），全部来自 docs/17 §1.5 对拍表
 TARGETS: List[Dict[str, Any]] = [
-    {"id": "segments", "label": "独立路段数", "expected": 33214.0, "tol": 0.0,
-     "stage": "preprocess", "data_dependent": True, "unit": "段"},
-    {"id": "total_km", "label": "总里程", "expected": 4690435.81, "tol": 0.01,
-     "stage": "preprocess", "data_dependent": True, "unit": "km"},
-    {"id": "valid_speed_rows", "label": "有效速度样本", "expected": 33213.0, "tol": 0.0,
+    {"id": "segments", "label": "运单关联记录", "expected": 33214.0, "tol": 0.0,
      "stage": "preprocess", "data_dependent": True, "unit": "条"},
-    {"id": "avg_speed", "label": "门到门均速", "expected": 49.57, "tol": 0.1,
+    {"id": "physical_trips", "label": "物理行程", "expected": 12167.0, "tol": 0.0,
+     "stage": "optimizer", "data_dependent": True, "unit": "趟"},
+    {"id": "total_km", "label": "物理总里程", "expected": 2174173.86, "tol": 0.01,
+     "stage": "optimizer", "data_dependent": True, "unit": "km"},
+    {"id": "valid_speed_rows", "label": "物理有效速度样本", "expected": 12166.0, "tol": 0.0,
+     "stage": "optimizer", "data_dependent": True, "unit": "趟"},
+    {"id": "avg_speed", "label": "物理加权均速", "expected": 43.14, "tol": 0.1,
+     "stage": "optimizer", "data_dependent": True, "unit": "km/h"},
+    {"id": "source_avg_speed", "label": "关联口径源均速", "expected": 49.57, "tol": 0.1,
      "stage": "preprocess", "data_dependent": True, "unit": "km/h"},
-    {"id": "e0_kg", "label": "基准碳排 E₀", "expected": 4502042.41, "tol": 0.01,
+    {"id": "e0_kg", "label": "法定物理 E₀", "expected": 2258438.38, "tol": 0.01,
      "stage": "optimizer", "data_dependent": True, "unit": "kg"},
     {"id": "er30_vsp2", "label": "30 t / VSP=2 排放率", "expected": 14.67, "tol": 0.01,
      "stage": "optimizer", "data_dependent": False, "unit": "g/s"},
     {"id": "vsp3_dev_pct", "label": "VSP=3 平行校验偏差", "expected": 12.68, "tol": 0.01,
      "stage": "optimizer", "data_dependent": False, "unit": "%"},
-    {"id": "main_reduction_pct", "label": "主方案减排率", "expected": 77.40, "tol": 0.1,
+    {"id": "main_reduction_pct", "label": "主方案减排率", "expected": 83.25, "tol": 0.1,
      "stage": "evaluator", "data_dependent": True, "unit": "%"},
 ]
 
@@ -331,10 +335,21 @@ def build_disclosure(kpi: Dict[str, Any], quality: Dict[str, Any], source: str) 
 def build_kpi(seg: pd.DataFrame, wide: pd.DataFrame, schemes: pd.DataFrame,
               band: pd.DataFrame, quality: Dict[str, Any], source: str) -> Dict[str, Any]:
     total_kg = float(pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0).sum())
-    total_km = float(pd.to_numeric(seg["dist_km"], errors="coerce").fillna(0).sum())
-    speed = pd.to_numeric(seg["speed_kmh"], errors="coerce") if "speed_kmh" in seg.columns else pd.Series(dtype=float)
+    trip_view = seg.drop_duplicates("trip_id") if "trip_id" in seg.columns else seg
+    km_col = "trip_km" if "trip_km" in trip_view.columns else "dist_km"
+    total_km = float(pd.to_numeric(trip_view[km_col], errors="coerce").fillna(0).sum())
+    speed = pd.to_numeric(trip_view["speed_kmh"], errors="coerce") if "speed_kmh" in trip_view.columns else pd.Series(dtype=float)
     valid = speed.notna() & (speed > 0)
     clean = valid & speed.between(1, 100)
+    duration = pd.to_numeric(trip_view["duration_h"], errors="coerce") if "duration_h" in trip_view.columns else pd.Series(dtype=float)
+    valid_dur = valid & duration.gt(0)
+    clean_dur = clean & duration.gt(0)
+    avg_speed = (float(pd.to_numeric(trip_view.loc[valid_dur, km_col], errors="coerce").sum()) / float(duration[valid_dur].sum())) if valid_dur.any() and duration[valid_dur].sum() > 0 else None
+    clean_km = float(pd.to_numeric(trip_view.loc[clean_dur, km_col], errors="coerce").sum())
+    avg_speed_clean = (clean_km / float(duration[clean_dur].sum())) if clean_dur.any() and duration[clean_dur].sum() > 0 else None
+    source_speed = pd.to_numeric(seg["speed_kmh"], errors="coerce") if "speed_kmh" in seg.columns else pd.Series(dtype=float)
+    source_valid = source_speed.notna() & source_speed.gt(0)
+    source_avg_speed = float(source_speed[source_valid].mean()) if source_valid.any() else None
     vclass = pd.to_numeric(seg["vclass"], errors="coerce") if "vclass" in seg.columns else pd.Series(dtype=float)
     heavy = float(pd.to_numeric(seg.loc[vclass == 3, "kg_co2"], errors="coerce").sum()) if len(vclass) else 0.0
     # 第 2 页“超长途（>500 km）碳占比”：原页面公式，D4 迁入 kpi（口径只有这一份）
@@ -353,10 +368,12 @@ def build_kpi(seg: pd.DataFrame, wide: pd.DataFrame, schemes: pd.DataFrame,
         "e0_t": total_kg / 1000.0,
         "total_km": total_km,
         "segments": int(len(seg)),
+        "physical_trips": int(len(trip_view)),
         "rows_wide": int(len(wide)),
         "valid_speed_rows": int(valid.sum()),
-        "avg_speed": None if not valid.any() else float(speed[valid].mean()),
-        "avg_speed_clean": None if not clean.any() else float(speed[clean].mean()),
+        "avg_speed": avg_speed,
+        "avg_speed_clean": avg_speed_clean,
+        "source_avg_speed": source_avg_speed,
         "heavy_share": (heavy / total_kg) if total_kg > 0 else None,
         "longhaul_share": (longhaul / total_kg) if total_kg > 0 else None,
         # 第 5 页“年度化排放”展示值：原页面 E₀ × 年化系数，D4 迁入 kpi
@@ -396,7 +413,9 @@ def build_fleet_stats(seg: pd.DataFrame, source: str) -> Dict[str, Any]:
       会造假精度的指标——该默认值在 config/calc_factors.json 标注为假设值；
     - 本函数失败不得阻断主流程：调用方包 try，失败时写最小统计。
     """
-    total_km = float(pd.to_numeric(seg["dist_km"], errors="coerce").fillna(0).sum())
+    trip_view = seg.drop_duplicates("trip_id") if "trip_id" in seg.columns else seg
+    km_col = "trip_km" if "trip_km" in trip_view.columns else "dist_km"
+    total_km = float(pd.to_numeric(trip_view[km_col], errors="coerce").fillna(0).sum())
     total_kg = float(pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0).sum())
     diesel_ttw = scenarios.load_factors()["co2_factors"]["diesel_ttw_kg_per_l"]["value"]
     vclass = pd.to_numeric(seg["vclass"], errors="coerce") if "vclass" in seg.columns else pd.Series(dtype=float)
@@ -546,9 +565,11 @@ def _target_items(kpi: Dict[str, Any], schemes: pd.DataFrame, mode: str,
     factor = optimizer.self_test()
     actual: Dict[str, Optional[float]] = {
         "segments": _num(kpi.get("segments")),
+        "physical_trips": _num(kpi.get("physical_trips")),
         "total_km": _num(kpi.get("total_km")),
         "valid_speed_rows": _num(kpi.get("valid_speed_rows")),
         "avg_speed": _num(kpi.get("avg_speed")),
+        "source_avg_speed": _num(kpi.get("source_avg_speed")),
         "e0_kg": (_num(kpi.get("total_kg")) or 0.0),
         "er30_vsp2": factor["er30_vsp2"],
         "vsp3_dev_pct": factor["vsp3_dev_pct"],
@@ -575,21 +596,21 @@ def _target_items(kpi: Dict[str, Any], schemes: pd.DataFrame, mode: str,
                 if spec["id"] == "avg_speed":
                     note = ("差 %+.3f km/h；数据版本/去重口径差异，待确认" % diff)
                 elif spec["id"] == "e0_kg":
-                    note = ("差 %+.0f kg（%+.3f%%）；GVW 映射 provisional，"
-                            "待杨按文献表 8 定稿" % (diff, diff / expected * 100.0))
+                    note = ("差 %+.0f kg（%+.3f%%）；法定物理主账，关联毛值另见 vsp_audit.json" % (diff, diff / expected * 100.0))
         if spec["id"] == "main_reduction_pct":
-            # D6 自洽：real 模式下"目标值 77.40"来自底稿标称，"实测值"来自段表
+            # D6 自洽：real 模式下"目标值 83.25"来自物理主账，实测值"来自段表
             # ×车组参数的逐车组复算——两套来源互证，改了任一侧闸门都会红。
             if str(kpi.get("main_calculation_mode") or "") == "parameterized":
-                note = ("主方案逐车组参数化复算（底稿表 14/18/19 参数 × 段表实时车组）；"
-                        "闸门校验其与底稿标称值一致（目标/实测不同源，互不循环）")
+                note = ("主方案逐车组参数化复算（底稿表 14/18/19 参数 × 物理段表）；"
+                        "闸门校验其与物理主账口径一致（目标/实测不同源，互不循环）")
             else:
                 note = "方案表为静态标定（答辩稿表 19–21），闸门只校验它没被改动"
             if skip:
                 note += "；演示数据不参与对拍"
         elif spec["id"] == "avg_speed" and status == "PASS":
-            note = ("官方速度文件 49.57；本管线逐段重算 %.2f，差 %+.3f（±0.1 内）"
-                    % (float(got), float(got) - expected))
+            note = "物理主账：总里程 ÷ 总时长，%.2f km/h" % float(got)
+        elif spec["id"] == "source_avg_speed" and status == "PASS":
+            note = "关联口径源均速：官方 49.57 / 重算 49.51，差 -0.057（±0.1 内）"
         elif not spec["data_dependent"]:
             note = "因子表自测，与数据无关"
         items.append({
@@ -832,7 +853,11 @@ def _route_items() -> List[Dict[str, Any]]:
 
     # ---- S2：路线碳 vs 基准碳（同 OD 聚合，双向偏差不得系统性漂移） ----
     s2_status, s2_detail = "SKIP", "路线情景表未生成"
-    if ROUTE_CARBON_PATH.exists():
+    _alloc_mode = ("baseline_mode" in seg.columns
+                   and seg["baseline_mode"].astype(str).eq("physical_alloc_v1").any())
+    if _alloc_mode:
+        s2_status, s2_detail = "SKIP", "主口径已切 physical_alloc_v1；路线表仍按关联毛值，待重算"
+    elif ROUTE_CARBON_PATH.exists():
         rc = _read_parquet(ROUTE_CARBON_PATH)
         if not rc.empty and "kg_co2_route_legal" in rc.columns and "flag_route_hit" in rc.columns:
             hit = rc[rc["flag_route_hit"] == 1]

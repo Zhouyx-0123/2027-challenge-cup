@@ -1,26 +1,37 @@
 {
-  "generated_at": "2026-10-22T09:47:52",
+  "generated_at": "2026-10-24T11:13:19",
   "source": "real",
   "mode": "real",
   "passed": true,
   "targets": [
     {
       "id": "segments",
-      "label": "独立路段数",
+      "label": "运单关联记录",
       "stage": "preprocess",
       "expected": 33214.0,
       "actual": 33214.0,
       "tol": 0.0,
-      "unit": "段",
+      "unit": "条",
+      "status": "PASS",
+      "note": ""
+    },
+    {
+      "id": "physical_trips",
+      "label": "物理行程",
+      "stage": "optimizer",
+      "expected": 12167.0,
+      "actual": 12167.0,
+      "tol": 0.0,
+      "unit": "趟",
       "status": "PASS",
       "note": ""
     },
     {
       "id": "total_km",
-      "label": "总里程",
-      "stage": "preprocess",
-      "expected": 4690435.81,
-      "actual": 4690435.81,
+      "label": "物理总里程",
+      "stage": "optimizer",
+      "expected": 2174173.86,
+      "actual": 2174173.8600000003,
       "tol": 0.01,
       "unit": "km",
       "status": "PASS",
@@ -28,32 +39,43 @@
     },
     {
       "id": "valid_speed_rows",
-      "label": "有效速度样本",
-      "stage": "preprocess",
-      "expected": 33213.0,
-      "actual": 33213.0,
+      "label": "物理有效速度样本",
+      "stage": "optimizer",
+      "expected": 12166.0,
+      "actual": 12166.0,
       "tol": 0.0,
-      "unit": "条",
+      "unit": "趟",
       "status": "PASS",
       "note": ""
     },
     {
       "id": "avg_speed",
-      "label": "门到门均速",
+      "label": "物理加权均速",
+      "stage": "optimizer",
+      "expected": 43.14,
+      "actual": 43.14116909427427,
+      "tol": 0.1,
+      "unit": "km/h",
+      "status": "PASS",
+      "note": "物理主账：总里程 ÷ 总时长，43.14 km/h"
+    },
+    {
+      "id": "source_avg_speed",
+      "label": "关联口径源均速",
       "stage": "preprocess",
       "expected": 49.57,
       "actual": 49.512733417637676,
       "tol": 0.1,
       "unit": "km/h",
       "status": "PASS",
-      "note": "官方速度文件 49.57；本管线逐段重算 49.51，差 -0.057（±0.1 内）"
+      "note": "关联口径源均速：官方 49.57 / 重算 49.51，差 -0.057（±0.1 内）"
     },
     {
       "id": "e0_kg",
-      "label": "基准碳排 E₀",
+      "label": "法定物理 E₀",
       "stage": "optimizer",
-      "expected": 4502042.41,
-      "actual": 4502042.41069416,
+      "expected": 2258438.38,
+      "actual": 2258438.3762076,
       "tol": 0.01,
       "unit": "kg",
       "status": "PASS",
@@ -85,12 +107,12 @@
       "id": "main_reduction_pct",
       "label": "主方案减排率",
       "stage": "evaluator",
-      "expected": 77.4,
-      "actual": 77.37645382140694,
+      "expected": 83.25,
+      "actual": 83.24781931272416,
       "tol": 0.1,
       "unit": "%",
       "status": "PASS",
-      "note": "主方案逐车组参数化复算（底稿表 14/18/19 参数 × 段表实时车组）；闸门校验其与底稿标称值一致（目标/实测不同源，互不循环）"
+      "note": "主方案逐车组参数化复算（底稿表 14/18/19 参数 × 物理段表）；闸门校验其与物理主账口径一致（目标/实测不同源，互不循环）"
     }
   ],
   "structural": [
@@ -134,7 +156,7 @@
       "id": "kpi_total",
       "label": "E₀ 与 kpi 同源",
       "status": "PASS",
-      "detail": "段表 4502042.41 kg vs kpi 4502042.41 kg"
+      "detail": "段表 2258438.38 kg vs kpi 2258438.38 kg"
     },
     {
       "id": "ledger_fields",
@@ -146,7 +168,7 @@
       "id": "ledger_total",
       "label": "台账总碳 = 首页总碳",
       "status": "PASS",
-      "detail": "台账基准 4502042.41 kg vs 第 1 页 4502042.41 kg"
+      "detail": "台账基准 2258438.38 kg vs 第 1 页 2258438.38 kg"
     },
     {
       "id": "disclosure_six",
@@ -158,13 +180,13 @@
       "id": "schemes",
       "label": "方案表可对账",
       "status": "PASS",
-      "detail": "减排 0.0–77.4%｜回本 0.0–9.6 年"
+      "detail": "减排 0.0–83.2%｜回本 0.0–9.6 年"
     },
     {
       "id": "scheme_emission",
       "label": "方案排放对回 E₀",
       "status": "PASS",
-      "detail": "7 个方案排放全部对回 E₀ × (1 − 减排率)，最大偏差 0.0004 t"
+      "detail": "7 个方案排放全部对回 E₀ × (1 − 减排率)，最大偏差 0.0003 t"
     },
     {
       "id": "scheme_boundary",
@@ -194,7 +216,7 @@
       "id": "composition_total",
       "label": "E₀ 构成下钻对回总碳",
       "status": "PASS",
-      "detail": "全量组合 4502042.41 kg vs 段表 4502042.41 kg（偏差 0.0007）｜组合 216 组"
+      "detail": "全量组合 2258438.38 kg vs 段表 2258438.38 kg（偏差 0.0038）｜组合 216 组"
     },
     {
       "id": "source",
@@ -215,8 +237,8 @@
       "id": "S2",
       "label": "路线碳 vs 基准碳（无系统漂移）",
       "stage": "route",
-      "status": "PASS",
-      "detail": "中位偏差 -0.10%（阈值 ±50%，比对 13493 段）"
+      "status": "SKIP",
+      "detail": "主口径已切 physical_alloc_v1；路线表仍按关联毛值，待重算"
     },
     {
       "id": "S3",
@@ -227,7 +249,7 @@
     }
   ],
   "counts": {
-    "pass": 26,
+    "pass": 28,
     "fail": 0,
     "skip": 0
   }

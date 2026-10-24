@@ -67,20 +67,30 @@ def build(src: Path = DEFAULT_SRC, out: Path = PROCESSED) -> dict:
     h.columns = HYC_COLS
     h = _physical_key(h)
 
-    # Current waybill-association口径
+    # Current waybill-association口径 (gross, before physical allocation)
+    gross = b["kg_co2_gross"] if "kg_co2_gross" in b.columns else b["kg_co2"]
     current_rows = int(len(b))
     current_km = float(b["dist_km"].sum())
-    current_t = float(b["kg_co2"].sum() / 1000.0)
+    current_t = float(gross.sum() / 1000.0)
 
-    # Current physical-trip口径: first row per physical key, current factors
-    first = b.drop_duplicates(KEYS, keep="first").copy()
-    physical_trips = int(len(first))
-    physical_km = float(first["dist_km"].sum())
-    physical_t = float(first["kg_co2"].sum() / 1000.0)
-
-    # Our own VSP physical track (same physical trips; no HYC factors)
-    vsp_t = float(first["kg_co2_phys"].sum() / 1000.0)
-    vsp_all_t = float(b["kg_co2_phys"].sum() / 1000.0)
+    # Current physical-trip口径. New baseline is allocated per association,
+    # so aggregate by trip_id; old baseline falls back to first-row dedupe.
+    if "trip_id" in b.columns:
+        trip_legal = b.groupby("trip_id", dropna=False)["kg_co2"].sum()
+        trip_vsp = b.groupby("trip_id", dropna=False)["kg_co2_phys"].sum()
+        trip_km = b.groupby("trip_id", dropna=False)["trip_km"].first()
+        physical_trips = int(b["trip_id"].nunique())
+        physical_km = float(trip_km.sum())
+        physical_t = float(trip_legal.sum() / 1000.0)
+        vsp_t = float(trip_vsp.sum() / 1000.0)
+        first = b.drop_duplicates(KEYS, keep="first").copy()
+    else:
+        first = b.drop_duplicates(KEYS, keep="first").copy()
+        physical_trips = int(len(first))
+        physical_km = float(first["dist_km"].sum())
+        physical_t = float(first["kg_co2"].sum() / 1000.0)
+        vsp_t = float(first["kg_co2_phys"].sum() / 1000.0)
+    vsp_all_t = float((b["kg_co2_phys_gross"] if "kg_co2_phys_gross" in b.columns else b["kg_co2_phys"]).sum() / 1000.0)
 
     # HYC physical口径
     hyc_trips = int(len(h))
@@ -115,14 +125,14 @@ def build(src: Path = DEFAULT_SRC, out: Path = PROCESSED) -> dict:
     month_rows = []
     for m in [1, 2, 3, 11, 12]:
         cm = b[b["month"] == m]
-        pm = first[first["month"] == m]
         hm = h[h["month"] == f"2023-{m:02d}"]
+        cm_gross = cm["kg_co2_gross"] if "kg_co2_gross" in cm.columns else cm["kg_co2"]
         month_rows.append({
             "月份": f"2023-{m:02d}",
             "当前关联行": int(len(cm)),
-            "物理行程": int(len(pm)),
-            "当前关联_t": round(float(cm["kg_co2"].sum() / 1000.0), 2),
-            "物理口径_t": round(float(pm["kg_co2"].sum() / 1000.0), 2),
+            "物理行程": int(cm["trip_id"].nunique()) if "trip_id" in cm.columns else int(len(cm.drop_duplicates(KEYS))),
+            "当前关联_t": round(float(cm_gross.sum() / 1000.0), 2),
+            "物理口径_t": round(float(cm["kg_co2"].sum() / 1000.0), 2),
             "HYC_t": round(float(hm["e_kg"].sum() / 1000.0), 2),
         })
 

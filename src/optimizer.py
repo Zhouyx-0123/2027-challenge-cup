@@ -54,7 +54,8 @@ FACTOR_ANCHORS = np.array([394.56, 544.752, 759.24, 1055.952, 1374.672, 1581.84]
 
 # 2023 基准因子表（来自《2023年基准碳排放计算结果.xlsx》路段明细）：
 #   class 1（轻）统一 394.56；class 2 按 10/12/18/25 t；class 3 按 30/32/35/38/40/45/49 t。
-# 这是 E₀=4,502,042.41 的对拍口径；factor_lookup 仍保留为未知车型/演示数据的兜底。
+# 这是关联毛值 4,502,042.41 kg 的因子口径；物理主账按 12,167 趟首行因子得 2,258,438.38 kg。
+# factor_lookup 仍保留为未知车型/演示数据的兜底。
 FACTOR_BY_CLASS_LOAD: Dict[Tuple[int, float], float] = {
     (1, 1.0): 394.560000,
     (1, 1.5): 394.560000,
@@ -174,6 +175,40 @@ def compute_baseline(wide: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def allocate_physical_baseline(df: pd.DataFrame) -> pd.DataFrame:
+    """Physical-trip allocation layer.
+
+    Keep 33,214 waybill associations for traceability, but make their kg_co2 sum
+    to the 12,167-trip physical total (legal), and kg_co2_phys sum to VSP total.
+    Gross per-association values are preserved in kg_co2_gross / kg_co2_phys_gross.
+    """
+    out = df.copy()
+    out["_plate_s"] = out["plate"].astype(str).str.strip()
+    out["_dist_s"] = pd.to_numeric(out["dist_km"], errors="coerce").round(2)
+    out["_dep_s"] = pd.to_datetime(out["depart_ts"], errors="coerce").astype("string")
+    out["_arr_s"] = pd.to_datetime(out["arrive_ts"], errors="coerce").astype("string")
+    out["_o_s"] = out["dep_site"].astype(str).str.strip()
+    out["_d_s"] = out["arr_site"].astype(str).str.strip()
+    key = ["_plate_s", "_dist_s", "_dep_s", "_arr_s", "_o_s", "_d_s"]
+    g = out.groupby(key, dropna=False, sort=False)
+    out["trip_id"] = g.ngroup().astype(int) + 1
+    out["waybill_assoc_count"] = g["kg_co2"].transform("size").astype(int)
+    out["trip_km"] = g["dist_km"].transform("first")
+    out["kg_co2_gross"] = out["kg_co2"].astype(float)
+    out["kg_co2_phys_gross"] = out["kg_co2_phys"].astype(float)
+    trip_legal = g["kg_co2"].transform("first").astype(float)
+    trip_phys = g["kg_co2_phys"].transform("first").astype(float)
+    n = out["waybill_assoc_count"].replace(0, 1)
+    out["allocation_share"] = 1.0 / n
+    out["kg_co2"] = trip_legal / n
+    out["kg_co2_phys"] = trip_phys / n
+    out["delta_pct"] = np.where(out["kg_co2"] > 0,
+                                (out["kg_co2_phys"] - out["kg_co2"]) / out["kg_co2"] * 100.0,
+                                0.0)
+    out["baseline_mode"] = "physical_alloc_v1"
+    out = out.drop(columns=["_plate_s", "_dist_s", "_dep_s", "_arr_s", "_o_s", "_d_s"])
+    return out
+
 def _save_parquet(df: pd.DataFrame, path: Path, tries: int = 4) -> None:
     last: Exception | None = None
     for i in range(tries):
@@ -190,16 +225,18 @@ def build_baseline() -> pd.DataFrame:
     if not WIDE_PATH.exists():
         raise FileNotFoundError("缺少 data/processed/wide_data.parquet，请先跑 preprocess")
     wide = pd.read_parquet(WIDE_PATH)
-    out = compute_baseline(wide)
+    out = allocate_physical_baseline(compute_baseline(wide))
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     _save_parquet(out, BASELINE_PATH)
 
     total_t = float(out["kg_co2"].sum()) / 1000.0
-    total_km = float(out["dist_km"].sum())
+    gross_t = float(out["kg_co2_gross"].sum()) / 1000.0
+    total_km = float(out.drop_duplicates("trip_id")["trip_km"].sum())
     med = float(out["delta_pct"].median()) if len(out) else 0.0
-    print("  [O4] 段级碳排落盘：%s（%d 段）" % (BASELINE_PATH.name, len(out)))
-    print("       E0 = %s tCO2e | 总里程 = %s km | 双轨偏差中位 = %+.2f%%"
-          % (format(total_t, ",.2f"), format(total_km, ",.2f"), med))
+    print("  [O4] 段级碳排落盘：%s（%d 条关联 / %d 趟）"
+          % (BASELINE_PATH.name, len(out), int(out["trip_id"].nunique())))
+    print("       法定物理 E0 = %s tCO2e | 运单关联毛值 = %s t | 总里程 = %s km | 双轨偏差中位 = %+.2f%%"
+          % (format(total_t, ",.2f"), format(gross_t, ",.2f"), format(total_km, ",.2f"), med))
     print("       因子表版本 %s（%s）" % (FACTOR_VERSION, FACTOR_SOURCE))
 
     by_cls = out.groupby("vclass", as_index=False).agg(
@@ -218,7 +255,7 @@ def build_baseline() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 #
 # 口径分层（docs/23 §6.1）：
-#   L0 基准核算 = 宽表实测里程 × 因子        → E₀ = 4,502,042.41 kg，**永不动**
+#   L0 基准核算 = 物理行程 × 因子             → 主账 E₀ = 2,258,438.38 kg；4,502,042.41 仅关联毛值
 #   L1 路线情景 = 高德路线距离/时长 × 同一因子 → 只做差量分析，不覆盖 E₀
 #   L2 λ 决策   = L1 + 运营成本 + λ          → 回答"λ 一动推荐换不换"
 #

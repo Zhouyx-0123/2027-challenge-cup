@@ -6,7 +6,7 @@
   "annual_factor": 3.0417,
   "limitations": "含 1357 条时间戳异常段（保留计碳）；1935 条口径换算；12 条估算值（前端黄框）；未含制冷、空驶调车、仓储与上游燃料生产；主方案 S5 为逐车组参数化计算（calculation_mode=parameterized、decision_eligible=True；4,809 万 / 500.8 万年节省 / 9.6 年回本 / 77.4% 由段表实时车组复算得出，与底稿标称值一致）；S1–S4/S7 仍为历史标定（legacy_calibration、decision_eligible=False），不可对外称已核验；班次化层 64.2% 里程依赖沿线补能网络（未核实）；75 车型总质量映射为 provisional，复核后 E₀ 会小幅变动并需重跑闸门。",
   "data_source": "real",
-  "e0_t": 4502.042,
+  "e0_t": 2258.438,
   "factor_version": "JCB2023-BASE-v1",
-  "generated_at": "2026-10-22T09:47:42"
+  "generated_at": "2026-10-24T11:13:16"
 }

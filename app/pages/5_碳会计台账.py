@@ -7,7 +7,7 @@
 - kpi.json：E₀、年度化排放、段数、总里程（pipeline 预计算）
 - composition.json：E₀ 构成下钻（月份子集 × 车型大类子集预计算，D4）
 - data_quality.json：源行号可回查率等数据层审计指标
-- baseline_carbon.parquet：33,214 段级明细（追溯终点）
+- baseline_carbon.parquet：33,214 条运单关联（分摊/追溯），归到 12,167 趟物理行程
 
 页面口径：年度化换算（E₀ × 3.0417）的**结果值**由 pipeline 写进 kpi.json，
 第 1 页 E₀ 是数据期口径、不乘；两个口径不能混。
@@ -69,7 +69,7 @@ trace_rate = q.get("trace_rate")
 order_rate = 100.0 * float(q.get("order_match_rate", q.get("match_rate", 1.0)) or 0.0)
 vehicle_rate = 100.0 * float(q.get("vehicle_match_rate", 1.0) or 0.0)
 
-cards.panel_head("数据可追溯", "台账每个数都能回到 33,214 段中的具体一行", "DA · docs/07")
+cards.panel_head("数据可追溯", "台账每个数都能回到 33,214 条关联，再归到 12,167 趟物理行程", "DA · docs/07")
 cards.stats([
     {"label": "台账行", "value": services.fmt(len(led)), "tone": "mint", "sub": "三行结论账"},
     {"label": "源行号可回查", "value": (("%.1f%%" % (100 * trace_rate)) if trace_rate is not None else "—"),
@@ -209,7 +209,7 @@ else:
 cards.trace_chain([
     {"t": "披露数字", "d": "披露六要素中的 E₀ = " + services.fmt(e0_t, 3) + " t（数据期口径）"},
     {"t": "台账行", "d": picked_scheme + " · " + services.fmt(emission, 2) + " tCO₂e"},
-    {"t": "基准 E₀", "d": "33,214 段逐段累加｜总里程 " + services.fmt(k.get("total_km"), 0) + " km",
+    {"t": "基准 E₀", "d": "12,167 趟逐趟核算｜33,214 条关联分摊｜总里程 " + services.fmt(k.get("total_km"), 0) + " km",
      "tone": "amber"},
     {"t": "段级明细", "d": "任取一行都能追到原始运单号 / 车牌 / 封解车时间"},
 ])

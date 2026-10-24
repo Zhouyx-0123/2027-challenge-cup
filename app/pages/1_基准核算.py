@@ -4,7 +4,7 @@
 - kpi.json：总碳 / 总里程 / 段数 / 均速 / 重型占比 / 估算占比（全量锁定口径）
 - hotspots.parquet：车型碳排排行（dimension=车型）
 - data_quality.json：四类 FLAG 计数、源行号可回查率、估算原因拆分
-- gate_report.json：八项对拍目标（本页只展示）
+- gate_report.json：十项对拍目标（本页只展示）
 - baseline_carbon.parquet：段级明细（地图 / 直方图 / 明细表直接画原始列）
 
 页面口径：KPI 与排行榜为**全量锁定口径**，不随本页筛选变化——
@@ -50,7 +50,7 @@ badges = [layout.source_badge(services.source_name()), layout.gate_badge(gate),
           "数据期 2023 · 120 天", "双轨计量"]
 theme.hero(
     "基准核算：碳从哪里来",
-    "逐段计量每一条公路运输，先看清总量、结构与数据的可信度。",
+    "逐趟计量每一条公路运输，先看清总量、结构与数据的可信度。",
     kicker="01 / BASELINE",
     badges=badges,
 )
@@ -90,24 +90,25 @@ est_share_pct = (est_share / k["segments"]) if (est_share is not None and k.get(
 
 layout.kpi_row([
     {"label": "总碳排放（tCO₂e）", "value": services.fmt(k.get("e0_t"), 1),
-     "help": "逐条运单—车辆关联记录累加；同一物理行程可能对应多张运单，非车队物理总排放。全量锁定口径，不随筛选变化"},
-    {"label": "总里程（万 km）", "value": services.fmt((k.get("total_km") or 0) / 10000.0, 1)},
-    {"label": "关联记录数", "value": services.fmt(k.get("segments")),
-     "help": "运单—车辆关联记录；同一物理行程可能对应多张运单，不等于独立行程数"},
-    {"label": "门到门均速（km/h）", "value": services.fmt(k.get("avg_speed"), 2),
-     "help": "有效速度样本均值，口径与闸门一致；>100 km/h 的异常段保留计碳"},
+     "help": "12,167 趟物理行程的法定轨碳排；33,214 条运单关联仅用于分摊/追溯"},
+    {"label": "总里程（万 km）", "value": services.fmt((k.get("total_km") or 0) / 10000.0, 1),
+     "help": "物理行程去重后的总里程"},
+    {"label": "物理行程", "value": services.fmt(k.get("physical_trips")),
+     "help": "12,167 趟；33,214 条运单关联仅供分摊/追溯"},
+    {"label": "物理加权均速（km/h）", "value": services.fmt(k.get("avg_speed"), 2),
+     "help": "总里程 ÷ 总时长；关联口径源均速 49.51 仍作数据质量检查"},
     {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—")},
     {"label": "估算值占比", "value": (("%.2f%%" % (100 * est_share_pct)) if est_share_pct is not None else "—"),
      "help": "黄框标出的行；只填补、不删除"},
 ], per_row=3)
-st.caption("剔除 >100 km/h 的时间戳异常后均速 %s km/h；异常段保留计碳，只影响速度统计。"
-           "KPI 为 pipeline 出口锁定的全量口径（kpi.json），筛选只影响下方地图、"
-           "速度分布与段级明细——避免筛选后的数字与闸门对不上。"
-           % services.fmt(k.get("avg_speed_clean"), 2))
+st.caption("物理加权均速 %s km/h（总里程 ÷ 总时长）；关联口径源均速 %s km/h 对官方 49.57，"
+           "仍作为数据质量检查。KPI 为 pipeline 出口锁定的全量口径（kpi.json），筛选只影响下方地图、"
+           "速度分布与明细——避免筛选后的数字与闸门对不上。"
+           % (services.fmt(k.get("avg_speed"), 2), services.fmt(k.get("source_avg_speed"), 2)))
 
 # ---------------- 对拍口径 ----------------
 st.markdown("")
-layout.section("对拍口径", "闸门在 pipeline 出口自动核对七个数，本页只展示，不重算")
+layout.section("对拍口径", "闸门在 pipeline 出口自动核对十个数，本页只展示，不重算")
 targets = gate.get("targets", []) if gate else []
 if targets:
     tdf = pd.DataFrame(targets)
@@ -123,31 +124,31 @@ if targets:
             "label": "核对项", "stage": "出处", "note": "说明"}),
         title="G2 对拍口径", desc="pipeline 出口锁定，本页只展示", max_rows=20, status_col="判定",
     )
-    st.caption("真实数据八项全过：E₀ 4,502,042.41 kg 精确；均速 49.51 对官方 49.57 在 ±0.1 内。"
-               "演示模式则跳过依赖真数据的五项。")
+    st.caption("真实数据十项全过：法定物理 E₀ 2,258,438.38 kg；物理加权均速 43.14；"
+               "关联口径源均速 49.51 对官方 49.57 在 ±0.1 内。演示模式跳过依赖真数据的项。")
 else:
     st.info("还没有 gate_report.json——运行 python -m src.pipeline 生成。")
 
 # ---------------- 双口径审计（HYC 物理行程） ----------------
-# 这是审计层，不替代 E0：pipeline 的 4,502.04 t 与闸门仍是主口径。
+# 主账已切为法定物理轨 2,258.44 t；4,502.04 仅作运单关联毛值/分摊基数。
 _audit = services.vsp_audit()
 if _audit:
     st.markdown("")
     layout.section(
-        "双口径审计 · 运单关联 vs 物理行程",
-        "HYC 交付的 12,167 趟物理行程审计；不改变本页 E₀ 主口径，也不改闸门",
+        "口径审计 · 物理主账 vs 运单关联毛值",
+        "主账 2,258.44 t；4,502.04 t 仅作关联毛值/分摊基数；VSP 与 HYC 单列对照",
     )
     _cur = _audit.get("current", {})
     _phy = _audit.get("physical_current", {})
     _vsp = _audit.get("vsp", {})
     _hyc = _audit.get("hyc", {})
     cards.stats([
-        {"label": "运单关联口径", "value": services.fmt(_cur.get("t"), 1) + " t",
+        {"label": "运单关联毛值", "value": services.fmt(_cur.get("t"), 1) + " t",
          "sub": "%s 条关联 · %.1f 万 km" % (services.fmt(_cur.get("rows")), (_cur.get("km") or 0) / 10000.0),
-         "tone": "coral", "help": "当前 E₀：逐条运单—车辆关联记录求和"},
-        {"label": "物理行程口径", "value": services.fmt(_phy.get("t"), 1) + " t",
+         "tone": "coral", "help": "仅作分摊基数，不再作为主账 E₀"},
+        {"label": "法定物理主账", "value": services.fmt(_phy.get("t"), 1) + " t",
          "sub": "%s 趟 · %.1f 万 km" % (services.fmt(_phy.get("trips")), (_phy.get("km") or 0) / 10000.0),
-         "tone": "mint", "help": "按物理行程键去重；当前因子表"},
+         "tone": "mint", "help": "12,167 趟 × 当前六档因子；主账 E₀"},
         {"label": "我们的 VSP 物理轨", "value": services.fmt(_vsp.get("t"), 1) + " t",
          "sub": "较法定 %+.1f t (%+.2f%%)" % (
              (_vsp.get("t") or 0) - (_phy.get("t") or 0),
@@ -169,12 +170,11 @@ if _audit:
         )
 
     cards.note(
-        "**审计结论**：33,214 条是**运单—车辆关联记录**，不是 33,214 趟独立行程；"
-        "同一物理行程平均关联 **2.73 条**运单。按物理行程键去重后为 **12,167 趟 / 217.4 万 km**。"
-        "当前因子算得 **2,258.44 t**；我们自己的 VSP 物理轨算得 **2,324.65 t**，比法定轨高 **66.22 t（+2.93%）**。"
-        "HYC 代理因子算得 **2,338.93 t**，只比我们的 VSP 高 **14.28 t（+0.61%）**，但它是固定因子代理，**不是 VSP**。"
-        "净差异 2,163.11 t 仍是 4,502.04−2,338.93：重复计数 **2,243.60 t**、因子映射 **−80.49 t**。"
-        "月份、数据源、行程键均不是差异原因；本区块**不改变 E₀ 4,502.04 t**。"
+        "**主账已切为法定物理轨 2,258.44 t**：12,167 趟、217.4 万 km；33,214 条运单关联仅作分摊/追溯。"
+        "4,502.04 t 是关联毛值，不再作主账；我们自己的 VSP 物理轨为 **2,324.65 t**，比法定高 **66.22 t（+2.93%）**。"
+        "HYC 代理因子为 **2,338.93 t**，只比 VSP 高 **14.28 t（+0.61%）**，但它是固定因子代理，**不是 VSP**。"
+        "四者净差 2,163.11 t：重复计数 **2,243.60 t**、因子映射 **−80.49 t**；月份/数据源/行程键均不是原因。"
+        "G2 闸门已按物理主账、物理行程、物理里程和物理加权均速更新。"
     )
 
     with st.expander("查看物理行程与车型组明细（审计口径）"):

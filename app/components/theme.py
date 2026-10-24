@@ -755,7 +755,7 @@ div[data-testid="stStatusWidget"] * { display: none !important; }
 
 
 PAGES: List[Dict[str, str]] = [
-    {"id": "0", "label": "概览", "href": "/", "path": "app.py"},
+    {"id": "0", "label": "概览", "href": "/概览", "path": "pages/0_概览.py"},
     {"id": "1", "label": "核算", "href": "/基准核算", "path": "pages/1_基准核算.py"},
     {"id": "2", "label": "诊断", "href": "/高排放诊断", "path": "pages/2_高排放诊断.py"},
     {"id": "3", "label": "方案", "href": "/替代方案", "path": "pages/3_替代方案.py"},
@@ -901,13 +901,6 @@ def top_nav(current: str = "", source_name: str = "", gate: Optional[Dict[str, A
         with c_links:
             with st.container(horizontal=True, gap="small", key="cm_nav_row"):
                 for item in PAGES:
-                    if item["id"] == "0":
-                        cls = "cm-nav-link on" if current == "0" else "cm-nav-link"
-                        st.markdown(
-                            "<a class='" + cls + "' href='/' target='_top'>概览</a>",
-                            unsafe_allow_html=True,
-                        )
-                        continue
                     try:
                         st.page_link(
                             item["path"],

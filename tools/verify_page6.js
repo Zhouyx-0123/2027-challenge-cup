@@ -10,7 +10,7 @@
  *   2. 三个模式按钮都能点开；
  *   3. 模式② 里 OpenLayers 真的画出路线（iframe 内）；
  *   4. 模式③ 对照表有数据、且写着「不是同一口径」；
- *   5. 顶部没有多出第 9 页导航（8 页结构不变）。
+ *   5. 顶部导航仍是 9 个入口（概览 + 8 个模块）。
  */
 const { chromium } = require('playwright-core');
 const path = require('path');
@@ -63,7 +63,7 @@ const shotDir = process.argv[4] || 'outputs/figures';
   result.currentUrl = page.url();
   await page.waitForTimeout(3000);
 
-  // 1) 顶部导航：必须还是 8 页
+  // 1) 顶部导航：概览 + 8 个模块 = 9 个入口
   //    同一个页面在 DOM 里有三种 URL 形态（绝对 URL / 相对路径 / 百分号编码），
   //    先归一化成"中文路径名"再去重，否则会数出 25 个。
   const nav = await page.evaluate(() => {
@@ -216,7 +216,7 @@ const shotDir = process.argv[4] || 'outputs/figures';
   await browser.close();
 
   const fail = [];
-  if (result.navCount !== 8) fail.push('顶部导航页数异常: ' + result.navCount + ' (应为 8)');
+  if (result.navCount !== 9) fail.push('顶部导航页数异常: ' + result.navCount + ' (应为 9)');
   if (result.tabLabels.length < 3) fail.push('三个 Tab 未齐: ' + JSON.stringify(result.tabLabels));
   if (!result.tab1_has_od) fail.push('Tab① 缺共用 OD 选择器');
   if (!result.tab2_has_disclaimer) fail.push('Tab② 缺「非实时/固定因子/proxy」声明');
@@ -253,5 +253,5 @@ const shotDir = process.argv[4] || 'outputs/figures';
     console.error('\n验证失败:\n- ' + fail.join('\n- '));
     process.exit(1);
   }
-  console.error('\n验证通过：三个 Tab 均正常，OSM 地图已渲染，对照表齐全，顶部导航仍为 8 页。');
+  console.error('\n验证通过：三个 Tab 均正常，OSM 地图已渲染，对照表齐全，顶部导航为 9 个入口。');
 })();

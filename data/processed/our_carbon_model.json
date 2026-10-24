@@ -1,0 +1,72 @@
+{
+  "model_version": "CM-2026.10-v1",
+  "factor_version": "JCB2023-BASE-v1",
+  "vsp_version": "VSP-PROXY-v1",
+  "speed_policy": "door_to_door; <=1 km/h -> 50; clip 1..130",
+  "generated_at": "2026-10-24T10:59:08+08:00",
+  "trips": 12167,
+  "km": 2174173.86,
+  "legal_t": 2258.438,
+  "vsp_t": 2324.654,
+  "vsp_delta_t": 66.216,
+  "vsp_delta_pct": 2.932,
+  "factors": [
+    {
+      "load_t": 4.5,
+      "g_per_km": 394.56
+    },
+    {
+      "load_t": 12.0,
+      "g_per_km": 544.752
+    },
+    {
+      "load_t": 18.0,
+      "g_per_km": 759.24
+    },
+    {
+      "load_t": 30.0,
+      "g_per_km": 1055.952
+    },
+    {
+      "load_t": 40.0,
+      "g_per_km": 1374.672
+    },
+    {
+      "load_t": 45.0,
+      "g_per_km": 1581.84
+    }
+  ],
+  "anchors": {
+    "er30_vsp2": 14.666,
+    "er30_vsp3": 16.5256,
+    "vsp3_dev_pct": 12.68
+  },
+  "vsp_curve": [
+    {
+      "vsp": 0.0,
+      "multiplier": 0.82
+    },
+    {
+      "vsp": 1.0,
+      "multiplier": 0.92
+    },
+    {
+      "vsp": 2.0,
+      "multiplier": 1.0
+    },
+    {
+      "vsp": 3.0,
+      "multiplier": 1.1268
+    },
+    {
+      "vsp": 4.0,
+      "multiplier": 1.24
+    }
+  ],
+  "notes": [
+    "legal_t = physical trips x representative factor / 1000",
+    "vsp_t = speed -> VSP -> ER x travel time; not fuel measurement",
+    "speed is door-to-door and includes waiting/loading; see speed_policy",
+    "HYC 2,338.93 t is a proxy-factor package, not this model"
+  ]
+}

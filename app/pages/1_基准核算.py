@@ -90,9 +90,10 @@ est_share_pct = (est_share / k["segments"]) if (est_share is not None and k.get(
 
 layout.kpi_row([
     {"label": "总碳排放（tCO₂e）", "value": services.fmt(k.get("e0_t"), 1),
-     "help": "段级碳排逐段累加；重复行已剔除。全量锁定口径，不随筛选变化"},
+     "help": "逐条运单—车辆关联记录累加；同一物理行程可能对应多张运单，非车队物理总排放。全量锁定口径，不随筛选变化"},
     {"label": "总里程（万 km）", "value": services.fmt((k.get("total_km") or 0) / 10000.0, 1)},
-    {"label": "运输段数", "value": services.fmt(k.get("segments"))},
+    {"label": "关联记录数", "value": services.fmt(k.get("segments")),
+     "help": "运单—车辆关联记录；同一物理行程可能对应多张运单，不等于独立行程数"},
     {"label": "门到门均速（km/h）", "value": services.fmt(k.get("avg_speed"), 2),
      "help": "有效速度样本均值，口径与闸门一致；>100 km/h 的异常段保留计碳"},
     {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—")},
@@ -111,6 +112,8 @@ targets = gate.get("targets", []) if gate else []
 if targets:
     tdf = pd.DataFrame(targets)
     tdf["判定"] = tdf["status"]
+    tdf["label"] = tdf["label"].replace({"独立路段数": "运单—车辆关联记录"})
+    tdf.loc[tdf["label"].eq("运单—车辆关联记录"), "unit"] = "条"
     tdf["目标"] = tdf.apply(lambda r: services.fmt(r["expected"], 2) + " " + str(r["unit"]), axis=1)
     tdf["实测"] = tdf.apply(
         lambda r: ("—" if r["actual"] is None else services.fmt(r["actual"], 2)) + " " + str(r["unit"]),
@@ -124,6 +127,72 @@ if targets:
                "演示模式则跳过依赖真数据的五项。")
 else:
     st.info("还没有 gate_report.json——运行 python -m src.pipeline 生成。")
+
+# ---------------- 双口径审计（HYC 物理行程） ----------------
+# 这是审计层，不替代 E0：pipeline 的 4,502.04 t 与闸门仍是主口径。
+_audit = services.vsp_audit()
+if _audit:
+    st.markdown("")
+    layout.section(
+        "双口径审计 · 运单关联 vs 物理行程",
+        "HYC 交付的 12,167 趟物理行程审计；不改变本页 E₀ 主口径，也不改闸门",
+    )
+    _cur = _audit.get("current", {})
+    _phy = _audit.get("physical_current", {})
+    _hyc = _audit.get("hyc", {})
+    cards.stats([
+        {"label": "运单关联口径", "value": services.fmt(_cur.get("t"), 1) + " t",
+         "sub": "%s 条关联 · %.1f 万 km" % (services.fmt(_cur.get("rows")), (_cur.get("km") or 0) / 10000.0),
+         "tone": "coral", "help": "当前 E₀：逐条运单—车辆关联记录求和"},
+        {"label": "物理行程口径", "value": services.fmt(_phy.get("t"), 1) + " t",
+         "sub": "%s 趟 · %.1f 万 km" % (services.fmt(_phy.get("trips")), (_phy.get("km") or 0) / 10000.0),
+         "tone": "mint", "help": "按物理行程键去重；当前因子表"},
+        {"label": "HYC 代理口径", "value": services.fmt(_hyc.get("t"), 1) + " t",
+         "sub": "较物理 %+.1f t" % ((_hyc.get("t") or 0) - (_phy.get("t") or 0)),
+         "tone": "amber", "help": "HYC 车型代理因子；不是 VSP 精度提升"},
+        {"label": "净差异", "value": services.fmt(_audit.get("net_delta_t"), 1) + " t",
+         "sub": "重复 %+.1f t / 因子 %+.1f t" % (
+             _audit.get("duplicate_effect_t") or 0, _audit.get("factor_effect_t") or 0),
+         "tone": "warn", "help": "4,502.04 − 2,338.93；重复计数为主因"},
+    ], cols=4)
+
+    _rec = pd.DataFrame(_audit.get("reconciliation", []))
+    if not _rec.empty:
+        cards.data_table(
+            _rec, title="四口径对照",
+            desc="同一批数据、不同统计单元；差异不是数据错误",
+            max_rows=6, numeric=["记录数", "里程_km", "碳排_t"],
+        )
+
+    cards.note(
+        "**审计结论**：33,214 条是**运单—车辆关联记录**，不是 33,214 趟独立行程；"
+        "同一物理行程平均关联 **2.73 条**运单。按物理行程键去重后为 **12,167 趟 / 217.4 万 km**。"
+        "当前因子算得 **2,258.44 t**；HYC 代理因子算得 **2,338.93 t**，差的 **80.49 t** "
+        "来自 40 t/45 t 车型代理映射，**不是 VSP 精度提升**。"
+        "月份、数据源、行程键均不是差异原因；本区块**不改变 E₀ 4,502.04 t**。"
+    )
+
+    with st.expander("查看物理行程与车型组明细（审计口径）"):
+        _grp = services.vsp_vehicle_groups()
+        if not _grp.empty:
+            cards.data_table(
+                _grp, title="HYC 车型组汇总",
+                desc="按 HYC 代表因子组汇总；代理映射，不是逐车实测",
+                max_rows=8, numeric=["物理行程", "里程_km", "碳排_kg", "平均因子_g_km", "碳排占比_pct"],
+            )
+        _trips = services.vsp_physical_trips()
+        if not _trips.empty:
+            cards.data_table(
+                _trips.head(30), title="物理行程明细（前 30 行）",
+                desc="已去除车牌/运单/客户；完整 12,167 行可下载",
+                max_rows=30, numeric=["distance_km", "ef_g_km", "carbon_kg", "carbon_t"],
+            )
+            st.download_button(
+                "下载物理行程审计 CSV（12,167 行）",
+                data=_trips.to_csv(index=False).encode("utf-8-sig"),
+                file_name="vsp_physical_trips_audit.csv", mime="text/csv",
+                width="stretch",
+            )
 
 # ---------------- 地图 ----------------
 st.markdown("")

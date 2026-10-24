@@ -62,6 +62,10 @@ RESULT_FILES: Dict[str, str] = {
     # 上海—北京 OSM 碳基线（docs/35 D2/D3）：非实时 · 固定因子 · 道路等级 proxy
     "route_baseline_steps": "route_baseline_sh_bj_steps.parquet",
     "route_baseline_summary": "route_baseline_sh_bj_summary.json",
+    # HYC 物理行程审计（docs/39）：只读审计层，不替代 E0 主口径
+    "vsp_audit": "vsp_audit.json",
+    "vsp_physical_trips": "vsp_physical_trips.parquet",
+    "vsp_vehicle_groups": "vsp_vehicle_groups.parquet",
 }
 
 # --------------------------------------------------------------------------

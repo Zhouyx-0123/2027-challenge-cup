@@ -407,6 +407,28 @@ def route_baseline_available() -> bool:
     return not route_baseline_steps().empty
 
 
+# ---------------- HYC 物理行程审计（docs/39，只读，不替代 E0） ----------------
+
+def vsp_audit() -> Dict[str, Any]:
+    """物理行程审计汇总 vsp_audit.json。缺失返回 {}。"""
+    return _read_json(RESULT_FILES["vsp_audit"])
+
+
+def vsp_physical_trips() -> pd.DataFrame:
+    """12,167 条物理行程（已去车牌/运单/客户），供审计表与下载。"""
+    return _read_parquet(RESULT_FILES["vsp_physical_trips"])
+
+
+def vsp_vehicle_groups() -> pd.DataFrame:
+    """HYC 车型组汇总（6 组），供审计下钻。"""
+    return _read_parquet(RESULT_FILES["vsp_vehicle_groups"])
+
+
+def vsp_available() -> bool:
+    """审计层是否就绪；旧数据目录没有这三张表时页面自动隐藏。"""
+    return bool(vsp_audit()) and not vsp_physical_trips().empty
+
+
 @st.cache_data(show_spinner=False)
 def route_lab_rows() -> pd.DataFrame:
     """路线实验室的展示表：route_od 的几何/端点 + route_select 的碳账与推荐车型。

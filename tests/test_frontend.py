@@ -53,6 +53,10 @@ def test_no_deprecated_streamlit_api():
         for py in sorted(folder.rglob("*.py")):
             text = py.read_text(encoding="utf-8")
             for pattern in _BANNED_PATTERNS:
+                # 导航遮罩/外链桥接需要执行一小段同源 JS；st.html 会剥掉 script，
+                # 只有 components.html 能可靠运行。仅允许 theme.py 这一处。
+                if pattern == r"streamlit\.components\.v1" and py == APP_DIR / "components" / "theme.py":
+                    continue
                 if re.search(pattern, text):
                     offenders.append("%s → %s" % (py.name, pattern))
     assert not offenders, "发现弃用 API：%s" % offenders

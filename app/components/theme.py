@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import quote, urlencode
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 CSS = """
 <style>
@@ -811,7 +812,27 @@ SCROLL_RESET_JS = """
       return h ? (h.innerText || '').replace(/\\s+/g, ' ').trim() : '';
     }
 
+    function normHref(h) {
+      var s = (h || '').split('#')[0].split('?')[0];
+      try { s = decodeURIComponent(s); } catch(e) {}
+      if (s.indexOf(p.location.origin) === 0) s = s.slice(p.location.origin.length);
+      while (s.charAt(0) === '/') s = s.slice(1);
+      return s;
+    }
+
+    function pageLinkFor(href) {
+      var target = normHref(href);
+      if (!target) return null;
+      var links = doc.querySelectorAll('a[data-testid="stPageLink-NavLink"]');
+      for (var i = 0; i < links.length; i++) {
+        if (links[i].getAttribute('aria-disabled') === 'true') continue;
+        if (normHref(links[i].getAttribute('href')) === target) return links[i];
+      }
+      return null;
+    }
+
     doc.addEventListener('click', function(e){
+      if (p.__cmBridging) return;
       var a = e.target && e.target.closest
         ? e.target.closest('a[data-testid="stPageLink-NavLink"], a.cm-nav-link, a.cm-btn, a.cm-bento-card')
         : null;
@@ -833,6 +854,19 @@ SCROLL_RESET_JS = """
       });
       observer.observe(body, {childList: true, subtree: true});
       setTimeout(hideVeil, 5000);
+
+      // 首页卡片/CTA 是纯 <a>：桥接到顶栏同目标的 st.page_link，
+      // 走客户端路由，避免 target=_top 全量刷新。
+      if (a.getAttribute('data-testid') !== 'stPageLink-NavLink') {
+        var bridge = pageLinkFor(a.getAttribute('href'));
+        if (bridge) {
+          e.preventDefault();
+          e.stopPropagation();
+          p.__cmBridging = true;
+          bridge.click();
+          p.__cmBridging = false;
+        }
+      }
     }, true);
 
     p.addEventListener('pageshow', function(){ hideVeil(); });
@@ -851,7 +885,7 @@ def inject() -> None:
     """
     st.markdown(CSS, unsafe_allow_html=True)
     try:
-        st.html(SCROLL_RESET_JS, unsafe_allow_javascript=True)
+        components.html(SCROLL_RESET_JS, height=0, width=0, scrolling=False)
     except Exception:
         pass
 

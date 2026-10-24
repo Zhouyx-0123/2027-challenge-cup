@@ -767,6 +767,26 @@ PAGES: List[Dict[str, str]] = [
 ]
 
 
+SCROLL_RESET_JS = """
+<script>
+(function(){
+  var p = window.parent;
+  try {
+    var main = p.document.querySelector('[data-testid=\"stMain\"]');
+    var path = p.location.pathname;
+    var last = null;
+    try { last = p.sessionStorage.getItem('cm_last_path'); } catch(e) {}
+    if (last !== path) {
+      if (main) main.scrollTop = 0;
+      try { p.scrollTo(0, 0); } catch(e) {}
+      try { p.sessionStorage.setItem('cm_last_path', path); } catch(e) {}
+    }
+  } catch(e) {}
+})();
+</script>
+"""
+
+
 def inject() -> None:
     """注入全局样式。
 
@@ -775,6 +795,10 @@ def inject() -> None:
     重新注入的成本很低，稳定优先。
     """
     st.markdown(CSS, unsafe_allow_html=True)
+    try:
+        st.html(SCROLL_RESET_JS, unsafe_allow_javascript=True)
+    except Exception:
+        pass
 
 
 def _esc(value: Any) -> str:

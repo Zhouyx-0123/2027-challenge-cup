@@ -35,8 +35,8 @@ import pandas as pd
 import streamlit as st
 
 import services
-from components import (amapview, baseline_compare, baseline_map, cards,
-                       layout, mapview, olmapview, theme)
+from components import (amapview, baseline_compare, baseline_map, basemap_align,
+                       cards, layout, mapview, olmapview, route_visual, theme)
 
 layout.setup("6 路线实验室")
 src = services.source()
@@ -89,35 +89,49 @@ cards.chips([
 ], tones=["mint", "mint", "skip", "info", "mint" if n_cand_od else "warn",
           "mint" if base_ready else "warn", "warn"])
 
+# ---------------------------------------------------------------- 三模式
+# 先选模式，再决定 OD 控件：基线是固定试点，不能继续显示一条无关的实时 OD。
+_modes = ["① 实时路线 · 高德", "② 碳核算基线 · OSM", "③ 对照"]
+mode = st.segmented_control(
+    "路线模式", _modes, default=_modes[0],
+    label_visibility="collapsed", key="p6_mode",
+) or _modes[0]
+
 # ---------------------------------------------------------------- 共用选择器
-# 三个模式共用 OD / 车型 / 载重：选一次就行，交互最顺。
+# 实时/对照共用 OD；基线固定试点，只读展示，避免"选广州、画北京"的误导。
 layout.section(
     "共用选择器 · OD / 车型 / 载重",
-    "三个模式共用同一组选择。OSM 基线当前是上海车墩→北京通州试点，"
-    "其余 OD 待扩展；车型与载重在基线侧固定为 30 t 牵引车 / 30 t。",
+    "实时与对照模式共用 OD；OSM 基线当前固定为上海车墩→北京通州试点。"
+    "车型与载重在基线侧固定为 30 t 牵引车 / 30 t。",
 )
 
-_od_options = []
-for _, r in rows.iterrows():
-    _od_options.append("%s → %s（%.0f km）" % (
-        str(r.get("origin", "")), str(r.get("dest", "")),
-        float(r.get("distance_km") or 0.0)))
-
 _sel_cols = st.columns([2.2, 1.1, 1.1])
+picked_row = None
 with _sel_cols[0]:
-    picked_label = st.selectbox("OD（网点级）", _od_options, index=0, key="p6_od")
+    if mode == _modes[1]:
+        st.text_input(
+            "OD（基线试点，固定）",
+            "上海车墩集货分拣中心 → 北京通州分拣中心",
+            disabled=True,
+        )
+    else:
+        _od_options = []
+        for _, r in rows.iterrows():
+            _od_options.append("%s → %s（%.0f km）" % (
+                str(r.get("origin", "")), str(r.get("dest", "")),
+                float(r.get("distance_km") or 0.0)))
+        picked_label = st.selectbox("OD（网点级）", _od_options, index=0, key="p6_od")
+        picked_row = rows.iloc[_od_options.index(picked_label)]
 with _sel_cols[1]:
     vehicle_label = st.selectbox("车型", ["按路线推荐车型"], index=0, key="p6_vehicle")
 with _sel_cols[2]:
     load_label = st.selectbox("载重", ["按路线载重"], index=0, key="p6_load")
 
-picked_row = rows.iloc[_od_options.index(picked_label)]
-
-# ---------------------------------------------------------------- 三模式
-mode_tabs = st.tabs(["① 实时路线 · 高德", "② 碳核算基线 · OSM", "③ 对照"])
+# 只渲染当前模式：避免 st.tabs 同时挂载高德 iframe + OSM 地图，
+# 切页时旧地图/旧 iframe 残留造成"闪现原界面"。
 
 # ================================================================ 模式 ① 高德
-with mode_tabs[0]:
+if mode == _modes[0]:
     layout.section(
         "实时路线实验室",
         "左侧选线路与策略；右侧路线由高德实时规划。碳账数字来自结果表，浏览器不重算。",
@@ -245,7 +259,7 @@ with mode_tabs[0]:
     )
 
 # ================================================================ 模式 ② OSM 基线
-with mode_tabs[1]:
+elif mode == _modes[1]:
     if not base_ready:
         layout.section("碳核算基线 · OSM", "基线数据还没生成")
         cards.empty_state(
@@ -260,7 +274,7 @@ with mode_tabs[1]:
         layout.section(
             "碳核算基线 · OSM（上海车墩 → 北京通州）",
             "OpenLayers 渲染 OSM/OSRM 路线，按道路等级着色；右侧逐 step 可查"
-            "道路等级、速度、碳排。点击 step 定位。",
+            "道路等级、速度、碳排。点击 step 定位，鼠标悬停路线可看该段详情。",
         )
 
         # 顶部声明条（组件内已渲染）+ 页面侧再声明一次，双重保险
@@ -272,23 +286,35 @@ with mode_tabs[1]:
             "© OpenStreetMap contributors",
         ], tones=["warn", "warn", "coral", "warn", "skip"])
 
-        # 底图：天地图 WMTS（CGCS2000，与 OSM 的 WGS-84 同基准，叠加零偏移）
+        # 底图：有天地图 token 用天地图（CGCS2000，原生对齐）；
+        # 没有就用高德栅格（GCJ-02，服务端已把几何转成 GCJ-02 对齐）。
+        # 两种都是国内持牌服务，都不会出现"线偏在路边"的错位。
         token = olmapview.load_tianditu_token()
-        layers = olmapview.default_tianditu_layers(token) if token else []
-        if not token:
-            st.info(
-                "未配置天地图 token（config/tianditu_token.txt）：当前只渲染路线矢量，"
-                "无底图参照。填入 token 后刷新即出现天地图底图。"
-                "**注意：这里不能用高德底图**——高德是 GCJ-02，OSM 是 WGS-84，"
-                "叠加会偏 500–800 m。")
+        layers: list = []
+        if token:
+            layers.extend(olmapview.default_tianditu_layers(token))
+        else:
+            layers.append(basemap_align.amap_xyz_layer())
 
         payload = baseline_map.build_baseline_payload(base_steps, base_summary, layers=layers)
         olmapview.render(
             payload,
             height=780,
             title="碳基线 · OSM 路线（OpenLayers）",
-            fallback_note=("未配置天地图 token" if not token else
-                           "底图：WMS / WMTS 服务加载（OpenLayers）"),
+            fallback_note=("底图：高德栅格（GCJ-02，已做基准对齐）" if not token else
+                           "底图：天地图 WMTS（CGCS2000，零偏移）"),
+        )
+        cards.note(
+            "**底图与坐标基准**："
+            + ("当前用**天地图 WMTS**（CGCS2000，与 OSM 的 WGS-84 差 &lt; 1 m），"
+               "路线几何原样绘制。"
+               if token else
+               "当前用**高德栅格**（GCJ-02）。路线几何来自 OSM（WGS-84），"
+               "已在服务端转成 GCJ-02 后再下发，**与底图对齐，不存在偏移**。"
+               "转换只改坐标，**距离/时长/碳排数值一个字节都没动**。")
+            + "右上角可切换底图。",
+            sub="底图只是参照物，路线与全部指标仍然来自 OSM/OSRM —— "
+                "与上方「① 实时路线 · 高德」不是同一口径。",
         )
 
         _s = base_summary
@@ -368,7 +394,7 @@ with mode_tabs[1]:
         )
 
 # ================================================================ 模式 ③ 对照
-with mode_tabs[2]:
+else:
     layout.section(
         "对照 · 高德实时 vs OSM 基线",
         "**这不是同一个口径。** 高德是实时规划 + 项目因子表；"

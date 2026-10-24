@@ -7,9 +7,9 @@
  *
  * 验证内容：
  *   1. 页面加载无 JS 错误；
- *   2. 三个 Tab 都能点开；
- *   3. Tab② 里 OpenLayers 真的画出路线（iframe 内）；
- *   4. Tab③ 对照表有数据、且写着「不是同一口径」；
+ *   2. 三个模式按钮都能点开；
+ *   3. 模式② 里 OpenLayers 真的画出路线（iframe 内）；
+ *   4. 模式③ 对照表有数据、且写着「不是同一口径」；
  *   5. 顶部没有多出第 9 页导航（8 页结构不变）。
  */
 const { chromium } = require('playwright-core');
@@ -40,15 +40,16 @@ const shotDir = process.argv[4] || 'outputs/figures';
   // Streamlit 用 websocket 长连接，networkidle 永远不会触发 —— 用 domcontentloaded + 显式等待。
   await page.goto(base + pagePath, { waitUntil: 'domcontentloaded', timeout: 90000 });
 
-  // 等 Streamlit 渲染出 Tab。
-  // 注意：Tab 是**延迟渲染**的 —— 页面先渲染上半部分（含高德 iframe），
-  // Tab 组件才出现。所以这里要轮询等待，不能只等一次。
+  // 等 Streamlit 渲染出模式按钮。
+  // 注意：模式按钮是延迟渲染的 —— 页面先渲染上半部分，按钮才出现。
+  // 第 6 页已经从 st.tabs 改为 segmented_control（只渲染当前模式），
+  // 因此这里用 button[role=radio]，不能再查 stTab。
   const waitStart = Date.now();
   let tabCount = 0;
   let probeError = null;
   while (Date.now() - waitStart < 60000) {
     try {
-      tabCount = await page.evaluate(() => document.querySelectorAll('[data-testid="stTab"]').length);
+      tabCount = await page.evaluate(() => document.querySelectorAll('button[role="radio"]').length);
     } catch (e) {
       probeError = String(e && e.message ? e.message : e);
       tabCount = 0;
@@ -82,11 +83,10 @@ const shotDir = process.argv[4] || 'outputs/figures';
   result.navPages = nav;
   result.navCount = nav.length;
 
-  // 2) 找三个 Tab
-  //    Streamlit 1.56 的 Tab 是 [data-testid="stTab"]（不是 stBaseButton-primary）。
-  //    用 evaluate 直接读，避免 Playwright 的 hasText 在多层子节点上匹配不到。
+  // 2) 找三个模式按钮
+  //    st.segmented_control 渲染为 button[role=radio]，父级是 stButtonGroup。
   const tabLabels = await page.evaluate(() => {
-    const tabs = Array.from(document.querySelectorAll('[data-testid="stTab"]'));
+    const tabs = Array.from(document.querySelectorAll('button[role="radio"]'));
     return tabs.map((b) => (b.innerText || b.textContent || '').trim()).filter(Boolean);
   });
   result.tabLabels = tabLabels;
@@ -95,13 +95,13 @@ const shotDir = process.argv[4] || 'outputs/figures';
     // 在页面上下文里找并点击，避免 locator 的文本匹配问题
     const clicked = await page.evaluate((pat) => {
       const re = new RegExp(pat);
-      const tabs = Array.from(document.querySelectorAll('[data-testid="stTab"]'));
+      const tabs = Array.from(document.querySelectorAll('button[role="radio"]'));
       const hit = tabs.find((b) => re.test((b.innerText || b.textContent || '').trim()));
       if (!hit) return false;
       hit.click();
       return true;
     }, pattern.source || pattern);
-    if (!clicked) { result.steps.push({ tab: name, ok: false, why: '找不到 Tab' }); return null; }
+    if (!clicked) { result.steps.push({ tab: name, ok: false, why: '找不到模式按钮' }); return null; }
     await page.waitForTimeout(9000);
     await page.screenshot({ path: path.join(shotDir, 'p6_' + name + '.png') });
     const text = await page.evaluate(() => document.body.innerText);
@@ -172,6 +172,22 @@ const shotDir = process.argv[4] || 'outputs/figures';
           foot: document.querySelector('#foot')
             ? document.querySelector('#foot').innerText.replace(/\s+/g, ' ').trim() : null,
           hasOl: typeof ol !== 'undefined',
+          // 底图切换器项数（几何基准标记在 banner 里）
+          switchItems: document.querySelectorAll('#sw-items .it').length,
+          // 起终点 marker：OL 画成 Icon，走的是矢量层的图片样式，
+          // 这里用「起/终」文字标签的数量来判断。
+          markers: (typeof PAYLOAD !== 'undefined' && PAYLOAD.markers)
+            ? PAYLOAD.markers.length : 0,
+          // 里程刻度与道路名标注
+          mileage: (typeof PAYLOAD !== 'undefined' && PAYLOAD.mileage)
+            ? PAYLOAD.mileage.length : 0,
+          roadNames: (typeof PAYLOAD !== 'undefined' && PAYLOAD.roadNames)
+            ? PAYLOAD.roadNames.length : 0,
+          // 图例必须是中文（"labels" 被误用会导致退化���英文）
+          legendIsCn: (function () {
+            var lg = document.querySelector('#legend');
+            return lg ? /高速|国道|省道|城市道路/.test(lg.innerText) : false;
+          })(),
         };
       }).catch(() => null);
       if (r) {
@@ -209,6 +225,25 @@ const shotDir = process.argv[4] || 'outputs/figures';
   if (result.mapInfo && result.mapInfo.listItems < 60) fail.push('地图内逐 step 列表项数异常: ' + result.mapInfo.listItems);
   if (result.mapInfo && !/非实时/.test(result.mapInfo.banner || '')) fail.push('地图声明条缺少「非实时」');
   if (result.mapInfo && !/高速/.test(result.mapInfo.legend || '')) fail.push('地图图例缺少高速项');
+  // 几何基准必须写在声明条上——这是"路线没偏"的唯一可核对凭据。
+  // 缺了它，评审无法判断底图与路线是否对齐（历史上这里偏过 500–800 m）。
+  if (result.mapInfo && !/几何\s*(WGS-?84|GCJ-?02)/i.test(result.mapInfo.banner || '')) {
+    fail.push('地图声明条缺少几何基准标记（WGS-84 / GCJ-02）');
+  }
+  // 底图切换器必须存在：有底图才有地理参照，否则又退化成"一条线悬在黑底上"。
+  if (result.mapInfo && result.mapInfo.switchItems < 1) fail.push('地图缺底图切换器');
+  // 起终点 marker：没有它就不像一张"路线地图"。
+  if (result.mapInfo && result.mapInfo.markers < 2) fail.push('地图缺起终点 marker');
+  // 里程刻度：每 100 km 一个，全长 1190 km → 应有 11 个
+  if (result.mapInfo && result.mapInfo.mileage < 5) {
+    fail.push('地图里程刻度过少: ' + result.mapInfo.mileage);
+  }
+  // 道路名标注
+  if (result.mapInfo && result.mapInfo.roadNames < 5) {
+    fail.push('地图道路名标注过少: ' + result.mapInfo.roadNames);
+  }
+  // 图例必须中文（payload 的 "labels" 被 roadNames 撞名会导致图例退化英文）
+  if (result.mapInfo && !result.mapInfo.legendIsCn) fail.push('地图图例退化成英文');
   if (!result.tab3_has_table) fail.push('Tab③ 缺对照表');
   if (!result.tab3_says_not_same) fail.push('Tab③ 缺「不是同一口径」声明');
   if (errors.length) fail.push('JS 错误: ' + errors.join(' | '));

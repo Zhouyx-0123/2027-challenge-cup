@@ -7,32 +7,35 @@
 （高德实时路线）并存：
 
 * ``amapview``  → 高德 JS API，**实时**路况、贴公路动画、策略切换（**完全保留不动**）
-* ``olmapview``  → OpenLayers，**非实时** OSM/OSRM 基线路线，WMS/WMTS 底图，逐 step 可查
+* ``olmapview``  → OpenLayers，**非实时** OSM/OSRM 基线路线，WMS/WMTS/XYZ 底图，逐 step 可查
 
-底图源为什么按基准分
---------------------
-这是本组件最容易踩的坑，**必须理解再用**：
+底图与坐标基准（**本组件最容易踩的坑，必须理解再用**）
+---------------------------------------------------
+路线几何来自 OSM/OSRM，基准是 **WGS-84**；不同底图基准不同：
 
-=============== =============== ======================================
-底图             数据基准         与 OSM 路线（WGS-84）叠加
-=============== =============== ======================================
-天地图 WMTS      CGCS2000        ✅ 同基准，差异 < 1 m，无可见偏移
-高德栅格/矢量     GCJ-02          ❌ 差 500–800 m，路线会明显错位
-=============== =============== ======================================
+=============== ============== ==========================================
+底图             数据基准         怎么处理
+=============== ============== ==========================================
+天地图 WMTS      CGCS2000        直接叠，差 < 1 m，无可见偏移
+高德栅格 XYZ     GCJ-02          **必须**先把几何转成 GCJ-02（否则偏 500–800 m）
+=============== ============== ==========================================
 
-所以：**基线模式默认用天地图 WMTS**。高德底图只能配在"高德实时"那一侧。
+关键：**不是"不能用高德底图"，而是"用之前必须先对齐基准"**。
+转换由服务端在 :mod:`app.components.basemap_align` 完成，
+**只改坐标不改数值**——距离/时长/碳排一个字节都不动。
+详见该模块 docstring。
 
 合规
 ----
 按国内地图数据规范，底图只使用**持牌服务**：天地图 / 高德 / 百度 / 腾讯。
-默认配置写天地图 WMTS（需 token，占位符模式），
-**不内置任何可用 key**；token 由服务端读取后注入 HTML，不进版本库。
+默认配置写天地图 WMTS（需 token，占位符模式）；
+若未配置 token，则退到**高德栅格**（公开端点，无需 key）。
 
 断网与缺 token
 --------------
 答辩现场可能断网。本组件的三条纪律（对齐 amapview）：
 
-1. **缺 token / 加载失败 → 不留灰块**，在 iframe 内显示可读提示；
+1. **缺底图 → 不留灰块**，在 iframe 内显示可读提示；
 2. **路线矢量永远画得出来**——它来自本地 parquet，不依赖网络；
 3. **key 只在服务端拼 HTML 时注入**，不出现在任何前端源码与文档里。
 
@@ -90,7 +93,7 @@ ROAD_LABELS: Dict[str, str] = {
 def load_tianditu_token() -> str:
     """读天地图 token；未配置或仍是占位符时返回空串。
 
-    空串 = 不可用 = 组件回退"无底图矢量模式"，**不是错误**。
+    空串 = 不可用 = 组件回退"高德栅格底图"，**不是错误**。
     """
     if not TIANDITU_TOKEN_PATH.exists():
         return ""
@@ -123,6 +126,8 @@ def build_layer_config(layers: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]
             "visible": bool(layer.get("visible", True)),
             "opacity": float(layer.get("opacity", 1.0)),
         }
+        if layer.get("attribution"):
+            item["attribution"] = str(layer["attribution"])
         if kind == "wms":
             item["layers"] = str(layer.get("layers", ""))
             item["format"] = str(layer.get("format", "image/png"))
@@ -175,7 +180,9 @@ def build_payload(features: Sequence[Dict[str, Any]],
                   layers: Sequence[Dict[str, Any]],
                   center: Sequence[float],
                   zoom: float = 6.0,
-                  attribution: str = "") -> Dict[str, Any]:
+                  attribution: str = "",
+                  geom_crs: str = "wgs84",
+                  markers: Optional[Sequence[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """组装前端 payload（只放展示数据，不放任何 key）。"""
     return {
         "features": list(features),
@@ -185,6 +192,8 @@ def build_payload(features: Sequence[Dict[str, Any]],
         "attribution": attribution,
         "colors": ROAD_COLORS,
         "labels": ROAD_LABELS,
+        "geomCrs": geom_crs,
+        "markers": list(markers or []),
     }
 
 
@@ -209,6 +218,14 @@ _TEMPLATE = r"""<!DOCTYPE html>
   html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--sans)}
   #wrap{position:relative;height:__HEIGHT__px;width:100%;overflow:hidden;background:var(--bg)}
   #map{position:absolute;inset:0;background:var(--bg)}
+  /* 暗色化：只对**底图瓦片层**反相，矢量层不受影响。
+     关键：不能写成 `#map.darkmode .ol-layer canvas`——那会连矢量层一起反相，
+     路线颜色（橙/青/紫）被 invert 后全部失真，整条线看起来发白。
+     本项目实测踩过：修正后路线才恢复成等级本色。
+     底图层用 className 单独标记（ol.layer.Base 的 className 选项）。 */
+  #map.darkmode .basemap-tile canvas{
+    filter:invert(1) hue-rotate(180deg) brightness(.88) contrast(1.22) saturate(.78);
+  }
   /* 断网/无底图时的可读提示，绝不留灰块 */
   #fallback{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
     justify-content:center;gap:10px;padding:24px;text-align:center;
@@ -227,15 +244,27 @@ _TEMPLATE = r"""<!DOCTYPE html>
     color:var(--muted);background:rgba(255,255,255,.03)}
   #banner .chip.warn{color:var(--amber);border-color:rgba(245,200,107,.34);background:rgba(245,200,107,.07)}
   #banner .chip.coral{color:var(--coral);border-color:rgba(255,138,91,.34);background:rgba(255,138,91,.07)}
+  /* 底图切换器 */
+  #switch{position:absolute;right:12px;top:46px;z-index:22;background:var(--panel);
+    border:1px solid var(--line);border-radius:8px;overflow:hidden;backdrop-filter:blur(7px);max-width:210px}
+  #switch .hd{padding:7px 11px;font-size:10px;color:var(--muted);border-bottom:1px solid var(--line);
+    letter-spacing:.06em}
+  #switch .it{padding:6px 11px;font-size:11px;cursor:pointer;display:flex;gap:7px;align-items:center;
+    color:var(--text);transition:background .12s}
+  #switch .it:hover{background:rgba(255,255,255,.06)}
+  #switch .it.on{color:var(--mint);background:rgba(45,212,167,.10)}
+  #switch .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;opacity:.5}
+  #switch .it.on .dot{opacity:1}
+  #switch .crs{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--muted)}
   /* 图例 */
   #legend{position:absolute;left:14px;bottom:14px;z-index:20;background:var(--panel);
     border:1px solid var(--line);border-radius:9px;padding:10px 12px;backdrop-filter:blur(7px);
-    min-width:132px}
+    min-width:140px}
   #legend .h{font-size:10px;color:var(--muted);margin-bottom:7px;letter-spacing:.08em}
   #legend .row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text);
     margin:4px 0;cursor:pointer;user-select:none}
   #legend .row.off{opacity:.35}
-  #legend .sw{width:16px;height:3px;border-radius:2px;flex:none}
+  #legend .sw{width:20px;height:3px;border-radius:2px;flex:none}
   #legend .pc{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--muted)}
   /* 右侧 step 列表 */
   #side{position:absolute;right:0;top:38px;bottom:0;width:318px;z-index:15;
@@ -257,8 +286,13 @@ _TEMPLATE = r"""<!DOCTYPE html>
   #side .foot{padding:9px 14px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);
     line-height:1.6}
   #side .foot b{color:var(--text);font-weight:600}
+  /* 悬浮提示 */
+  #tip{position:absolute;z-index:30;display:none;pointer-events:none;background:rgba(8,12,17,.96);
+    border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:11px;max-width:250px;
+    box-shadow:0 8px 24px rgba(0,0,0,.55)}
+  #tip .n{font-weight:600;margin-bottom:4px;color:var(--text)}
+  #tip .r{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.65}
   .ol-zoom{top:auto!important;bottom:auto!important}
-  /* 高德底图模式下隐藏 OL 自带 attribution 位置冲突 */
   .ol-attribution{font-size:9px!important;background:rgba(8,12,17,.7)!important;color:#8A97A6!important}
   .ol-attribution button{color:#8A97A6!important}
   @media (max-width:900px){ #side{width:260px} }
@@ -273,7 +307,9 @@ _TEMPLATE = r"""<!DOCTYPE html>
     <span class="chip warn">固定因子 fixed_50</span>
     <span class="chip coral">道路等级 = proxy</span>
     <span class="chip">OSM/OSRM · 非高德口径</span>
+    <span class="chip" id="crs-chip">几何 WGS-84</span>
   </div>
+  <div id="switch"><div class="hd">底图</div><div id="sw-items"></div></div>
   <div id="legend"><div class="h">道路等级（里程占比）</div><div id="lg-rows"></div></div>
   <div id="side">
     <div class="hd">
@@ -283,6 +319,7 @@ _TEMPLATE = r"""<!DOCTYPE html>
     <div class="lst" id="lst"></div>
     <div class="foot" id="foot"></div>
   </div>
+  <div id="tip"></div>
   <div id="fallback">
     <div class="t">底图不可用</div>
     <div class="d" id="fb-d"></div>
@@ -290,11 +327,15 @@ _TEMPLATE = r"""<!DOCTYPE html>
   </div>
 </div>
 <script>
-var PAYLOAD = __PAYLOAD__;
-var FALLBACK = __FALLBACK__;
+  var PAYLOAD = __PAYLOAD__;
+  var FALLBACK = __FALLBACK__;
+  var FONT = '"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif';
 (function(){
-  var map=null, vectorLayer=null, baseLayers={}, baseVisible=true;
-  var feats=[], layerById={}, shown={};
+  var map=null, haloLayer=null, coreLayer=null, markerLayer=null;
+  var labelLayer=null, mileLayer=null;
+  var baseLayers={}, baseOrder=[];
+  var feats=[], layerById={}, shown={}, haloById={};
+  var baseKey=null;
 
   function $(id){return document.getElementById(id);}
   function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
@@ -308,18 +349,16 @@ var FALLBACK = __FALLBACK__;
 
   function fmt(v, d){ if(v==null||isNaN(v)) return "—"; return Number(v).toFixed(d==null?1:d); }
 
-  function styleOf(color, width, fillOpacity){
+  function makeStyle(width, color, opacity){
     return new ol.style.Style({
-      stroke: new ol.style.Stroke({color: color, width: width}),
-      fill: new ol.style.Fill({color: color, opacity: fillOpacity==null?0.16:fillOpacity})
+      stroke: new ol.style.Stroke({color: color, width: width, opacity: (opacity==null?1:opacity)})
     });
   }
 
   function makeFeature(props){
     var geom = props.geometry;
     // OL v10 移除了 ol.geom.GeoJSON（v7 起就没了），只有 ol.format.GeoJSON。
-    // 这里直接用 LineString 构造：几何坐标本来就是 WGS-84 经纬（EPSG:4326），
-    // 再经 ol.proj.fromLonLat 投影到视图投影（EPSG:3857）。
+    // 几何坐标已是目标基准的经纬（服务端转好），再经 ol.proj.fromLonLat 投影到 EPSG:3857。
     var coords = (geom && geom.coordinates) ? geom.coordinates : [];
     var projected = [];
     for (var i=0;i<coords.length;i++){
@@ -329,30 +368,176 @@ var FALLBACK = __FALLBACK__;
       geometry: new ol.geom.LineString(projected),
       props: props
     });
-    // OL v10 的 setStyle 只接受 ol.style.Style 实例（或其数组），
-    // 传普通对象会抛 "Expected an `ol/style/Style`"。
-    f.setStyle(styleOf(props.color||"#5EE7FF", props.width||3.2, props.opacity));
     return f;
   }
 
   function buildVector(){
     feats = PAYLOAD.features || [];
-    layerById = {};
-    var src = new ol.source.Vector();
+    layerById = {}; haloById = {};
+    var coreSrc = new ol.source.Vector();
+    var haloSrc = new ol.source.Vector();
     for (var i=0;i<feats.length;i++){
       var p = feats[i];
       var f = makeFeature(p);
-      src.addFeature(f);
+      // halo：深色描边打底，保证亮色底图上路线依然清晰
+      var hf = new ol.Feature({geometry: f.getGeometry(), props: p});
+      hf.setStyle(makeStyle(p.halo||((p.width||3)+1.5), p.haloColor||"rgba(4,9,14,.55)", 0.8));
+      f.setStyle(makeStyle(p.width||3, p.color||"#5EE7FF", p.opacity==null?0.95:p.opacity));
+      coreSrc.addFeature(f);
+      haloSrc.addFeature(hf);
       layerById[p.id] = f;
+      haloById[p.id] = hf;
       shown[p.id] = true;
     }
-    vectorLayer = new ol.layer.Vector({source: src, declutter:false});
-    map.addLayer(vectorLayer);
+    haloLayer = new ol.layer.Vector({source: haloSrc, declutter:false});
+    coreLayer = new ol.layer.Vector({source: coreSrc, declutter:false});
+    map.addLayer(haloLayer);
+    map.addLayer(coreLayer);
+    buildMarkers();
+    buildLabels();
+    buildMileage();
+  }
+
+  function buildMarkers(){
+    var markers = PAYLOAD.markers || [];
+    if (!markers.length){ markerLayer = null; return; }
+    var src = new ol.source.Vector();
+    for (var i=0;i<markers.length;i++){
+      var m = markers[i];
+      var f = new ol.Feature({
+        geometry: new ol.geom.Point(ol.proj.fromLonLat([m.lng, m.lat])),
+        props: m
+      });
+      var img = new ol.style.Icon({
+        src: m.src, width: m.width||38, height: m.height||38,
+        anchor:[0.5,0.5], anchorXUnits:'fraction', anchorYUnits:'fraction'
+      });
+      // 起终点加文字标签（起 / 终），小圆点太不起眼。
+      // 注意：text 必须在 Style 构造时一起传，
+      // 只给 image 的 Style 调 getText() 会返回 null —— 实测踩过，
+      // 报错 "Cannot read properties of null (reading 'setText')"，
+      // 整个 buildVector 中断，路线层根本没建起来。
+      var tone = (m.kind === "start") ? "#2DD4A7" : "#FF8A5B";
+      var st = new ol.style.Style({
+        image: img,
+        text: new ol.style.Text({
+          text: m.label || "",
+          font: "500 12px " + FONT,
+          fill: new ol.style.Fill({color: "#0B1218"}),
+          padding: [2, 3, 2, 3],
+          backgroundFill: new ol.style.Fill({color: tone}),
+          backgroundStroke: new ol.style.Stroke({color: tone, width: 1})
+        })
+      });
+      f.setStyle(st);
+      src.addFeature(f);
+    }
+    markerLayer = new ol.layer.Vector({source: src, declutter:true});
+    map.addLayer(markerLayer);
+  }
+
+  // 道路名标注层：把路名打在路线上（高德那张图有这个，这里补上）。
+  //
+  // 按 tier 分成**三个独立图层**，各自 declutter —— OL 的 declutter 只在
+  // 同一图层内避让，跨图层会互相挤掉：
+  //   long   （≥120 km）→ 一直显示
+  //   medium （≥8 km）  → zoom ≥ 8 才显示
+  //   short  （≥18 km 门槛内更短的）→ zoom ≥ 10 才显示
+  // 这样全国视图干净，放大后信息逐级浮现。
+  function buildLabels(){
+    var labels = PAYLOAD.roadNames || [];
+    if (!labels.length){ labelLayer = null; return; }
+    var tiers = {long: [], medium: [], short: []};
+    for (var i=0;i<labels.length;i++){
+      var t = labels[i].tier || "medium";
+      if (!tiers[t]) tiers[t] = [];
+      tiers[t].push(labels[i]);
+    }
+    var groups = [];
+    for (var key in tiers){
+      if (!tiers[key] || !tiers[key].length) continue;
+      var src = new ol.source.Vector();
+      for (var j=0;j<tiers[key].length;j++){
+        var L = tiers[key][j];
+        var f = new ol.Feature({
+          geometry: new ol.geom.Point(ol.proj.fromLonLat([L.lng, L.lat])),
+          props: L
+        });
+        var st = new ol.style.Style({
+          text: new ol.style.Text({
+            text: L.text,
+            font: "500 12px " + FONT,
+            fill: new ol.style.Fill({color: "#E9F0F7"}),
+            stroke: new ol.style.Stroke({color: "rgba(4,9,14,.92)", width: 3}),
+            offsetY: -9,
+            overflow: true,
+            padding: [2, 4, 2, 4],
+            backgroundFill: new ol.style.Fill({color: "rgba(8,12,17,.72)"})
+          })
+        });
+        f.setStyle(st);
+        src.addFeature(f);
+      }
+      var lyr = new ol.layer.Vector({source: src, declutter: true});
+      lyr.set('tier', key);
+      map.addLayer(lyr);
+      groups.push(lyr);
+    }
+    labelLayer = groups;
+  }
+
+  // 按当前缩放显示对应档位的路名标注
+  function applyLabelTier(){
+    if (!labelLayer) return;
+    var z = map.getView().getZoom();
+    var want = (z >= 10) ? "short" : (z >= 8 ? "medium" : "long");
+    for (var i=0;i<labelLayer.length;i++){
+      var lyr = labelLayer[i];
+      var tier = lyr.get('tier');
+      // long 档在所有缩放都显示；其余按门槛显示
+      lyr.setVisible(tier === "long" ? true : tier === want || (want === "short" && tier === "medium"));
+    }
+  }
+
+  // 里程刻度层：每 100 km 一个圆点 + 里程数字。
+  // 这是"这趟路有多长、我在第几百公里"的直观读数。
+  function buildMileage(){
+    var miles = PAYLOAD.mileage || [];
+    if (!miles.length){ mileLayer = null; return; }
+    var src = new ol.source.Vector();
+    for (var i=0;i<miles.length;i++){
+      var m = miles[i];
+      var f = new ol.Feature({
+        geometry: new ol.geom.Point(ol.proj.fromLonLat([m.lng, m.lat])),
+        props: m
+      });
+      var st = new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 4.5,
+          fill: new ol.style.Fill({color: "#0B1218", opacity: 0.9}),
+          stroke: new ol.style.Stroke({color: "#F5C86B", width: 2})
+        }),
+        text: new ol.style.Text({
+          text: Math.round(m.km) + " km",
+          font: "500 10px " + FONT,
+          fill: new ol.style.Fill({color: "#F5C86B"}),
+          stroke: new ol.style.Stroke({color: "rgba(4,9,14,.92)", width: 3}),
+          offsetY: -12,
+          overflow: true,
+          padding: [1, 3, 1, 3],
+          backgroundFill: new ol.style.Fill({color: "rgba(8,12,17,.78)"})
+        })
+      });
+      f.setStyle(st);
+      src.addFeature(f);
+    }
+    mileLayer = new ol.layer.Vector({source: src, declutter: true});
+    map.addLayer(mileLayer);
   }
 
   function buildBase(){
     var layers = PAYLOAD.layers || [];
-    var first = null;
+    baseOrder = []; baseLayers = {};
     for (var i=0;i<layers.length;i++){
       var L = layers[i];
       var src = null;
@@ -376,25 +561,110 @@ var FALLBACK = __FALLBACK__;
             requestEncoding: "REST"
           });
         } else {
-          src = new ol.source.XYZ({url: L.url, crossOrigin:"anonymous"});
+          // XYZ：{1-4} 是 OL 支持的子域占位符写法。
+          // 注意不能写 {s}——OL 的 XYZ 源不认，实测会全部落到同一个主机上拿空瓦片。
+          src = new ol.source.XYZ({url: L.url, crossOrigin:"anonymous", attributions: L.attribution || undefined});
         }
       }catch(err){
         continue;
       }
-      var tl = new ol.layer.Tile({source: src, opacity: L.opacity, visible: L.visible});
+      // className: 把底图瓦片层单独标记出来，
+      // 暗色滤镜只作用于它，矢量层颜色保持原样。
+      var tl = new ol.layer.Tile({source: src, opacity: L.opacity, visible: L.visible,
+                                 className: "basemap-tile"});
+      tl.set('baseName', L.name);
+      tl.set('baseCrs', L.crs || 'wgs84');
+      // 亮色栅格底图（高德/天地图）反相成暗色，融入 Carbon Tide 主题。
+      // 暗色化的开关由底图本身决定，初始就要生效——不能只在用户手动切换时才触发。
+      tl.set('needDark', (L.crs === 'gcj02' || /高德|tianditu|autonavi/i.test(L.url||'')) ? 1 : 0);
       baseLayers[L.name] = tl;
-      map.addLayer(tl);
-      if (first===null) first = tl;
+      baseOrder.push(tl);
     }
-    if (first===null){
-      baseVisible = false;
-    } else {
-      baseVisible = true;
+    // 底图必须在最下层：先全部加，再把矢量层置顶
+    for (var j=0;j<baseOrder.length;j++){ map.addLayer(baseOrder[j]); }
+    if (baseOrder.length){ baseKey = baseOrder[0].get('baseName'); }
+    applyDark();
+    renderSwitch();
+  }
+
+  // 用 zIndex 排图层顺序（OL 官方方式，不依赖已移除的 map.getLayers()）
+  function applyZIndex(){
+    var z = 0;
+    for (var i=0;i<baseOrder.length;i++){ baseOrder[i].setZIndex(z++); }
+    if (haloLayer) haloLayer.setZIndex(z++);
+    if (coreLayer) coreLayer.setZIndex(z++);
+    // 里程刻度优先于路名标注：数字读数比路名更重要，
+    // 让它独占一层、独占 declutter，避免被路名挤掉（实测 700 km 后刻度消失）。
+    if (mileLayer) mileLayer.setZIndex(z++);
+    // labelLayer 现在是数组（按 tier 分层）
+    if (labelLayer){
+      if (labelLayer.length){
+        for (var k=0;k<labelLayer.length;k++){ labelLayer[k].setZIndex(z++); }
+      } else {
+        labelLayer.setZIndex(z++);
+      }
+    }
+    if (markerLayer) markerLayer.setZIndex(z++);
+  }
+
+  // 当前底图是否需要暗色化
+  function currentNeedDark(){
+    for (var i=0;i<baseOrder.length;i++){
+      if (baseOrder[i].get('baseName')===baseKey) return !!baseOrder[i].get('needDark');
+    }
+    return false;
+  }
+
+  function applyDark(){
+    $("map").classList.toggle("darkmode", currentNeedDark());
+  }
+
+  function renderSwitch(){
+    var box = $("sw-items");
+    if (!box){ return; }
+    if (!baseOrder.length){
+      box.innerHTML = '<div class="it" style="cursor:default;color:#8A97A6">无可用底图</div>';
+      return;
+    }
+    var html = "";
+    for (var i=0;i<baseOrder.length;i++){
+      var L = baseOrder[i];
+      var nm = L.get('baseName');
+      var crs = L.get('baseCrs');
+      html += '<div class="it" data-n="'+esc(nm)+'"><span class="dot"></span>'+esc(nm)
+        +'<span class="crs">'+esc(crs)+'</span></div>';
+    }
+    box.innerHTML = html;
+    var items = box.querySelectorAll(".it");
+    for (var j=0;j<items.length;j++){
+      items[j].addEventListener("click", function(ev){
+        var nm = ev.currentTarget.getAttribute("data-n");
+        switchBase(nm);
+      });
+    }
+    markActive();
+  }
+
+  function markActive(){
+    var items = $("sw-items").querySelectorAll(".it");
+    for (var j=0;j<items.length;j++){
+      items[j].classList.toggle("on", items[j].getAttribute("data-n")===baseKey);
     }
   }
 
+  function switchBase(name){
+    for (var i=0;i<baseOrder.length;i++){
+      baseOrder[i].setVisible(baseOrder[i].get('baseName')===name);
+    }
+    baseKey = name;
+    markActive();
+    hideFallback();
+    applyDark();
+  }
+
   function fitToRoute(){
-    var src = vectorLayer.getSource();
+    if (!coreLayer) return;
+    var src = coreLayer.getSource();
     if (!src) return;
     var ext = src.getExtent();
     if (!ext || (isNaN(ext[0]) && isNaN(ext[1]))){ return; }
@@ -424,10 +694,15 @@ var FALLBACK = __FALLBACK__;
         for (var m=0;m<feats.length;m++){
           var p = feats[m];
           if (p.road_class !== k) continue;
-          var f = layerById[p.id];
+          var f = layerById[p.id], hf = haloById[p.id];
           if (!f) continue;
-          if (on){ f.setStyle(styleOf(p.color||"#5EE7FF", p.width||3.2, 0.03)); }
-          else { f.setStyle(styleOf("rgba(140,150,165,.22)", 1.1, 0)); }
+          if (on){
+            f.setStyle(makeStyle(p.width||3, p.color||"#5EE7FF", 0.95));
+            if (hf) hf.setStyle(makeStyle(p.halo||((p.width||3)+1.5), p.haloColor||"rgba(4,9,14,.55)", 0.8));
+          } else {
+            f.setStyle(makeStyle(1.0, "rgba(140,150,165,.22)", 0.5));
+            if (hf) hf.setStyle(makeStyle(1.0, "rgba(140,150,165,.10)", 0.4));
+          }
         }
       });
     }
@@ -482,7 +757,58 @@ var FALLBACK = __FALLBACK__;
     $("foot").innerHTML = html;
   }
 
+  function bindTooltip(){
+    var tip = $("tip");
+    map.on("pointermove", function(e){
+      if (e.dragging){ tip.style.display="none"; return; }
+      var hit = map.hasFeatureAtPixel(e.pixel, {layerFilter: function(l){return l===coreLayer;}});
+      if (!hit || !hit.length){ tip.style.display="none"; return; }
+      var p = hit[0].get("props") || {};
+      var labels = PAYLOAD.labels || {}, colors = PAYLOAD.colors || {};
+      var px = map.getPixelFromCoordinate(hit[0].getGeometry().getCoordinates()[0]);
+      if (!px){ tip.style.display="none"; return; }
+      var nm = p.road_name || "（无名路段）";
+      if (p.road_ref){ nm = nm + " " + p.road_ref; }
+      var html = '<div class="n">'+esc(nm)+'</div><div class="r">'
+        + '等级 '+esc(labels[p.road_class]||p.road_class||"—")+' · proxy<br>'
+        + '里程 '+fmt(p.distance_km,1)+' km · '+fmt(p.speed_kmh,0)+' km/h<br>'
+        + '时长 '+fmt(p.duration_min,1)+' min · 碳排 '+fmt(p.carbon_kg,1)+' kg</div>';
+      tip.innerHTML = html;
+      tip.style.display = "block";
+      tip.style.left = (px[0]+14)+"px";
+      tip.style.top = (px[1]-12)+"px";
+    });
+    map.on("pointerleave", function(){ $("tip").style.display="none"; });
+  }
+
+  // 单步渲染的异常隔离。
+  // 为什么需要：渲染链是 buildBase → buildVector → applyZIndex → renderLegend
+  // → renderList → renderFoot 的串行调用，任何一步抛错都会让**后面全部不执行**。
+  // 本项目实测踩过：map.getLayers()（OL v10 已移除）抛 TypeError，
+  // 结果图例、逐 step 列表、页脚三块全空，页面看上去"地图能画，就是没内容"。
+  // 现在每一步单独 try，失败只记日志，不影响其余部分。
+  function safe(fn, name){
+    try{ fn(); }
+    catch(err){
+      if (window.console && console.warn) console.warn("[olmapview] " + name + " 失败: " + (err && err.message ? err.message : err));
+    }
+  }
+
   function boot(){
+    // ---- 第一段：完全不依赖 OpenLayers 的内容 ----
+    // 逐 step 列表、图例、页脚、声明条都只用 PAYLOAD 里的数据，
+    // **不需要 OL**。所以必须在 OL 加载检查之前渲染，
+    // 否则 CDN 一挂（断网 / 抖动），整页就只剩一句"底图不可用"，
+    // 连 65 条 step 明细都没了 —— 实测踩过：CDN 偶发失败时列表全空。
+    safe(renderLegend, "renderLegend");
+    safe(renderList, "renderList");
+    safe(renderFoot, "renderFoot");
+    var chip = $("crs-chip");
+    if (chip){
+      chip.textContent = "几何 " + (PAYLOAD.geomCrs||"wgs84").toUpperCase()
+        + (PAYLOAD.geomCrs==="gcj02" ? "（已对齐底图）" : "");
+    }
+
     if (typeof ol === "undefined"){
       showFallback("OpenLayers 未能从 CDN 加载（可能断网）。路线几何来自本地结果表，但底图与渲染依赖 JS 库。",
         "CDN: "+esc(FALLBACK.oljs));
@@ -505,33 +831,37 @@ var FALLBACK = __FALLBACK__;
       showFallback("地图初始化失败："+esc(err.message||err), "");
       return;
     }
-    buildBase();
-    buildVector();
-    fitToRoute();
-    renderLegend();
-    renderList();
-    renderFoot();
+    safe(buildBase, "buildBase");
+    safe(buildVector, "buildVector");
+    // 层级最终校正：底图 zIndex 最低，halo 次之，路线与 marker 在最上。
+    // 用 setZIndex 而不是 map.getLayers().setAt()——
+    // OL v10 移除了 map.getLayers()，用它会直接抛 TypeError，
+    // 把后续的图例/列表/页脚渲染全部打断（本项目实测踩过）。
+    safe(applyZIndex, "applyZIndex");
+    safe(fitToRoute, "fitToRoute");
+    safe(bindTooltip, "bindTooltip");
+    safe(applyLabelTier, "applyLabelTier");
+    // 缩放变化时切换路名标注档位（全国视图只显示超长段，放大后逐级浮现）
+    map.on("change:resolution", function(){ safe(applyLabelTier, "applyLabelTier"); });
 
     // 底图瓦片加载失败 → 明确提示（不留灰块）
     var t0 = Date.now();
     var probe = setTimeout(function(){
-      if (!baseVisible){
+      if (!baseOrder.length){
         showFallback("未配置可用底图。路线矢量已渲染，但缺少底图参照。", FALLBACK.note||"");
       }
     }, 2500);
     map.on("rendercomplete", function(){
       clearTimeout(probe);
-      if (baseVisible){
-        var src = null;
-        var names = Object.keys(baseLayers);
-        for (var i=0;i<names.length;i++){ src = baseLayers[names[i]].getSource(); break; }
+      if (baseOrder.length){
+        var src = baseOrder[0].getSource();
         if (src){
           var failed = false;
           src.on("tileloaderror", function(){ failed = true; });
           setTimeout(function(){
             if (failed){
-              showFallback("底图瓦片加载失败（token 无效或断网）。路线矢量仍可正常查看。",
-                FALLBACK.note||"");
+              showFallback("底图瓦片加载失败（token 无效或断网）。路线矢量仍可正常查看，"
+                +"可在右上角切换其他底图。", FALLBACK.note||"");
             }
           }, 2600);
         }

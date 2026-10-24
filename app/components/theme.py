@@ -439,6 +439,19 @@ section[data-testid="stSidebar"] [data-testid="stSidebarNavItems"] { display: no
 div[data-testid="stTabs"] { margin-top: 4px; }
 button[data-testid="stTab"] { font-size: 12px; color: var(--muted); border-radius: 8px 8px 0 0; }
 button[data-testid="stTab"][aria-selected="true"] { color: var(--tide); }
+/* 第 6 页模式切换：segmented_control，只渲染当前模式，避免双地图同时挂载 */
+div[data-testid="stButtonGroup"] { gap: 6px; margin: 2px 0 8px 0; }
+div[data-testid="stButtonGroup"] button[role="radio"] {
+  border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(255,255,255,0.018); color: var(--muted);
+  font-size: 11.5px; min-height: 0; padding: 6px 13px;
+}
+div[data-testid="stButtonGroup"] button[role="radio"]:hover { border-color: rgba(94,231,255,0.35); color: var(--text); }
+div[data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] {
+  background: linear-gradient(135deg, rgba(94,231,255,0.20), rgba(255,196,107,0.16));
+  border-color: rgba(94,231,255,0.55); color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(94,231,255,0.10);
+}
 div[data-testid="stExpander"] details { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 div[data-testid="stExpander"] summary { font-size: 12px; color: var(--text); }
 div[data-testid="stExpander"] summary:hover { color: var(--tide); }

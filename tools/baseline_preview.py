@@ -41,7 +41,7 @@ if str(APP_DIR) not in sys.path:
 
 import pandas as pd  # noqa: E402
 
-from components import baseline_map, olmapview  # noqa: E402
+from components import baseline_map, basemap_align, olmapview  # noqa: E402
 
 PROCESSED = ROOT / "data" / "processed"
 STEPS_PATH = PROCESSED / "route_baseline_sh_bj_steps.parquet"
@@ -65,7 +65,14 @@ def main(argv: List[str] | None = None) -> int:
     summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
 
     token = olmapview.load_tianditu_token()
-    layers = olmapview.default_tianditu_layers(token) if token else []
+    # 底图优先级：天地图（CGCS2000，零偏移，需 token）> 高德栅格（GCJ-02，服务端对齐）。
+    # 两者都是国内持牌服务，都不会出现"路线偏在路边"。
+    if token:
+        layers = olmapview.default_tianditu_layers(token)
+        basemap_desc = "天地图 WMTS（CGCS2000，零偏移）"
+    else:
+        layers = [basemap_align.amap_xyz_layer()]
+        basemap_desc = "高德栅格（GCJ-02，已做基准对齐）"
     payload = baseline_map.build_baseline_payload(steps, summary, layers=layers)
     payload["attribution"] = str(summary.get("attribution") or "")
 
@@ -73,8 +80,7 @@ def main(argv: List[str] | None = None) -> int:
         payload,
         height=int(args.height),
         title="上海—北京 OSM 碳基线 · 道路等级着色",
-        fallback_note=("未配置天地图 token（config/tianditu_token.txt）：仅路线矢量，无底图"
-                       if not token else "底图：WMS / WMTS 服务加载（OpenLayers）"),
+        fallback_note=("底图：%s" % basemap_desc),
     )
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -82,7 +88,8 @@ def main(argv: List[str] | None = None) -> int:
 
     print("预览已生成: %s" % out)
     print("  feature 数 : %d" % len(payload["features"]))
-    print("  底图       : %s" % ("天地图 WMTS" if token else "无（仅矢量）"))
+    print("  底图       : %s" % basemap_desc)
+    print("  几何基准   : %s" % payload.get("geomCrs"))
     print("  道路等级   : %s" % payload["road_class_share"])
     print("  署名       : © OpenStreetMap contributors")
     return 0

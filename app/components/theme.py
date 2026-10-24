@@ -48,9 +48,7 @@ CSS = """
   --radius: 22px;
 }
 
-/* 同源整页切换时用浏览器 View Transition 做交叉淡入，避免旧页面闪回 */
-@view-transition { navigation: auto; }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: .32s; animation-timing-function: cubic-bezier(.22,.61,.36,1); }
+/* 不用 View Transition：客户端路由下 old(root) 快照会把上一页再显示一次，造成“跳回原页面”。 */
 
 * { scrollbar-width: thin; scrollbar-color: rgba(94,231,255,0.22) transparent; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }

@@ -2,7 +2,7 @@
   "source": "D:\\vsp_delivery",
   "source_file": "improved_model.xlsx",
   "source_sha256": "3a11ebd59a45e56bb92aee19c042e8fc3eb001f84575473374b51441d3f8f980",
-  "generated_at": "2026-10-24T10:42:18+08:00",
+  "generated_at": "2026-10-24T10:51:41+08:00",
   "mode": "audit_only",
   "note": "物理行程审计口径，不替代当前 E0；HYC 是代理因子映射，不是 VSP。",
   "current": {
@@ -14,6 +14,13 @@
     "trips": 12167,
     "km": 2174173.86,
     "t": 2258.438
+  },
+  "vsp": {
+    "trips": 12167,
+    "km": 2174173.86,
+    "t": 2324.654,
+    "all_rows_t": 4400.866,
+    "ef_gkm": 1069.213
   },
   "hyc": {
     "trips": 12167,
@@ -28,10 +35,13 @@
   "duplicate_effect_t": 2243.604,
   "factor_effect_t": -80.493,
   "net_delta_t": 2163.111,
+  "vsp_effect_t": 66.216,
   "ratios": {
     "associations_per_trip": 2.73,
     "current_to_physical_km": 2.1573,
-    "current_to_hyc_t": 1.9248
+    "current_to_hyc_t": 1.9248,
+    "vsp_to_legal_pct": 2.932,
+    "hyc_to_vsp_pct": 0.614
   },
   "reconciliation": [
     {
@@ -46,7 +56,14 @@
       "记录数": 12167,
       "里程_km": 2174173.86,
       "碳排_t": 2258.438,
-      "说明": "按物理行程键保留首行；当前因子"
+      "说明": "法定轨：里程 × 当前六档因子；非 VSP"
+    },
+    {
+      "口径": "我们的 VSP 物理轨 + 物理行程",
+      "记录数": 12167,
+      "里程_km": 2174173.86,
+      "碳排_t": 2324.654,
+      "说明": "物理轨：速度 → VSP → 排放率积分；我们的模型"
     },
     {
       "口径": "HYC 代理因子 + 物理行程",

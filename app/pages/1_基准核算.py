@@ -139,6 +139,7 @@ if _audit:
     )
     _cur = _audit.get("current", {})
     _phy = _audit.get("physical_current", {})
+    _vsp = _audit.get("vsp", {})
     _hyc = _audit.get("hyc", {})
     cards.stats([
         {"label": "运单关联口径", "value": services.fmt(_cur.get("t"), 1) + " t",
@@ -147,19 +148,22 @@ if _audit:
         {"label": "物理行程口径", "value": services.fmt(_phy.get("t"), 1) + " t",
          "sub": "%s 趟 · %.1f 万 km" % (services.fmt(_phy.get("trips")), (_phy.get("km") or 0) / 10000.0),
          "tone": "mint", "help": "按物理行程键去重；当前因子表"},
+        {"label": "我们的 VSP 物理轨", "value": services.fmt(_vsp.get("t"), 1) + " t",
+         "sub": "较法定 %+.1f t (%+.2f%%)" % (
+             (_vsp.get("t") or 0) - (_phy.get("t") or 0),
+             ((_vsp.get("t") or 0) / (_phy.get("t") or 1) - 1) * 100),
+         "tone": "info", "help": "速度 → VSP → 排放率积分；我们自己的物理轨"},
         {"label": "HYC 代理口径", "value": services.fmt(_hyc.get("t"), 1) + " t",
-         "sub": "较物理 %+.1f t" % ((_hyc.get("t") or 0) - (_phy.get("t") or 0)),
+         "sub": "较 VSP %+.1f t (%+.2f%%)" % (
+             (_hyc.get("t") or 0) - (_vsp.get("t") or 0),
+             ((_hyc.get("t") or 0) / (_vsp.get("t") or 1) - 1) * 100),
          "tone": "amber", "help": "HYC 车型代理因子；不是 VSP 精度提升"},
-        {"label": "净差异", "value": services.fmt(_audit.get("net_delta_t"), 1) + " t",
-         "sub": "重复 %+.1f t / 因子 %+.1f t" % (
-             _audit.get("duplicate_effect_t") or 0, _audit.get("factor_effect_t") or 0),
-         "tone": "warn", "help": "4,502.04 − 2,338.93；重复计数为主因"},
     ], cols=4)
 
     _rec = pd.DataFrame(_audit.get("reconciliation", []))
     if not _rec.empty:
         cards.data_table(
-            _rec, title="四口径对照",
+            _rec, title="五口径对照",
             desc="同一批数据、不同统计单元；差异不是数据错误",
             max_rows=6, numeric=["记录数", "里程_km", "碳排_t"],
         )
@@ -167,8 +171,9 @@ if _audit:
     cards.note(
         "**审计结论**：33,214 条是**运单—车辆关联记录**，不是 33,214 趟独立行程；"
         "同一物理行程平均关联 **2.73 条**运单。按物理行程键去重后为 **12,167 趟 / 217.4 万 km**。"
-        "当前因子算得 **2,258.44 t**；HYC 代理因子算得 **2,338.93 t**，差的 **80.49 t** "
-        "来自 40 t/45 t 车型代理映射，**不是 VSP 精度提升**。"
+        "当前因子算得 **2,258.44 t**；我们自己的 VSP 物理轨算得 **2,324.65 t**，比法定轨高 **66.22 t（+2.93%）**。"
+        "HYC 代理因子算得 **2,338.93 t**，只比我们的 VSP 高 **14.28 t（+0.61%）**，但它是固定因子代理，**不是 VSP**。"
+        "净差异 2,163.11 t 仍是 4,502.04−2,338.93：重复计数 **2,243.60 t**、因子映射 **−80.49 t**。"
         "月份、数据源、行程键均不是差异原因；本区块**不改变 E₀ 4,502.04 t**。"
     )
 

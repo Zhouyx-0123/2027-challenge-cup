@@ -78,6 +78,10 @@ def build(src: Path = DEFAULT_SRC, out: Path = PROCESSED) -> dict:
     physical_km = float(first["dist_km"].sum())
     physical_t = float(first["kg_co2"].sum() / 1000.0)
 
+    # Our own VSP physical track (same physical trips; no HYC factors)
+    vsp_t = float(first["kg_co2_phys"].sum() / 1000.0)
+    vsp_all_t = float(b["kg_co2_phys"].sum() / 1000.0)
+
     # HYC physical口径
     hyc_trips = int(len(h))
     hyc_km = float(h["km"].sum())
@@ -93,6 +97,7 @@ def build(src: Path = DEFAULT_SRC, out: Path = PROCESSED) -> dict:
     duplicate_effect = current_t - physical_t
     factor_effect = physical_t - hyc_t
     net_delta = current_t - hyc_t
+    vsp_effect = vsp_t - physical_t
 
     # group summary from HYC physical trips
     g = h.groupby("group", dropna=False).agg(
@@ -150,21 +155,29 @@ def build(src: Path = DEFAULT_SRC, out: Path = PROCESSED) -> dict:
         "note": "物理行程审计口径，不替代当前 E0；HYC 是代理因子映射，不是 VSP。",
         "current": {"rows": current_rows, "km": round(current_km, 2), "t": round(current_t, 3)},
         "physical_current": {"trips": physical_trips, "km": round(physical_km, 2), "t": round(physical_t, 3)},
+        "vsp": {"trips": physical_trips, "km": round(physical_km, 2), "t": round(vsp_t, 3),
+                "all_rows_t": round(vsp_all_t, 3),
+                "ef_gkm": round(vsp_t * 1_000_000.0 / physical_km, 3)},
         "hyc": {"trips": hyc_trips, "km": round(hyc_km, 2), "t": round(hyc_t, 3)},
         "hyc_aux": {"rows": current_rows, "km": round(current_km, 2), "t": round(hyc_aux_t, 3)},
         "duplicate_effect_t": round(duplicate_effect, 3),
         "factor_effect_t": round(factor_effect, 3),
         "net_delta_t": round(net_delta, 3),
+        "vsp_effect_t": round(vsp_effect, 3),
         "ratios": {
             "associations_per_trip": round(current_rows / physical_trips, 3),
             "current_to_physical_km": round(current_km / physical_km, 4),
             "current_to_hyc_t": round(current_t / hyc_t, 4),
+            "vsp_to_legal_pct": round((vsp_t / physical_t - 1.0) * 100.0, 3),
+            "hyc_to_vsp_pct": round((hyc_t / vsp_t - 1.0) * 100.0, 3),
         },
         "reconciliation": [
             {"口径": "当前 E0（运单—车辆关联）", "记录数": current_rows, "里程_km": round(current_km, 2),
              "碳排_t": round(current_t, 3), "说明": "逐条关联记录求和；同一物理行程可能重复"},
             {"口径": "当前因子 + 物理行程去重", "记录数": physical_trips, "里程_km": round(physical_km, 2),
-             "碳排_t": round(physical_t, 3), "说明": "按物理行程键保留首行；当前因子"},
+             "碳排_t": round(physical_t, 3), "说明": "法定轨：里程 × 当前六档因子；非 VSP"},
+            {"口径": "我们的 VSP 物理轨 + 物理行程", "记录数": physical_trips, "里程_km": round(physical_km, 2),
+             "碳排_t": round(vsp_t, 3), "说明": "物理轨：速度 → VSP → 排放率积分；我们的模型"},
             {"口径": "HYC 代理因子 + 物理行程", "记录数": hyc_trips, "里程_km": round(hyc_km, 2),
              "碳排_t": round(hyc_t, 3), "说明": "HYC 车型代理映射；不是 VSP"},
             {"口径": "HYC 因子 + 当前关联行", "记录数": current_rows, "里程_km": round(current_km, 2),

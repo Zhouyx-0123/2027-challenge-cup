@@ -50,6 +50,7 @@ CSS = """
 
 /* 明确关闭 View Transition：客户端路由下 old(root) 快照会把上一页再显示一次，造成“跳回原页面”。 */
 @view-transition { navigation: none; }
+@keyframes cmVeilFade { 0%, 72% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 * { scrollbar-width: thin; scrollbar-color: rgba(94,231,255,0.22) transparent; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -785,22 +786,27 @@ SCROLL_RESET_JS = """
 
     if (p.__cmVeilInit) return;
     p.__cmVeilInit = true;
-    var veil = null, observer = null, timer = null;
+    var veil = null, observer = null, timer = null, maxTimer = null;
 
     function showVeil() {
-      if (veil || doc.getElementById('cm-nav-veil')) return;
+      var old = doc.getElementById('cm-nav-veil');
+      if (old) old.remove();
       veil = doc.createElement('div');
       veil.id = 'cm-nav-veil';
       veil.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#07080A;'
         + 'display:flex;align-items:center;justify-content:center;color:#5EE7FF;'
-        + 'font:600 13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.18em;';
+        + 'font:600 13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.18em;'
+        + 'animation:cmVeilFade 1.8s ease forwards;';
       veil.textContent = 'CARBON INTELLIGENCE · LOADING';
       doc.body.appendChild(veil);
+      if (maxTimer) p.clearTimeout(maxTimer);
+      maxTimer = p.setTimeout(hideVeil, 1800);
     }
 
     function hideVeil() {
       if (observer) { observer.disconnect(); observer = null; }
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (timer) { p.clearTimeout(timer); timer = null; }
+      if (maxTimer) { p.clearTimeout(maxTimer); maxTimer = null; }
       if (!veil) { veil = doc.getElementById('cm-nav-veil'); }
       if (veil && veil.parentNode) veil.parentNode.removeChild(veil);
       veil = null;
@@ -848,11 +854,11 @@ SCROLL_RESET_JS = """
         if (p.location.pathname === startPath) return;
         var h = currentHero();
         if (!h || h === oldHero) return;
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(hideVeil, 80);
+        if (timer) p.clearTimeout(timer);
+        timer = p.setTimeout(hideVeil, 80);
       });
       observer.observe(body, {childList: true, subtree: true});
-      setTimeout(hideVeil, 5000);
+      p.setTimeout(hideVeil, 5000);
 
       // 首页卡片/CTA 是纯 <a>：桥接到顶栏同目标的 st.page_link，
       // 走客户端路由，避免 target=_top 全量刷新。

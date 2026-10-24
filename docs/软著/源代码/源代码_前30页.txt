@@ -1,0 +1,1530 @@
+碳慧智算物流碳感知智能决策系统 V1.0    第 001 页
+# -*- coding: utf-8 -*-
+"""单入口导航：页面由 st.navigation 统一管理，不再手工维护多页 URL。"""
+import sys
+from pathlib import Path
+
+import streamlit as st
+
+APP_DIR = Path(__file__).resolve().parent
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
+PAGES = [
+    st.Page("pages/0_概览.py", title="概览", url_path="概览", default=True),
+    st.Page("pages/1_基准核算.py", title="核算", url_path="基准核算"),
+    st.Page("pages/2_高排放诊断.py", title="诊断", url_path="高排放诊断"),
+    st.Page("pages/3_替代方案.py", title="方案", url_path="替代方案"),
+    st.Page("pages/4_成本效益.py", title="成本", url_path="成本效益"),
+    st.Page("pages/5_碳会计台账.py", title="台账", url_path="碳会计台账"),
+    st.Page("pages/6_路线实验室.py", title="路线", url_path="路线实验室"),
+    st.Page("pages/7_电动化测算.py", title="测算", url_path="电动化测算"),
+    st.Page("pages/8_车队TCO沙盘.py", title="TCO", url_path="车队TCO沙盘"),
+]
+
+pg = st.navigation(PAGES, position="hidden")
+pg.run()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 002 页
+# -*- coding: utf-8 -*-
+"""首页：Carbon Tide 电影感总览 + 八模块入口 + 数据/闸门状态。
+
+只做展示：所有数字来自 services.py 读取的结果表；页面不做业务计算。
+"""
+
+import sys
+from pathlib import Path
+APP_DIR = Path(__file__).resolve().parent
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
+import pandas as pd
+import streamlit as st
+
+import services
+from components import cards, flags, layout, theme
+
+
+def _h(path: str) -> str:
+    return theme._href(path)
+
+
+def _bento_html(total_t, ratio_txt, speed_txt) -> str:
+    """首页八模块 bento 网格：纯 HTML/CSS，不加载任何图片。"""
+    return (
+        "<div class='cm-bento'>"
+        "<a class='cm-bento-card span2' href='" + _h("/基准核算") + "'>"
+        "<div class='cm-card-visual'><span class='cm-v-tag'>12,167 TRIPS</span>"
+        "<div class='cm-v-bars'><i style='height:28%'></i><i style='height:44%'></i>"
+        "<i style='height:36%'></i><i style='height:62%'></i><i style='height:51%'></i>"
+        "<i style='height:78%'></i><i style='height:66%'></i><i style='height:92%'></i></div>"
+        "<div class='cm-v-line'></div></div>"
+        "<div class='cm-card-body'><div class='cm-card-eyebrow'>01 / BASELINE</div>"
+        "<div class='cm-card-title'>基准核算<span>→</span></div>"
+        "<div class='cm-card-desc'>总碳排、总里程、数据质量：先把现状看清楚。E₀ "
+        + services.fmt(total_t, 1) + " t，逐趟可追溯。</div>"
+        "<div class='cm-card-foot'>DATA → LEDGER</div></div></a>"
+
+        "<a class='cm-bento-card' href='" + _h("/高排放诊断") + "'>"
+        "<div class='cm-card-visual'><span class='cm-v-tag'>HOTSPOTS</span>"
+        "<div class='cm-v-grid'>" + "".join("<i></i>" for _ in range(18)) + "</div></div>"
+        "<div class='cm-card-body'><div class='cm-card-eyebrow'>02 / DIAGNOSIS</div>"
+        "<div class='cm-card-title'>高排放诊断<span>→</span></div>"
+        "<div class='cm-card-desc'>四维热点 + 同线带宽 " + ratio_txt + "：减排空间不在平均数里。</div>"
+        "<div class='cm-card-foot'>FIND THE TAIL</div></div></a>"
+
+        "<a class='cm-bento-card' href='" + _h("/替代方案") + "'>"
+        "<div class='cm-card-visual'><span class='cm-v-tag'>C1–C5</span>"
+        "<div class='cm-v-compare'><i></i><i></i><i></i><i></i></div></div>"
+碳慧智算物流碳感知智能决策系统 V1.0    第 003 页
+        "<div class='cm-card-body'><div class='cm-card-eyebrow'>03 / ALTERNATIVES</div>"
+        "<div class='cm-card-title'>替代方案<span>→</span></div>"
+        "<div class='cm-card-desc'>这条线该派什么车？续航、窗口、运力、补能、冬季逐条校验。</div>"
+        "<div class='cm-card-foot'>SCENARIO × ROUTE</div></div></a>"
+
+        "<a class='cm-bento-card' href='" + _h("/成本效益") + "'>"
+        "<div class='cm-card-visual'><span class='cm-v-tag'>NPV / λ</span>"
+        "<div class='cm-v-bars'><i style='height:82%'></i><i style='height:58%'></i>"
+        "<i style='height:48%'></i><i style='height:34%'></i><i style='height:66%'></i></div></div>"
+        "<div class='cm-card-body'><div class='cm-card-eyebrow'>04 / COST & PAYBACK</div>"
+        "<div class='cm-card-title'>成本效益<span>→</span></div>"
+        "<div class='cm-card-desc'>多花多少钱、几年回本、λ 一动推荐换不换。</div>"
+        "<div class='cm-card-foot'>OPEX + CARBON</div></div></a>"
+
+        "<a class='cm-bento-card' href='" + _h("/碳会计台账") + "'>"
+        "<div class='cm-card-visual'><span class='cm-v-tag'>SIX FIELDS</span>"
+        "<div class='cm-v-rows'><i></i><i></i><i></i><i></i><i></i></div></div>"
+        "<div class='cm-card-body'><div class='cm-card-eyebrow'>05 / CARBON LEDGER</div>"
+        "<div class='cm-card-title'>碳会计台账<span>→</span></div>"
+        "<div class='cm-card-desc'>怎么记、怎么披露、怎么对接制度：六字段 + 六要素。</div>"
+        "<div class='cm-card-foot'>AUDIT READY</div></div></a>"
+
+        "<a class='cm-bento-card span2' href='" + _h("/路线实验室") + "'>"
+        "<div class='cm-card-visual'><span class='cm-v-tag'>AMAP LIVE · 4 POLICIES</span>"
+        "<svg class='cm-v-route' viewBox='0 0 600 150' preserveAspectRatio='none'>"
+        "<defs><linearGradient id='cmGrad' x1='0' x2='1'><stop offset='0%' stop-color='#5EE7FF'/>"
+        "<stop offset='100%' stop-color='#2DD4A7'/></linearGradient></defs>"
+        "<path d='M18 124 C 100 60, 160 138, 238 92 S 340 40, 410 76 S 520 118, 582 48'/>"
+        "<circle cx='18' cy='124' r='4'/><circle cx='582' cy='48' r='4'/></svg></div>"
+        "<div class='cm-card-body'><div class='cm-card-eyebrow'>06 / ROUTE LAB · LIVE</div>"
+        "<div class='cm-card-title'>路线实验室<span>→</span></div>"
+        "<div class='cm-card-desc'>高德实时规划，路线贴着公路走；4 条策略切换，策略级碳账同步更新。"
+        "310 个 OD，约 12,000 点/条。</div>"
+        "<div class='cm-card-foot'>ROAD-FOLLOWING · SMOOTH</div></div></a>"
+
+        "<a class='cm-bento-card span2' href='" + _h("/电动化测算") + "'>"
+        "<div class='cm-card-visual'><span class='cm-v-tag'>CHARGE MATH</span>"
+        "<div class='cm-v-bars'><i style='height:22%'></i><i style='height:38%'></i>"
+        "<i style='height:54%'></i><i style='height:72%'></i><i style='height:90%'></i>"
+        "<i style='height:62%'></i><i style='height:44%'></i></div></div>"
+        "<div class='cm-card-body'><div class='cm-card-eyebrow'>07 / ELECTRIFICATION</div>"
+        "<div class='cm-card-title'>电动化测算<span>→</span></div>"
+        "<div class='cm-card-desc'>改一个参数，全表联动：年节省、回本月份、NPV 四分解、双口径减碳。"
+        "当前均速 " + speed_txt + " km/h。</div>"
+        "<div class='cm-card-foot'>WHAT-IF ENGINE</div></div></a>"
+
+        "<a class='cm-bento-card span2' href='" + _h("/车队TCO沙盘") + "'>"
+        "<div class='cm-card-visual'><span class='cm-v-tag'>FLEET TCO</span>"
+        "<div class='cm-v-compare'><i></i><i></i><i></i><i></i><i></i></div></div>"
+        "<div class='cm-card-body'><div class='cm-card-eyebrow'>08 / FLEET TCO</div>"
+碳慧智算物流碳感知智能决策系统 V1.0    第 004 页
+        "<div class='cm-card-title'>车队 TCO 沙盘<span>→</span></div>"
+        "<div class='cm-card-desc'>柴油 / 电动 / CNG / HVO 同框架对比，NPV、回本、元/tCO₂e 一屏对齐。</div>"
+        "<div class='cm-card-foot'>MULTI-ROUTE · MULTI-FUEL</div></div></a>"
+        "</div>"
+    )
+
+
+def render() -> None:
+    layout.setup("碳慧智算")
+    src = services.source()
+    src_name = services.source_name()
+    gate = services.gate()
+    params = layout.sidebar_params(src_name, gate, current="0")
+
+    k = services.kpis()
+    mock = services.is_mock()
+    counts = services.flag_counts()
+
+    total_t = (k.get("total_kg") / 1000.0) if k.get("total_kg") else None
+    speed = k.get("avg_speed")
+    heavy = k.get("heavy_share")
+    ratio = k.get("od_ratio_median")
+    ratio_txt = ("%.2f×" % float(ratio)) if ratio is not None else "—"
+    speed_txt = services.fmt(speed, 2)
+
+    theme.hero(
+        "让每一吨碳，都有据可查。",
+        "从 12,167 趟物理行程、33,214 条运单关联出发，把路线、车型、成本与排放，"
+        "算成一张可审计、可决策、可披露的碳账。前端只读结果表，所有数字都能追到具体行程。",
+        kicker="碳慧智算 / CARBON INTELLIGENCE",
+        badges=[layout.source_badge(src_name), layout.gate_badge(gate), "8 个模块", "只读数据面"],
+        highlight="有据可查。",
+        actions=[
+            {"label": "进入决策台", "href": "/基准核算", "primary": True},
+            {"label": "打开路线实验室", "href": "/路线实验室", "primary": False},
+        ],
+    )
+    if mock:
+        layout.demo_note(str(src.get("reason", "")))
+
+    theme.marquee([
+        "12,167 PHYSICAL TRIPS",
+        "2,174,173.86 KM",
+        "E0 " + services.fmt(total_t, 1) + " tCO2e",
+        "AVG " + speed_txt + " KM/H",
+        "OD BAND " + ratio_txt,
+        "GATE PASS",
+        "READ-ONLY FRONTEND",
+        "AMAP LIVE ROUTE",
+    ])
+碳慧智算物流碳感知智能决策系统 V1.0    第 005 页
+
+    layout.section("数据底座 / THE LEDGER", "一份宽表，一条可追溯的碳账；不是报告，是装置。")
+    cards.stats([
+        {"label": "法定物理碳排", "value": services.fmt(total_t, 1) + " t",
+         "sub": "12,167 趟逐趟核算；33,214 条关联仅分摊", "tone": "mint"},
+        {"label": "物理总里程", "value": services.fmt((k.get("total_km") or 0) / 10000.0, 1) + " 万 km",
+         "sub": "物理行程去重后的总里程", "tone": "info"},
+        {"label": "物理行程", "value": services.fmt(k.get("physical_trips")),
+         "sub": "33,214 条运单关联 / 36,329 行", "tone": "plain"},
+        {"label": "物理加权均速", "value": speed_txt + " km/h",
+         "sub": "总里程 ÷ 总时长；源均速 49.51", "tone": "plain"},
+        {"label": "同线带宽", "value": ratio_txt,
+         "sub": "网点级中位；覆盖基准碳排 83.8%", "tone": "amber"},
+        {"label": "估算值", "value": services.fmt(k.get("estimated_rows")) + " 行",
+         "sub": "缺失字段填补，前端黄框留痕", "tone": "coral"},
+    ], cols=3)
+
+    layout.section("八个模块 / THE SYSTEM", "从一段运单到一张能披露的账，八个模块彼此咬合。")
+    st.markdown(_bento_html(total_t, ratio_txt, speed_txt), unsafe_allow_html=True)
+
+    layout.section("从运单到披露 / THE PIPELINE", "每一步都留下可复核的中间结果，而不是一句结论。")
+    cards.steps([
+        {"n": "01", "t": "运单清洗", "d": "36,329 行 → 33,214 条关联 / 12,167 趟物理行程"},
+        {"n": "02", "t": "行程计碳", "d": "法定轨 2,258.44 t + VSP 2,324.65 t，逐趟可查"},
+        {"n": "03", "t": "路径决策", "d": "路线 × 车型 × 成本 × λ；C1–C5 运营约束"},
+        {"n": "04", "t": "台账披露", "d": "六字段台账 + 六要素披露 + 多口径闸门"},
+    ], active=-1)
+
+    layout.section("运行状态 / LIVE STATUS", "前端只读结果表；缺表不红屏，只提示。")
+    status = pd.DataFrame(services.file_status())
+    _counts = pd.to_numeric(status["行数"], errors="coerce")
+    status["行数"] = _counts.apply(lambda x: "—" if pd.isna(x) else f"{int(x):,}")
+    cards.data_table(status, title="结果表清单", desc="data/processed 落盘状态", max_rows=20)
+
+    # ---------------- 闸门 ----------------
+    layout.section("对拍闸门 / G2", "10 个数字目标 + 18 项结构一致性；超差退出码非 0")
+    if gate and gate.get("targets"):
+        items = pd.DataFrame(gate["targets"])
+        if not items.empty:
+            items["判定"] = items["status"]
+            items["目标"] = items.apply(lambda r: services.fmt(r["expected"], 2) + " " + str(r["unit"]), axis=1)
+            items["实测"] = items.apply(
+                lambda r: ("—" if r["actual"] is None else services.fmt(r["actual"], 2)) + " " + str(r["unit"]),
+                axis=1)
+            show = items[["label", "stage", "目标", "实测", "判定", "note"]].rename(columns={
+                "label": "核对项", "stage": "出处", "note": "说明",
+            })
+            cards.data_table(show, title="G2 对拍明细", desc="10 个数字目标 + 18 项结构校验",
+                             max_rows=30, status_col="判定")
+        c = gate.get("counts", {})
+碳慧智算物流碳感知智能决策系统 V1.0    第 006 页
+        st.caption("模式：%s｜PASS %s｜FAIL %s｜SKIP %s｜%s"
+                   % (gate.get("mode", "—"), c.get("pass", 0), c.get("fail", 0),
+                      c.get("skip", 0), "GATE PASS · 全绿" if gate.get("passed") else "闸门未通过"))
+        bad = [x for x in gate.get("structural", []) if x.get("status") != "PASS"]
+        if bad:
+            for item in bad:
+                st.error("结构项未通过：" + str(item.get("label")) + "｜" + str(item.get("detail")))
+    else:
+        st.info("还没有 gate_report.json——运行 python -m src.pipeline 生成。")
+
+    # ---------------- 数据健康 ----------------
+    layout.section("数据健康 / DATA HYGIENE", "四类标记：灰底=重复，黄底=异常/口径，黄框=估算")
+    cards.data_table(flags.flag_summary(None, counts), title="四类数据标记",
+                     desc="灰底=重复 / 黄底=异常或口径 / 黄框=估算", max_rows=10)
+    flags.flag_legend()
+
+    # ---------------- 台账 + 披露 ----------------
+    led = services.ledger()
+    disc = services.disclosure()
+    with st.expander("G3 台账六字段 / G4 披露六要素（已生成，可下载）", expanded=False):
+        if led.empty:
+            st.info("台账未生成——先运行 python -m src.pipeline")
+        else:
+            cols = [c for c in (["scheme"] + services.LEDGER_COLUMNS + ["is_baseline"]) if c in led.columns]
+            cards.data_table(led[cols], title="G3 台账六字段",
+                             desc="基准 / 主推 / 保守三行结论账", max_rows=5, highlight="is_baseline")
+            st.caption("台账基准行的排放量 = 第 1 页 E₀（同一数据源，不二次计算）")
+            st.download_button(
+                "下载台账 CSV",
+                data=led.to_csv(index=False).encode("utf-8-sig"),
+                file_name="ledger.csv",
+                mime="text/csv",
+            )
+        if disc:
+            keys = [k for k in services.DISCLOSURE_KEYS if k in disc]
+            cards.data_table(
+                pd.DataFrame([{"要素": k, "内容": str(disc[k])} for k in keys]),
+                title="G4 披露六要素", desc="披露口径声明", max_rows=10,
+            )
+            st.download_button(
+                "下载披露 JSON",
+                data=pd.Series(disc).to_json(force_ascii=False, indent=2).encode("utf-8"),
+                file_name="disclosure.json",
+                mime="application/json",
+            )
+
+    # ---------------- 运行日志 ----------------
+    log = services.run_log()
+    if log:
+        with st.expander("G1 运行日志（哪一段失败、各段耗时）", expanded=False):
+碳慧智算物流碳感知智能决策系统 V1.0    第 007 页
+            stages = pd.DataFrame(log.get("stages", []))
+            if not stages.empty:
+                stages = stages.rename(columns={
+                    "name": "阶段", "status": "状态", "seconds": "耗时(s)", "error": "错误",
+                })
+                cards.data_table(stages[["阶段", "状态", "耗时(s)", "错误"]],
+                                 title="G1 分段耗时", max_rows=10, status_col="状态")
+            c1, c2 = st.columns(2)
+            c1.metric("总耗时（s）", services.fmt(log.get("total_seconds"), 2))
+            c2.metric("退出码", str(log.get("exit_code", "—")))
+
+    theme.cta(
+        "把一条运单，变成一张能披露的账。",
+        "从数据清洗、段级碳排、路线与车型决策，到台账与披露——每一步都只读结果表，"
+        "每个数字都能回到具体路段。",
+        primary={"label": "从基准核算开始", "href": "/基准核算"},
+        secondary={"label": "打开路线实验室", "href": "/路线实验室"},
+    )
+    layout.conclusion(
+        "系统把每一段运输翻译成可核查的碳排与成本，并把结论落成一张能披露的账；"
+        "所有估算都留痕，闸门不通过就退出码 1。"
+    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 008 页
+"""数据读取层（A0）：前端唯一的数据入口。
+
+规矩：
+1. 只读 data/processed/；只从 src/schema.py 取常量（文件名/列名/校验），
+   不调用任何核心算法（A0 规则针对算法，不针对常量——契约必须只有一份）；
+2. 缺文件、缺列、文件损坏一律返回空表 + 原因，不抛异常（答辩现场不能红屏）；
+3. 页面只能通过本模块取数，不允许直接 pd.read_parquet；
+4. 结果表由 python -m src.pipeline 预先生成，页面里没有一行业务公式。
+
+docs/20 §11 增补（情景演算页）：第 7/8 页是"用户输入→即时算"的演算页，
+与对拍链路隔离。全 app/ 只在本文件出现一次 ``from src import scenarios``
+（演算内核）；``from src import schema`` 只取列名/文件名常量，不调算法。
+页面仍只 import services——自证命令见 docs/20 §4。
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+import streamlit as st
+
+ROOT = Path(__file__).resolve().parents[1]
+PROCESSED = ROOT / "data" / "processed"
+if str(ROOT) not in sys.path:  # noqa: E402
+    sys.path.insert(0, str(ROOT))
+
+from src import schema  # noqa: E402  ← 只取常量（文件名/列名），不调算法
+from src import scenarios as _kernel  # noqa: E402  ← 全 app/ 唯一一处演算内核（docs/20 §11）
+                                       # 别名：避免与本文件 scenarios()（结果表读取）撞名
+
+# ---- 结果文件清单 / 列契约：唯一来源是 src/schema.py（此处只做别名） ----
+RESULT_FILES: Dict[str, str] = schema.RESULT_FILES
+
+# ---- 冻结的列名：只增不改 ----
+SEGMENT_COLUMNS: List[str] = schema.SEGMENT_COLUMNS
+
+# 页面能不能出数，只看这四列在不在（缺任何一列，页面停在数据检查，不编数字）
+CORE_COLUMNS: List[str] = schema.CORE_COLUMNS
+
+SCENARIO_COLUMNS: List[str] = schema.SCENARIO_COLUMNS
+
+#: O6 约束结论列：唯一来源是 src/schema.py（页面 3 按契约渲染，不猜列名）
+CONSTRAINT_COLUMNS: List[str] = schema.CONSTRAINT_COLUMNS
+
+#: 方案 × 线路约束表契约列（scenario_route_constraint.parquet）
+碳慧智算物流碳感知智能决策系统 V1.0    第 009 页
+ROUTE_CONSTRAINT_COLUMNS: List[str] = schema.ROUTE_CONSTRAINT_COLUMNS
+
+LEDGER_COLUMNS: List[str] = schema.LEDGER_COLUMNS
+
+DISCLOSURE_KEYS: List[str] = schema.DISCLOSURE_KEYS
+
+
+def path_of(name: str) -> Path:
+    return PROCESSED / RESULT_FILES.get(name, "")
+
+
+def _has(df: pd.DataFrame, col: str) -> bool:
+    return df is not None and not df.empty and col in df.columns
+
+
+def column_ok(df: pd.DataFrame, cols: List[str]) -> List[str]:
+    """返回缺失的列名；页面据此显示“该表还没就绪”。"""
+    if df is None or df.empty:
+        return list(cols)
+    return [c for c in cols if c not in df.columns]
+
+
+@st.cache_data(show_spinner=False)
+def available() -> Dict[str, bool]:
+    return {k: (PROCESSED / f).exists() for k, f in RESULT_FILES.items()}
+
+
+@st.cache_data(show_spinner=False)
+def _read_parquet(filename: str) -> pd.DataFrame:
+    p = PROCESSED / filename
+    if not p.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_parquet(p)
+    except Exception:
+        # 没装 pyarrow 或文件损坏，都退化成空表；页面显示空状态而不是红屏
+        return pd.DataFrame()
+
+
+@st.cache_data(show_spinner=False)
+def _read_json(filename: str) -> Dict[str, Any]:
+    p = PROCESSED / filename
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 010 页
+# ---------------- 主表 ----------------
+
+def wide() -> pd.DataFrame:
+    return _read_parquet(RESULT_FILES["wide"])
+
+
+def segments() -> pd.DataFrame:
+    return _read_parquet(RESULT_FILES["segments"])
+
+
+def scenarios() -> pd.DataFrame:
+    return _read_parquet(RESULT_FILES["scenarios"])
+
+
+# ---------------- 运营约束（O6 契约式读取，可选） ----------------
+# 规则文本见 docs/20 §7：C1 续航衰减 / C2 14h 窗口 / C3 运力匹配 / C4 补能可达 / C5 冬季山区。
+# O6 未接表前，页面 3 只展示规则框架；约束结论列写进结果表后，页面按约定自动渲染。
+
+
+def constraint_contract() -> Dict[str, Any]:
+    """探测结果表里的约束结论列。返回 {available, columns, rows}。"""
+    df = scenarios()
+    if df.empty or "scenario" not in df.columns:
+        return {"available": False, "columns": [], "rows": []}
+    cols = [c for c in CONSTRAINT_COLUMNS if c in df.columns]
+    if not cols:
+        return {"available": False, "columns": [], "rows": []}
+    rows = df[["scenario"] + cols].to_dict(orient="records")
+    return {"available": True, "columns": cols, "rows": rows}
+
+
+def route_constraints() -> pd.DataFrame:
+    """方案 × 哪条线：scenario_route_constraint.parquet（逐线路 C1–C5 结论）。
+
+    一行一个 (方案, 类别, 线路)；只有参数化方案才有行。缺失/旧结果表返回空表。
+    """
+    return _read_parquet(RESULT_FILES["route_constraints"])
+
+
+def route_constraint_contract() -> Dict[str, Any]:
+    """线路级约束表契约探测：{available, columns, rows, summary}。
+
+    summary 由段表级 verdict 列聚合不出（它在 final_report 的 note 里），
+    页面直接展示逐线表 + 表级状态分布即可，不在这里做二次统计口径。
+    """
+    df = route_constraints()
+    if df.empty:
+        return {"available": False, "columns": [], "rows": [], "summary": {}}
+    cols = [c for c in ROUTE_CONSTRAINT_COLUMNS if c in df.columns]
+    if not cols:
+碳慧智算物流碳感知智能决策系统 V1.0    第 011 页
+        return {"available": False, "columns": [], "rows": [], "summary": {}}
+    summary: Dict[str, Any] = {"rows": int(len(df))}
+    if "deploy_tier" in df.columns:
+        summary["by_tier"] = {str(k): int(v) for k, v in
+                              df["deploy_tier"].value_counts().items()}
+    if "constraint_status" in df.columns:
+        summary["by_status"] = {str(k): int(v) for k, v
+                                in df["constraint_status"].value_counts().items()}
+    return {"available": True, "columns": cols,
+            "rows": df[cols].to_dict(orient="records"), "summary": summary}
+
+
+def hotspots(dim: str | None = None) -> pd.DataFrame:
+    df = _read_parquet(RESULT_FILES["hotspots"])
+    if dim and _has(df, "dimension"):
+        df = df[df["dimension"] == dim]
+    return df
+
+
+def od_band() -> pd.DataFrame:
+    return _read_parquet(RESULT_FILES["od_band"])
+
+
+def od_vehicle_mix(od_site: Optional[str] = None) -> pd.DataFrame:
+    """可比较 OD 的逐车型构成（od_vehicle_mix.parquet，D4 预计算）。
+
+    一行一个 (od_site, vehicle_type)；占比 = 该车型碳排占该 OD 碳排的比例。
+    页面按 od_site 查表显示，不再在页面上做 groupby / mean / 占比。
+    """
+    df = _read_parquet(RESULT_FILES["od_vehicle_mix"])
+    if od_site and not df.empty and "od_site" in df.columns:
+        df = df[df["od_site"].astype(str) == str(od_site)]
+    return df
+
+
+def route_carbon_od(od_site: Optional[str] = None) -> pd.DataFrame:
+    """OD 级路线口径碳合计（route_carbon_od.parquet，D4 预计算）。
+
+    一行一个 od_site；列 = 段数 + kg_co2_route_legal/phys + route_km 合计。
+    浏览器端不再对段表 sum 碳排——那是口径计算，只能在这里读行。
+    仅在 --with-routes 跑过 optimizer.build_routes 后存在。
+    """
+    df = _read_parquet(RESULT_FILES["route_carbon_od"])
+    if od_site and not df.empty and "od_site" in df.columns:
+        df = df[df["od_site"].astype(str) == str(od_site)]
+    return df
+
+
+# ---------------- D5 · λ 敏感性曲线（预计算，页面只读） ----------------
+# 公式全项目唯一一份在 src/evaluator.build_lambda_curve（与 evaluate_scenario 的
+碳慧智算物流碳感知智能决策系统 V1.0    第 012 页
+# NPV 口径逐点一致：年节省 = 运营节省 + 年度减排量 × λ）。页面不得自建第二套。
+
+
+def lambda_curve() -> pd.DataFrame:
+    """λ × 回本年限全网格表（0–3000 元/t，步长 5）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["lambda_curve"])
+
+
+def lambda_grid() -> Dict[str, Any]:
+    """网格量程信息 {min, max, step, points}，页面据此注明“当前 λ 取最近网格点”。"""
+    df = lambda_curve()
+    if df.empty or "lambda_yuan_t" not in df.columns:
+        return {}
+    values = sorted(float(v) for v in
+                    pd.to_numeric(df["lambda_yuan_t"], errors="coerce").dropna().unique())
+    if len(values) < 2:
+        return {}
+    return {"min": values[0], "max": values[-1],
+            "step": float(values[1] - values[0]), "points": len(values)}
+
+
+def lambda_curve_at(lam: float) -> pd.DataFrame:
+    """当前 λ 的最近网格行（只做最近点选取，不做任何换算）。"""
+    df = lambda_curve()
+    if df.empty or "lambda_yuan_t" not in df.columns:
+        return df
+    values = [float(v) for v in
+              pd.to_numeric(df["lambda_yuan_t"], errors="coerce").dropna().unique()]
+    if not values:
+        return df
+    nearest = min(values, key=lambda v: abs(v - float(lam)))
+    return df[df["lambda_yuan_t"] == nearest]
+
+
+def ledger() -> pd.DataFrame:
+    return _read_parquet(RESULT_FILES["ledger"])
+
+
+def disclosure() -> Dict[str, Any]:
+    return _read_json(RESULT_FILES["disclosure"])
+
+
+def composition() -> Dict[str, Any]:
+    """E₀ 构成预计算表（第 5 页下钻）：combos[月份键|车型键] → 该组合的构成。
+
+    键规则与 src/pipeline._subset_key 一致：全集 = "all"，子集 = 升序逗号连接
+    （如 "1,2|1,3" = 1/2 月 × 轻型+重型）。页面只查表，不做聚合。
+    """
+    return _read_json(RESULT_FILES["composition"])
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 013 页
+
+def composition_combo(months: Optional[List[int]] = None,
+                      vclasses: Optional[List[int]] = None) -> Dict[str, Any]:
+    """按页面筛选取预计算组合；查不到返回 {}（页面显示提示，不自行聚合）。"""
+    data = composition()
+    combos = data.get("combos") or {}
+    all_months = [int(m) for m in (data.get("months") or [])]
+    all_classes = [int(v) for v in (data.get("vclasses") or [])]
+    picked_m = sorted(int(m) for m in (months or []))
+    picked_v = sorted(int(v) for v in (vclasses or []))
+    m_key = "all" if (not picked_m or picked_m == all_months) else ",".join(str(m) for m in picked_m)
+    v_key = "all" if (not picked_v or picked_v == all_classes) else ",".join(str(v) for v in picked_v)
+    return combos.get(m_key + "|" + v_key) or {}
+
+
+def quality() -> Dict[str, Any]:
+    return _read_json(RESULT_FILES["quality"])
+
+
+def gate() -> Dict[str, Any]:
+    return _read_json(RESULT_FILES["gate"])
+
+
+def run_log() -> Dict[str, Any]:
+    return _read_json(RESULT_FILES["run_log"])
+
+
+def fleet_stats() -> Dict[str, Any]:
+    """车队真实统计 fleet_stats.json（第 7/8 页计算器默认值）。缺失返回 {}。"""
+    return _read_json(RESULT_FILES["fleet_stats"])
+
+
+# ---------------- 情景演算桥（docs/20 §11） ----------------
+# 全 app/ 唯一调用 src 的地方；页面只经此处，不直接 import src。
+# 演算结果绝不写回结果表，也不进 kpi/gate（对拍口径与情景推演分列）。
+
+def calc_factors() -> Dict[str, Any]:
+    """口径配置 config/calc_factors.json（计算器的假设值来源）。"""
+    return _kernel.load_factors()
+
+
+def calc_electrification(params: Dict[str, Any]) -> Dict[str, Any]:
+    """第 7 页：电动车队测算。逻辑在 src/scenarios.py，本函数只转发。"""
+    return _kernel.calc_electrification(params)
+
+
+def calc_fleet_tco(params: Dict[str, Any]) -> Dict[str, Any]:
+    """第 8 页：车队 TCO 多路线对比。逻辑在 src/scenarios.py，本函数只转发。"""
+    return _kernel.calc_fleet_tco(params)
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 014 页
+
+def tonne_km_comparison(our_g_per_tkm: float, **kwargs: Any) -> Dict[str, Any]:
+    """口径对照：行业吨公里法 vs 我们段级自底向上（EcoTransIT 式）。"""
+    return _kernel.tonne_km_comparison(our_g_per_tkm, **kwargs)
+
+
+def source() -> Dict[str, Any]:
+    return _read_json(RESULT_FILES["source"])
+
+
+def source_name() -> str:
+    return str(source().get("source", "unknown"))
+
+
+# ---------------- T7 · 路线情景（只读） ----------------
+
+def routes() -> pd.DataFrame:
+    """路线表 route_od.parquet（高德真路线 + 离线兜底）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["routes"])
+
+
+def route_carbon() -> pd.DataFrame:
+    """路线情景段表 route_carbon.parquet（L1 双轨碳排）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_carbon"])
+
+
+def route_select() -> pd.DataFrame:
+    """λ 推荐表 route_select.parquet（L2 联合决策）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_select"])
+
+
+def route_candidates() -> pd.DataFrame:
+    """候选路线表 route_candidates.parquet（OD × 4 策略）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_candidates"])
+
+
+def route_candidate_carbon() -> pd.DataFrame:
+    """候选路线碳账 route_candidate_carbon.parquet（OD × 策略 × 车型）。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_candidate_carbon"])
+
+
+@st.cache_data(show_spinner=False)
+def route_lab_candidates() -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """路线实验室的策略碳账：od_key → {strategy: 指标}。
+
+    只做单位换算（kg → t）和字段搬运，不做碳/成本公式；缺失返回 {}。
+    """
+    df = route_candidate_carbon()
+    if df.empty or "od_key" not in df.columns or "strategy" not in df.columns:
+        return {}
+碳慧智算物流碳感知智能决策系统 V1.0    第 015 页
+    out: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for _, r in df.iterrows():
+        try:
+            od = str(r.get("od_key") or "")
+            strategy = str(int(r.get("strategy")))
+        except (TypeError, ValueError):
+            continue
+        if not od:
+            continue
+        def _f(key: str) -> float:
+            value = pd.to_numeric(pd.Series([r.get(key)]), errors="coerce").iloc[0]
+            return float(value) if pd.notna(value) else 0.0
+
+        kg = pd.to_numeric(pd.Series([r.get("kg_co2_route")]), errors="coerce").iloc[0]
+        out.setdefault(od, {})[strategy] = {
+            "km": _f("route_km"),
+            "min": _f("route_min"),
+            "toll": _f("toll_yuan"),
+            "co2": (float(kg) / 1000.0) if pd.notna(kg) else None,
+            "opex": _f("opex_yuan"),
+            "cc": _f("carbon_cost_yuan"),
+            "score": _f("score_yuan"),
+            "veh": str(r.get("vehicle_type") or ""),
+            "load": _f("load_t"),
+            "name": str(r.get("strategy_name") or ""),
+        }
+    return out
+
+
+def route_available() -> bool:
+    """路线表是否就绪（决定第 3 页显示动态路线面板还是提示）。"""
+    return not routes().empty
+
+
+# ---------------- 上海—北京 OSM 碳基线（docs/35 D2/D3） ----------------
+# 纪律：**只读不算**。summary 里的所有数字都是 tools/route_baseline.py
+# 预先算好的；页面不重算碳排、不重算占比、不做坐标转换。
+
+
+def route_baseline_steps() -> pd.DataFrame:
+    """OSM 基线逐 step 表 route_baseline_sh_bj_steps.parquet。缺失返回空表。"""
+    return _read_parquet(RESULT_FILES["route_baseline_steps"])
+
+
+def route_baseline_summary() -> Dict[str, Any]:
+    """OSM 基线汇总 route_baseline_sh_bj_summary.json。缺失返回 {}。
+
+    含 disclaimer（非实时 / 固定因子 / 道路等级 proxy），页面必须照着显示。
+    """
+    return _read_json(RESULT_FILES["route_baseline_summary"])
+碳慧智算物流碳感知智能决策系统 V1.0    第 016 页
+
+
+def route_baseline_available() -> bool:
+    """基线是否就绪（steps 与 summary 同时存在才算）。"""
+    if not route_baseline_summary():
+        return False
+    return not route_baseline_steps().empty
+
+
+# ---------------- HYC 物理行程审计（docs/39，只读，不替代 E0） ----------------
+
+def vsp_audit() -> Dict[str, Any]:
+    """物理行程审计汇总 vsp_audit.json。缺失返回 {}。"""
+    return _read_json(RESULT_FILES["vsp_audit"])
+
+
+def vsp_physical_trips() -> pd.DataFrame:
+    """12,167 条物理行程（已去车牌/运单/客户），供审计表与下载。"""
+    return _read_parquet(RESULT_FILES["vsp_physical_trips"])
+
+
+def vsp_vehicle_groups() -> pd.DataFrame:
+    """HYC 车型组汇总（6 组），供审计下钻。"""
+    return _read_parquet(RESULT_FILES["vsp_vehicle_groups"])
+
+
+def vsp_available() -> bool:
+    """审计层是否就绪；旧数据目录没有这三张表时页面自动隐藏。"""
+    return bool(vsp_audit()) and not vsp_physical_trips().empty
+
+
+@st.cache_data(show_spinner=False)
+def route_lab_rows() -> pd.DataFrame:
+    """路线实验室的展示表：route_od 的几何/端点 + route_select 的碳账与推荐车型。
+
+    只做左连接与列改名，不做碳/成本计算；页面拿到的是已经算好的数字。
+    缺失 route_select 时仍返回 route_od，实验室自动隐藏碳账区块。
+    """
+    route = routes()
+    if route.empty:
+        return route
+    out = route.copy()
+    select = route_select()
+    if not select.empty and "od_key" in select.columns:
+        keep = ["od_key", "vehicle_type", "load_t", "route_km", "route_min",
+                "toll_yuan", "kg_co2_route", "opex_yuan", "carbon_cost_yuan",
+                "score_yuan", "flag_route_est"]
+        sub = select[[c for c in keep if c in select.columns]].copy()
+        sub = sub.rename(columns={
+            "route_km": "sel_km", "route_min": "sel_min",
+碳慧智算物流碳感知智能决策系统 V1.0    第 017 页
+            "toll_yuan": "sel_toll_yuan", "kg_co2_route": "sel_kg_co2",
+            "flag_route_est": "sel_flag_route_est",
+        })
+        out = out.merge(sub, on="od_key", how="left")
+
+    for col in ("distance_km", "duration_min", "toll_yuan", "sel_km", "sel_min",
+                "sel_toll_yuan", "sel_kg_co2", "opex_yuan", "carbon_cost_yuan",
+                "score_yuan", "load_t", "flag_route_est", "sel_flag_route_est"):
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce")
+
+    if "distance_km" in out.columns and "sel_km" in out.columns:
+        out["distance_km"] = out["distance_km"].fillna(out["sel_km"])
+    if "duration_min" in out.columns and "sel_min" in out.columns:
+        out["duration_min"] = out["duration_min"].fillna(out["sel_min"])
+    if "toll_yuan" in out.columns and "sel_toll_yuan" in out.columns:
+        out["toll_yuan"] = out["toll_yuan"].fillna(out["sel_toll_yuan"])
+    if "flag_route_est" in out.columns and "sel_flag_route_est" in out.columns:
+        out["flag_route_est"] = out["flag_route_est"].fillna(out["sel_flag_route_est"])
+    if "flag_route_est" in out.columns:
+        out["flag_route_est"] = out["flag_route_est"].fillna(0).astype(int)
+
+    if "sel_kg_co2" in out.columns:
+        out["co2_t"] = out["sel_kg_co2"] / 1000.0
+    return out
+
+
+def is_mock() -> bool:
+    """演示数据：_source.json 说 demo，或旧版 _mock.flag 还在。"""
+    if source_name() == "demo":
+        return True
+    return (PROCESSED / "_mock.flag").exists() and source_name() != "real"
+
+
+# ---------------- 汇总指标 ----------------
+
+@st.cache_data(show_spinner=False)
+def kpis() -> Dict[str, Any]:
+    """kpi.json 是唯一来源（pipeline 预计算，口径只有这一份）。
+
+    D4：原函数在缺 kpi.json 时从段表自算 sum/mean/占比——那正是“前端第二套口径”，
+    已删除。缺文件时返回空 dict，页面显示“—”并提示重跑 pipeline，不编数字。
+    """
+    return dict(_read_json(RESULT_FILES["kpi"]))
+
+
+def flag_counts() -> Dict[str, int]:
+    """四类 FLAG 的计数：唯一来源是 data_quality.json（pipeline 预计算）。
+
+    D4：原实现在缺键时回退到段表 sum——前端第二套口径，已删除；
+碳慧智算物流碳感知智能决策系统 V1.0    第 018 页
+    缺键返回 0，页面显示空态而不是自算。
+    """
+    q = quality()
+    k = kpis()
+
+    def pick(qkey: str, kkey: str, default: int = 0) -> int:
+        for value in (q.get(qkey), k.get(kkey)):
+            try:
+                if value is not None:
+                    return int(value)
+            except (TypeError, ValueError):
+                pass
+        return default
+
+    return {
+        "rows_wide": pick("rows_wide", "rows_wide"),
+        "rows_dedup": pick("rows_dedup", "segments"),
+        "dup_rows": pick("dup_rows", "dup_rows"),
+        "anomaly_rows": pick("anomaly_rows", "anomaly_rows"),
+        "basis_rows": pick("basis_rows", "basis_rows"),
+        "estimated_rows": pick("estimated_rows", "estimated_rows"),
+    }
+
+
+# ---------------- 文件状态 ----------------
+
+@st.cache_data(show_spinner=False)
+def file_status() -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for key, filename in RESULT_FILES.items():
+        p = PROCESSED / filename
+        exists = p.exists()
+        count: Optional[int] = None
+        if exists and filename.endswith(".parquet"):
+            count = len(_read_parquet(filename))
+        updated = "—"
+        if exists:
+            try:
+                updated = datetime.fromtimestamp(p.stat().st_mtime).strftime("%m-%d %H:%M:%S")
+            except Exception:
+                updated = "—"
+        rows.append({
+            "结果表": key,
+            "文件": filename,
+            "状态": "已就绪" if exists else "未生成",
+            "行数": count if count is not None else "—",
+            "更新时间": updated,
+        })
+    return rows
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 019 页
+
+def fmt(value: Any, digits: int = 0) -> str:
+    """把数字变好看；None 显示为横杠。"""
+    if value is None:
+        return "—"
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if v != v:
+        return "—"
+    if digits == 0:
+        return "{:,.0f}".format(v)
+    return "{:,.{}f}".format(v, digits)
+
+
+def pct(value: Any, digits: int = 1) -> str:
+    try:
+        return "{:.{}f}%".format(float(value) * 100.0, digits)
+    except (TypeError, ValueError):
+        return "—"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 020 页
+# -*- coding: utf-8 -*-
+"""概览页：与 / 共用 home_view.render，走客户端路由回首页。"""
+import sys
+from pathlib import Path
+
+APP_DIR = Path(__file__).resolve().parents[1]
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
+from home_view import render
+
+render()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 021 页
+"""第 1 页 · 基准核算：碳排了多少、从哪来、数据有多脏。
+
+数据契约（只读，不重算，D4）：
+- kpi.json：总碳 / 总里程 / 段数 / 均速 / 重型占比 / 估算占比（全量锁定口径）
+- hotspots.parquet：车型碳排排行（dimension=车型）
+- data_quality.json：四类 FLAG 计数、源行号可回查率、估算原因拆分
+- gate_report.json：十项对拍目标（本页只展示）
+- baseline_carbon.parquet：段级明细（地图 / 直方图 / 明细表直接画原始列）
+
+页面口径：KPI 与排行榜为**全量锁定口径**，不随本页筛选变化——
+筛选只影响地图、速度分布与段级明细；这样任何筛选下的数字都与闸门对得上。
+"""
+
+import sys
+from pathlib import Path
+
+APP_DIR = Path(__file__).resolve().parents[1]
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
+import pandas as pd
+import streamlit as st
+
+import services
+from components import cards, layout, charts, flags, mapview, theme
+
+layout.setup("1 基准核算")
+src = services.source()
+gate = services.gate()
+layout.sidebar_params(services.source_name(), gate, current="1")
+
+seg = services.segments()
+if seg.empty:
+    theme.hero("基准核算", "还没有结果表", kicker="01 / BASELINE")
+    layout.empty_state(["baseline_carbon.parquet"])
+    st.stop()
+
+missing = services.column_ok(seg, services.CORE_COLUMNS)
+if missing:
+    theme.hero("基准核算", "结果表还没有按契约落盘", kicker="01 / BASELINE", badges=["数据检查"])
+    st.warning("缺少字段：" + "、".join(missing))
+    st.caption("当前字段：" + "、".join([str(c) for c in seg.columns]))
+    with st.expander("先看看现有数据"):
+        cards.data_table(seg.head(20), title="现有字段预览", max_rows=20)
+    layout.conclusion("数据契约没落地之前，页面不编数字——这是硬规矩。")
+    st.stop()
+
+mock = services.is_mock()
+badges = [layout.source_badge(services.source_name()), layout.gate_badge(gate),
+          "数据期 2023 · 120 天", "双轨计量"]
+碳慧智算物流碳感知智能决策系统 V1.0    第 022 页
+theme.hero(
+    "基准核算：碳从哪里来",
+    "逐趟计量每一条公路运输，先看清总量、结构与数据的可信度。",
+    kicker="01 / BASELINE",
+    badges=badges,
+)
+if mock:
+    layout.demo_note(str(src.get("reason", "")))
+
+# ---------------- 筛选条 ----------------
+f1, f2, f3 = st.columns([1.1, 1.0, 1.4])
+with f1:
+    picked_cls = st.multiselect("车型大类", ["轻型", "中型", "重型"], placeholder="全部")
+with f2:
+    month_opts = sorted([int(m) for m in seg["month"].dropna().unique()]) if "month" in seg.columns else []
+    picked_month = st.multiselect("月份", month_opts, placeholder="全月")
+with f3:
+    only_est = st.checkbox("只看估算值（黄框）", value=False,
+                           help="flag_estimated = 1 的行：有字段被历史/行业均值填补")
+st.caption("筛选只影响本页展示，不改计算结果；结果表的生成口径在 pipeline 出口已锁定。")
+
+view = seg.copy()
+if picked_cls and "vclass" in view.columns:
+    name2cls = {"轻型": 1, "中型": 2, "重型": 3}
+    view = view[view["vclass"].isin([name2cls[c] for c in picked_cls])]
+if picked_month and "month" in view.columns:
+    view = view[view["month"].isin(picked_month)]
+if only_est and "flag_estimated" in view.columns:
+    view = view[view["flag_estimated"] == 1]
+
+if view.empty:
+    st.info("当前筛选条件下没有数据。")
+    st.stop()
+
+# ---- KPI 行：全部读 kpi.json（pipeline 预计算，全量锁定口径） ----
+k = services.kpis()
+heavy_share = k.get("heavy_share")
+est_share = k.get("estimated_rows")
+est_share_pct = (est_share / k["segments"]) if (est_share is not None and k.get("segments")) else None
+
+layout.kpi_row([
+    {"label": "总碳排放（tCO₂e）", "value": services.fmt(k.get("e0_t"), 1),
+     "help": "12,167 趟物理行程的法定轨碳排；33,214 条运单关联仅用于分摊/追溯"},
+    {"label": "总里程（万 km）", "value": services.fmt((k.get("total_km") or 0) / 10000.0, 1),
+     "help": "物理行程去重后的总里程"},
+    {"label": "物理行程", "value": services.fmt(k.get("physical_trips")),
+     "help": "12,167 趟；33,214 条运单关联仅供分摊/追溯"},
+    {"label": "物理加权均速（km/h）", "value": services.fmt(k.get("avg_speed"), 2),
+     "help": "总里程 ÷ 总时长；关联口径源均速 49.51 仍作数据质量检查"},
+    {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—")},
+碳慧智算物流碳感知智能决策系统 V1.0    第 023 页
+    {"label": "估算值占比", "value": (("%.2f%%" % (100 * est_share_pct)) if est_share_pct is not None else "—"),
+     "help": "黄框标出的行；只填补、不删除"},
+], per_row=3)
+st.caption("物理加权均速 %s km/h（总里程 ÷ 总时长）；关联口径源均速 %s km/h 对官方 49.57，"
+           "仍作为数据质量检查。KPI 为 pipeline 出口锁定的全量口径（kpi.json），筛选只影响下方地图、"
+           "速度分布与明细——避免筛选后的数字与闸门对不上。"
+           % (services.fmt(k.get("avg_speed"), 2), services.fmt(k.get("source_avg_speed"), 2)))
+
+# ---------------- 对拍口径 ----------------
+st.markdown("")
+layout.section("对拍口径", "闸门在 pipeline 出口自动核对十个数，本页只展示，不重算")
+targets = gate.get("targets", []) if gate else []
+if targets:
+    tdf = pd.DataFrame(targets)
+    tdf["判定"] = tdf["status"]
+    tdf["label"] = tdf["label"].replace({"独立路段数": "运单—车辆关联记录"})
+    tdf.loc[tdf["label"].eq("运单—车辆关联记录"), "unit"] = "条"
+    tdf["目标"] = tdf.apply(lambda r: services.fmt(r["expected"], 2) + " " + str(r["unit"]), axis=1)
+    tdf["实测"] = tdf.apply(
+        lambda r: ("—" if r["actual"] is None else services.fmt(r["actual"], 2)) + " " + str(r["unit"]),
+        axis=1)
+    cards.data_table(
+        tdf[["label", "stage", "目标", "实测", "判定", "note"]].rename(columns={
+            "label": "核对项", "stage": "出处", "note": "说明"}),
+        title="G2 对拍口径", desc="pipeline 出口锁定，本页只展示", max_rows=20, status_col="判定",
+    )
+    st.caption("真实数据十项全过：法定物理 E₀ 2,258,438.38 kg；物理加权均速 43.14；"
+               "关联口径源均速 49.51 对官方 49.57 在 ±0.1 内。演示模式跳过依赖真数据的项。")
+else:
+    st.info("还没有 gate_report.json——运行 python -m src.pipeline 生成。")
+
+# ---------------- 双口径审计（HYC 物理行程） ----------------
+# 主账已切为法定物理轨 2,258.44 t；4,502.04 仅作运单关联毛值/分摊基数。
+_audit = services.vsp_audit()
+if _audit:
+    st.markdown("")
+    layout.section(
+        "口径审计 · 物理主账 vs 运单关联毛值",
+        "主账 2,258.44 t；4,502.04 t 仅作关联毛值/分摊基数；VSP 与 HYC 单列对照",
+    )
+    _cur = _audit.get("current", {})
+    _phy = _audit.get("physical_current", {})
+    _vsp = _audit.get("vsp", {})
+    _hyc = _audit.get("hyc", {})
+    cards.stats([
+        {"label": "运单关联毛值", "value": services.fmt(_cur.get("t"), 1) + " t",
+         "sub": "%s 条关联 · %.1f 万 km" % (services.fmt(_cur.get("rows")), (_cur.get("km") or 0) / 10000.0),
+         "tone": "coral", "help": "仅作分摊基数，不再作为主账 E₀"},
+        {"label": "法定物理主账", "value": services.fmt(_phy.get("t"), 1) + " t",
+         "sub": "%s 趟 · %.1f 万 km" % (services.fmt(_phy.get("trips")), (_phy.get("km") or 0) / 10000.0),
+碳慧智算物流碳感知智能决策系统 V1.0    第 024 页
+         "tone": "mint", "help": "12,167 趟 × 当前六档因子；主账 E₀"},
+        {"label": "我们的 VSP 物理轨", "value": services.fmt(_vsp.get("t"), 1) + " t",
+         "sub": "较法定 %+.1f t (%+.2f%%)" % (
+             (_vsp.get("t") or 0) - (_phy.get("t") or 0),
+             ((_vsp.get("t") or 0) / (_phy.get("t") or 1) - 1) * 100),
+         "tone": "info", "help": "速度 → VSP → 排放率积分；我们自己的物理轨"},
+        {"label": "HYC 代理口径", "value": services.fmt(_hyc.get("t"), 1) + " t",
+         "sub": "较 VSP %+.1f t (%+.2f%%)" % (
+             (_hyc.get("t") or 0) - (_vsp.get("t") or 0),
+             ((_hyc.get("t") or 0) / (_vsp.get("t") or 1) - 1) * 100),
+         "tone": "amber", "help": "HYC 车型代理因子；不是 VSP 精度提升"},
+    ], cols=4)
+
+    _rec = pd.DataFrame(_audit.get("reconciliation", []))
+    if not _rec.empty:
+        cards.data_table(
+            _rec, title="五口径对照",
+            desc="同一批数据、不同统计单元；差异不是数据错误",
+            max_rows=6, numeric=["记录数", "里程_km", "碳排_t"],
+        )
+
+    cards.note(
+        "**主账已切为法定物理轨 2,258.44 t**：12,167 趟、217.4 万 km；33,214 条运单关联仅作分摊/追溯。"
+        "4,502.04 t 是关联毛值，不再作主账；我们自己的 VSP 物理轨为 **2,324.65 t**，比法定高 **66.22 t（+2.93%）**。"
+        "HYC 代理因子为 **2,338.93 t**，只比 VSP 高 **14.28 t（+0.61%）**，但它是固定因子代理，**不是 VSP**。"
+        "四者净差 2,163.11 t：重复计数 **2,243.60 t**、因子映射 **−80.49 t**；月份/数据源/行程键均不是原因。"
+        "G2 闸门已按物理主账、物理行程、物理里程和物理加权均速更新。"
+    )
+
+    with st.expander("查看物理行程与车型组明细（审计口径）"):
+        _grp = services.vsp_vehicle_groups()
+        if not _grp.empty:
+            cards.data_table(
+                _grp, title="HYC 车型组汇总",
+                desc="按 HYC 代表因子组汇总；代理映射，不是逐车实测",
+                max_rows=8, numeric=["物理行程", "里程_km", "碳排_kg", "平均因子_g_km", "碳排占比_pct"],
+            )
+        _trips = services.vsp_physical_trips()
+        if not _trips.empty:
+            cards.data_table(
+                _trips.head(30), title="物理行程明细（前 30 行）",
+                desc="已去除车牌/运单/客户；完整 12,167 行可下载",
+                max_rows=30, numeric=["distance_km", "ef_g_km", "carbon_kg", "carbon_t"],
+            )
+            st.download_button(
+                "下载物理行程审计 CSV（12,167 行）",
+                data=_trips.to_csv(index=False).encode("utf-8-sig"),
+                file_name="vsp_physical_trips_audit.csv", mime="text/csv",
+                width="stretch",
+            )
+碳慧智算物流碳感知智能决策系统 V1.0    第 025 页
+
+# ---------------- 地图 ----------------
+st.markdown("")
+layout.section("碳排地图", "气泡大小 = 碳排放量；按月份播放，看春节前的峰")
+mode = st.radio("地图视图", ["发货地热力", "收货地热力", "OD 流向"], index=1,
+                horizontal=True, label_visibility="collapsed")
+if mode == "发货地热力":
+    fig = mapview.bubble_map(view)
+elif mode == "收货地热力":
+    fig = mapview.bubble_map(view, lat="dest_lat", lon="dest_lon", city="dest")
+else:
+    fig = mapview.flow_map(view)
+mapview.render(fig)
+
+origin_note = ("地图默认按收货地看全国分布，切到发货地看上海枢纽；"
+               "发货地 / 线路的碳排集中度见第 2 页四维热点。")
+st.caption(origin_note)
+
+# ---------------- 排行 + 速度分布 ----------------
+left, right = st.columns([0.56, 0.44])
+with left:
+    layout.section("车型排行", "碳排最高的 10 个车型（全量锁定口径，读 hotspots 预计算表）")
+    hot = services.hotspots("车型")
+    if hot.empty:
+        st.caption("车型热点表未生成：先运行 python -m src.pipeline")
+    else:
+        top = hot.sort_values("metric_t", ascending=False).head(10)
+        charts.hbar(top, "value", "metric_t", height=360)
+        st.caption("占比为该车型碳排占基准碳排的比例（hotspots.share_pct，pipeline 预计算）。")
+with right:
+    layout.section("速度分布", "异常段保留计碳，但不参与均速")
+    charts.hist(view, "speed_kmh", height=360, bins=36, x_label="门到门均速（km/h）")
+    st.caption("超过 100 km/h 的段来自封/解车时间戳异常，已打 flag_anomaly，不删除。")
+
+# ---------------- 数据健康 ----------------
+st.markdown("")
+layout.section("数据健康", "四类标记：灰底=重复，黄底=异常/口径，黄框=估算")
+counts = services.flag_counts()
+cards.data_table(flags.flag_summary(None, counts), title="数据健康 · 四类标记",
+                 desc="重复 / 异常 / 口径换算 / 估算", max_rows=10)
+flags.flag_legend()
+
+# ---- 数据层审计（DA 增量：61 字段数据字典 + 逐行可追溯 + 重复组冲突） ----
+q = services.quality() or {}
+
+
+def _fmtq(key: str) -> str:
+    value = q.get(key)
+    return services.fmt(value) if value is not None else "—"
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 026 页
+
+trace_rate = q.get("trace_rate")
+reason_counts = q.get("estimate_reason_counts") or {}
+
+cards.panel_head("数据层审计", "61 字段数据字典 + 逐行可追溯 + 重复组冲突标记", "DA · docs/07")
+cards.stats([
+    {"label": "源行号可回查", "value": (("%.1f%%" % (100 * trace_rate)) if trace_rate is not None else "—"),
+     "tone": "mint", "sub": "source_waybill_row（data_quality.json 预计算）"},
+    {"label": "重复组冲突", "value": "%s / %s" % (
+        _fmtq("vehicle_name_conflict_groups"), _fmtq("emission_factor_input_conflict_groups")),
+     "tone": "amber", "sub": "车型 / 因子输入"},
+    {"label": "估算 / 代理", "value": "%s 段" % _fmtq("estimated_rows"),
+     "tone": "coral", "sub": "全表 %s 行（含重复）" % _fmtq("estimated_rows_wide")},
+    {"label": "订单 / 车型匹配", "value": "%.0f%% / %.0f%%" % (
+        100.0 * float(q.get("order_match_rate", q.get("match_rate", 1.0)) or 0.0),
+        100.0 * float(q.get("vehicle_match_rate", 1.0) or 0.0)),
+     "tone": "mint", "sub": "order_match_rate / vehicle_match_rate"},
+], cols=4)
+cards.chips([
+    "订单号代理 %s" % _fmtq("order_no_fallback_rows"),
+    "包裹数缺失 %s" % _fmtq("cargo_pieces_missing_rows"),
+    "网点前缀兜底 %s" % _fmtq("origin_site_fallback_rows"),
+    "负时长 %s" % _fmtq("negative_duration_rows"),
+], tones=["skip", "skip", "warn", "warn"])
+cards.note("DA 本轮把订单号代理、包裹数缺失、城市网点前缀兜底、异常时长兜底都写进 estimate_note；"
+           "%s 段是去重后的代表行，%s 行是含重复的全表标记。"
+           "重复组中 %s 组因子输入冲突，当前保留代表行，不等于冲突已解决——答辩时要主动说明。"
+           % (_fmtq("estimated_rows"), _fmtq("estimated_rows_wide"),
+              _fmtq("emission_factor_input_conflict_groups")))
+
+if reason_counts:
+    reasons = pd.DataFrame(
+        [{"估算原因": str(k), "行数": int(v)} for k, v in reason_counts.items()]
+    ).sort_values("行数", ascending=False).head(8).reset_index(drop=True)
+    c1, c2 = st.columns([0.45, 0.55])
+    with c1:
+        cards.data_table(reasons, title="估算原因", desc="全量口径，不随筛选变化", max_rows=8)
+    with c2:
+        st.caption("填补顺序：同线历史均值 → 行业绕行系数 → 全样本中位数；"
+                   "车型找不到按载重推断；发票匹配不上按同类别历史均价。"
+                   "每一种填补都写进 estimate_note，前端黄框标出。"
+                   "（原因拆分为全量口径，读 data_quality.json 预计算，不随筛选变化。）")
+
+flags.estimated_panel(view, n=8)
+
+# ---------------- 明细 ----------------
+st.markdown("")
+layout.section("段级明细", "任取一行都能追到原始运单；黄框行 = 估算值")
+columns = ["waybill_no", "vehicle_type", "origin", "dest", "dist_km", "kg_co2",
+           "delta_pct", "speed_kmh", "estimate_note"]
+碳慧智算物流碳感知智能决策系统 V1.0    第 027 页
+available_cols = [c for c in columns if c in view.columns]
+flags.flagged_table(view, columns=available_cols, max_rows=200)
+
+layout.conclusion(
+    "基准碳排是全部减排率的分子分母——这个数改一个字，全篇结论都要重算；"
+    "本页把异常行与估算行全部标出而不是删掉，删了会改口径、对拍必挂。"
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 028 页
+"""第 2 页 · 高排放诊断：排放集中在哪，同一条线还能省多少。
+
+数据契约（只读，不重算，D4）：
+- kpi.json：重型车碳占比 / 超长途碳占比 / 同线带宽中位 / 可比较线路数 / 覆盖率
+- hotspots.parquet：四维热点（车型 / 线路 / 月份 / 里程段）
+- od_band.parquet：同线带宽（evaluator 预计算）
+"""
+
+import sys
+from pathlib import Path
+
+APP_DIR = Path(__file__).resolve().parents[1]
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
+import pandas as pd
+import streamlit as st
+
+import services
+from components import cards, layout, charts, theme
+
+layout.setup("2 高排放诊断")
+src = services.source()
+gate = services.gate()
+layout.sidebar_params(services.source_name(), gate, current="2")
+
+seg = services.segments()
+if seg.empty:
+    layout.empty_state(["baseline_carbon.parquet"])
+    st.stop()
+
+mock = services.is_mock()
+theme.hero(
+    "高排放诊断：空间在哪",
+    "四维热点告诉你排放集中在哪；同线带宽告诉你同一条线换车能差多少。",
+    kicker="02 / DIAGNOSIS",
+    badges=[layout.source_badge(services.source_name()), layout.gate_badge(gate),
+            "四维热点", "同线带宽"],
+)
+if mock:
+    layout.demo_note(str(src.get("reason", "")))
+
+k = services.kpis()
+heavy_share = k.get("heavy_share")
+longhaul_share = k.get("longhaul_share")
+band = services.od_band()
+ratio_median = k.get("od_ratio_median")
+od_pairs = k.get("od_pairs") or (len(band) if not band.empty else 0)
+coverage = k.get("od_coverage_pct")
+
+碳慧智算物流碳感知智能决策系统 V1.0    第 029 页
+layout.kpi_row([
+    {"label": "重型车碳占比", "value": (("%.1f%%" % (100 * heavy_share)) if heavy_share is not None else "—"),
+     "help": "重型车是电动化瓶颈（kpi.json 预计算）"},
+    {"label": "超长途（>500km）碳占比",
+     "value": (("%.1f%%" % (100 * longhaul_share)) if longhaul_share is not None else "—"),
+     "help": "kpi.json 预计算（原页面公式已迁入 pipeline）"},
+    {"label": "同线碳强度差（中位）", "value": (("%.2f×" % ratio_median) if ratio_median else "—"),
+     "help": "同一 OD 上不同车型的最大/最小因子比"},
+    {"label": "可比较线路数", "value": services.fmt(od_pairs)},
+    {"label": "碳排覆盖率", "value": (("%.1f%%" % coverage) if coverage is not None else "—"),
+     "help": "可比较线路覆盖的碳排占基准碳排比例"},
+], per_row=5)
+
+st.markdown("---")
+st.caption("可比较线路 = 同一 起点网点→终点网点 至少 3 段、至少 2 种车型；"
+           "倍数 = 最高因子 / 最低因子。结果表由 evaluator.py 预先生成，本页只读不重算。"
+           "当前 %d 条可比较 OD、中位 %.2f×、覆盖 %.1f%% 碳排。"
+           % (od_pairs, ratio_median or 0, coverage or 0))
+
+tabs = st.tabs(["车型维度", "线路维度", "月份维度", "里程段维度"])
+DIMS = [
+    ("车型", "vehicle_type", "TOP 车型碳排放（t）"),
+    ("线路", "od_pair", "TOP 线路碳排放（t）"),
+    ("月份", "month", "月份碳排放（t）"),
+    ("里程段", "dist_bin", "里程段碳排放（t）"),
+]
+
+for tab, (dim, _key, title) in zip(tabs, DIMS):
+    with tab:
+        hot = services.hotspots(dim)
+        if hot.empty:
+            st.info("热点表还没有这一维——先运行 python -m src.pipeline")
+            continue
+        hot = hot.copy()
+        if dim == "月份":
+            hot["_sort"] = pd.to_numeric(hot["value"], errors="coerce")
+            hot = hot.sort_values("_sort")
+            hot = hot.drop(columns=["_sort"])
+        else:
+            hot["_sort"] = pd.to_numeric(hot["metric_t"], errors="coerce")
+            hot = hot.sort_values("_sort", ascending=False).drop(columns=["_sort"])
+        top = hot.head(12)
+        charts.hbar(top, "value", "metric_t", title=title, height=380)
+        show = top[["value", "metric_t", "share_pct", "n"]].rename(columns={
+            "value": "类别", "metric_t": "碳排放(t)", "share_pct": "占比(%)", "n": "段数"})
+        cards.data_table(show, title=dim + " · TOP12", desc="热点表预计算，前端只展示", max_rows=12)
+
+# ---------------- 同线带宽 ----------------
+st.markdown("---")
+layout.section("同线带宽", "同一 OD、不同车型的碳强度倍数——这是“换车”而不是“选路”的空间")
+碳慧智算物流碳感知智能决策系统 V1.0    第 030 页
+if band.empty:
+    st.info("同线带宽表未生成：需要 od_band.parquet（先运行 python -m src.pipeline）。")
+else:
+    show = band.copy()
+    show["od_pair"] = show["od_pair"].astype(str)
+    top = show.sort_values("ratio", ascending=False).head(15)
+    charts.hbar(top, "od_pair", "ratio", title="同线碳强度差 TOP15（倍）", height=420)
+    cols = [c for c in ["od_pair", "n", "nt", "fmin", "fmax", "ratio", "kg_t", "coverage_pct"]
+            if c in show.columns]
+    table = show[cols].rename(columns={
+        "od_pair": "线路", "n": "段数", "nt": "车型数", "fmin": "最低因子(g/km)",
+        "fmax": "最高因子(g/km)", "ratio": "倍数", "kg_t": "碳排(t)", "coverage_pct": "覆盖率(%)",
+    })
+    cards.data_table(table.head(50), title="同线带宽 · TOP50",
+                     desc="倍数 = 同 OD 最高/最低碳强度", max_rows=50)
+    st.caption("倍数高不代表一定能换：还要过续航、14 小时驾驶窗口、补能与运力匹配四道约束（第 3 页）。"
+               "这里的倍数是结构性带宽，不是可立即兑现的减排量。")
+
+layout.conclusion(
+    "减排空间不在选路，在同线配车：同一 OD 上最高与最低碳强度中位差 "
+    + (("%.2f 倍" % ratio_median) if ratio_median else "待算")
+    + "，覆盖 " + (("%.1f%%" % coverage) if coverage is not None else "—")
+    + " 的基准碳排。"
+)
+if mock:
+    st.caption("演示数据提示：真数据口径的同线带宽中位目标为 1.50×（docs/17 §1.4），"
+               "接真数据后以闸门与 docs/18 复核为准。")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

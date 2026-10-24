@@ -1,0 +1,57 @@
+软件名称：碳慧智算物流碳感知智能决策系统
+版本：V1.0
+文件数：52
+总页数：404
+
+app\app.py	25
+app\home_view.py	272
+app\services.py	571
+app\pages\0_概览.py	12
+app\pages\1_基准核算.py	307
+app\pages\2_高排放诊断.py	127
+app\pages\3_替代方案.py	461
+app\pages\4_成本效益.py	389
+app\pages\5_碳会计台账.py	320
+app\pages\6_路线实验室.py	459
+app\pages\7_电动化测算.py	209
+app\pages\8_车队TCO沙盘.py	267
+app\components\__init__.py	1
+app\components\amapview.py	233
+app\components\baseline_compare.py	213
+app\components\baseline_map.py	228
+app\components\basemap_align.py	175
+app\components\calcpanel.py	260
+app\components\cards.py	246
+app\components\charts.py	240
+app\components\decision_panel.py	191
+app\components\flags.py	203
+app\components\layout.py	144
+app\components\mapview.py	279
+app\components\olmapview.py	905
+app\components\route_lab_html.py	1037
+app\components\route_visual.py	312
+app\components\theme.py	1082
+src\carbon_model.py	163
+src\evaluator.py	1451
+src\optimizer.py	922
+src\pipeline.py	1135
+src\preprocess.py	1524
+src\routing\__init__.py	24
+src\routing\carbon_baseline.py	78
+src\routing\coord.py	192
+src\routing\osrm_client.py	290
+src\routing\road_class.py	156
+src\scenarios.py	367
+src\schema.py	191
+tools\amap_setup.py	259
+tools\amap_smoke_test.py	133
+tools\baseline_preview.py	99
+tools\build_vsp_audit.py	215
+tools\coord_truth.py	298
+tools\git_push_api.py	308
+tools\launch.py	241
+tools\make_mock_results.py	19
+tools\route_baseline.py	264
+tools\route_candidates.py	217
+tools\route_fetch.py	946
+tools\scenarios_smoke_test.py	152

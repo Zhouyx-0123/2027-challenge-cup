@@ -17,7 +17,6 @@ from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import quote, urlencode
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 CSS = """
 <style>
@@ -885,7 +884,7 @@ def inject() -> None:
     """
     st.markdown(CSS, unsafe_allow_html=True)
     try:
-        components.html(SCROLL_RESET_JS, height=0, width=0, scrolling=False)
+        st.iframe(SCROLL_RESET_JS, height=1, width=1)
     except Exception:
         pass
 

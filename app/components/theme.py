@@ -772,7 +772,8 @@ SCROLL_RESET_JS = """
 (function(){
   var p = window.parent;
   try {
-    var main = p.document.querySelector('[data-testid=\"stMain\"]');
+    var doc = p.document;
+    var main = doc.querySelector('[data-testid="stMain"]');
     var path = p.location.pathname;
     var last = null;
     try { last = p.sessionStorage.getItem('cm_last_path'); } catch(e) {}
@@ -781,6 +782,60 @@ SCROLL_RESET_JS = """
       try { p.scrollTo(0, 0); } catch(e) {}
       try { p.sessionStorage.setItem('cm_last_path', path); } catch(e) {}
     }
+
+    if (p.__cmVeilInit) return;
+    p.__cmVeilInit = true;
+    var veil = null, observer = null, timer = null;
+
+    function showVeil() {
+      if (veil || doc.getElementById('cm-nav-veil')) return;
+      veil = doc.createElement('div');
+      veil.id = 'cm-nav-veil';
+      veil.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#07080A;'
+        + 'display:flex;align-items:center;justify-content:center;color:#5EE7FF;'
+        + 'font:600 13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.18em;';
+      veil.textContent = 'CARBON INTELLIGENCE · LOADING';
+      doc.body.appendChild(veil);
+    }
+
+    function hideVeil() {
+      if (observer) { observer.disconnect(); observer = null; }
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (!veil) { veil = doc.getElementById('cm-nav-veil'); }
+      if (veil && veil.parentNode) veil.parentNode.removeChild(veil);
+      veil = null;
+    }
+
+    function currentHero() {
+      var h = doc.querySelector('.cm-hero .cm-display, .cm-hero h1, h1');
+      return h ? (h.innerText || '').replace(/\\s+/g, ' ').trim() : '';
+    }
+
+    doc.addEventListener('click', function(e){
+      var a = e.target && e.target.closest
+        ? e.target.closest('a[data-testid="stPageLink-NavLink"], a.cm-nav-link, a.cm-btn, a.cm-bento-card')
+        : null;
+      if (!a) return;
+      if (a.getAttribute('aria-disabled') === 'true') return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+
+      var startPath = p.location.pathname;
+      var oldHero = currentHero();
+      showVeil();
+
+      var body = doc.body;
+      observer = new MutationObserver(function(){
+        if (p.location.pathname === startPath) return;
+        var h = currentHero();
+        if (!h || h === oldHero) return;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(hideVeil, 80);
+      });
+      observer.observe(body, {childList: true, subtree: true});
+      setTimeout(hideVeil, 5000);
+    }, true);
+
+    p.addEventListener('pageshow', function(){ hideVeil(); });
   } catch(e) {}
 })();
 </script>

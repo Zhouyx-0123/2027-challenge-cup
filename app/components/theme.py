@@ -48,7 +48,8 @@ CSS = """
   --radius: 22px;
 }
 
-/* 不用 View Transition：客户端路由下 old(root) 快照会把上一页再显示一次，造成“跳回原页面”。 */
+/* 明确关闭 View Transition：客户端路由下 old(root) 快照会把上一页再显示一次，造成“跳回原页面”。 */
+@view-transition { navigation: none; }
 
 * { scrollbar-width: thin; scrollbar-color: rgba(94,231,255,0.22) transparent; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }

@@ -14,6 +14,7 @@
    （证明闸门真的会红，不是装饰）。
 """
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -45,9 +46,18 @@ def sandbox() -> Path:
 
 
 def _run_pipeline(sandbox: Path, *args: str) -> subprocess.CompletedProcess:
+    # 编码必须**两端**都对齐，缺一端照样乱码：
+    #   · 写端（子进程）：stdout 接了管道后，Python 按系统 locale 编码输出 ——
+    #     中文 Windows 是 GBK。这里用 PYTHONIOENCODING=utf-8 强制子进程写 UTF-8，
+    #     否则父进程按 UTF-8 解出来是「�� 2 ��ʧ��」这种替换字符，断言必挂。
+    #   · 读端（父进程）：text=True 默认也按系统 locale 解码，这里显式 utf-8。
+    # 这样本地中文 Windows 与 CI（Ubuntu/UTF-8）行为完全一致。
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run(
         [sys.executable, "-m", "src.pipeline", *args],
-        cwd=sandbox, capture_output=True, text=True, timeout=900,
+        cwd=sandbox, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=900, env=env,
     )
 
 

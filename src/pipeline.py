@@ -288,12 +288,29 @@ def build_disclosure(kpi: Dict[str, Any], quality: Dict[str, Any], source: str) 
     estimated = int(quality.get("estimated_rows", 0) or 0)
     anomaly = int(quality.get("anomaly_rows", 0) or 0)
     basis = int(quality.get("basis_rows", 0) or 0)
+    # 主方案减排率：一律取实测值，不再在披露文本里写死标称数
+    # （历史上此处写死 77.4%，而闸门实测是 83.25% —— 披露与主账自相矛盾）。
+    _red = kpi.get("main_reduction_pct")
+    try:
+        reduction_txt = "%.2f%%" % float(_red) if _red is not None else "（未产出）"
+    except (TypeError, ValueError):
+        reduction_txt = "（未产出）"
+    # 发票披露必须条件式：原始附件没有发票字段时，不得声称"未匹配发票按均价估算"。
+    invoice_missing = int(quality.get("fill_invoice", 0) or 0)
+    invoice_applicable = int(quality.get("invoice_applicable", 0) or 0)
+    if invoice_applicable <= 0:
+        invoice_clause = "；原始附件不含发票字段，发票金额保持空值/不适用，未做估算"
+    elif invoice_missing > 0:
+        invoice_clause = "、未匹配发票按同类别历史均价，全部打 flag_estimated"
+    else:
+        invoice_clause = "；发票全部匹配，无估算填补"
     parameterized = str(kpi.get("main_calculation_mode") or "") == "parameterized"
     if parameterized:
         scheme_note = (
             "主方案 S5 为逐车组参数化计算（calculation_mode=parameterized、"
-            "decision_eligible=True；4,809 万 / 500.8 万年节省 / 9.6 年回本 / 77.4% "
-            "由段表实时车组复算得出，与底稿标称值一致）；"
+            "decision_eligible=True；4,809 万 / 500.8 万年节省 / 9.6 年回本 / "
+            + reduction_txt +
+            " 由段表实时车组复算得出，与底稿标称值一致）；"
             "S1–S4/S7 仍为历史标定（legacy_calibration、decision_eligible=False），"
             "不可对外称已核验；班次化层 64.2% 里程依赖沿线补能网络（未核实）"
         )
@@ -308,7 +325,7 @@ def build_disclosure(kpi: Dict[str, Any], quality: Dict[str, Any], source: str) 
         "assumptions": (
             "额定载重按载质量口径；整车总质量/准牵引总质量已换算成载质量并打 flag_basis"
             "（75 车型映射为 provisional，待逐车型复核）；"
-            "缺失里程按同线历史均值、缺失车型按载重推断、未匹配发票按同类别历史均价，全部打 flag_estimated；"
+            "缺失里程按同线历史均值、缺失车型按载重推断" + invoice_clause + "；"
             "速度 >100 km/h 的时间戳异常段保留计碳，只标记不删除；"
             "排放因子按文献[1] 表 8 六锚点分段内插（30 t / VSP=2 = 14.666 g/s、"
             "VSP=3 = 16.525 g/s，偏差 12.68%，闸门已对拍）。"

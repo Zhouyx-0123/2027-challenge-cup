@@ -101,31 +101,25 @@ def check_gate() -> Tuple[bool, str]:
 
 
 def check_amap() -> Tuple[bool, str]:
-    """高德 key 状态：齐了就提示能开在线地图，没齐就说会走离线兜底。"""
-    files = {
-        "Web服务key": CONFIG / "amap_key.txt",
-        "JS API key": CONFIG / "amap_js_key.txt",
-        "安全密钥": CONFIG / "amap_js_code.txt",
-    }
-    ready, missing = [], []
-    for label, path in files.items():
-        if not path.exists():
-            missing.append(label)
-            continue
+    """分别检查后端 REST Key 与前端 JS API 地图凭据。"""
+    from src.routing import amap_js
+    path = CONFIG / "amap_key.txt"
+    web_ready = False
+    if path.exists():
         text = path.read_text(encoding="utf-8").strip()
-        if text and not text.startswith("请至高德"):
-            ready.append(label)
-        else:
-            missing.append(label)
-    if not missing:
-        return True, "三把 key 齐备 → 在线底图 + 真路线可用"
-    return True, "缺 %s → 自动走离线兜底（Plotly 底图 + haversine 路线）" % "、".join(missing)
+        web_ready = bool(text and not text.startswith("请至高德"))
+    js_ready = amap_js.js_available()
+    if web_ready and js_ready:
+        return True, "REST Key + JS API 凭据齐备 → 路线规划与 3D 地图可用"
+    if web_ready:
+        return True, "REST Key 已配置；缺 JS API Key/安全密钥 → 精细地图待接入"
+    return True, "未配置高德凭据 → 路线沙盘会显示配置指引，不影响其他页面"
 
 
 def check_routes() -> Tuple[bool, str]:
     path = PROCESSED / "route_od.parquet"
     if not path.exists():
-        return True, "路线表未生成 → 第 3 页动态路线区块自动跳过"
+        return True, "路线基线表未生成 → 不影响五页主应用与实时路线沙盘"
     try:
         import pandas as pd
         df = pd.read_parquet(path)
@@ -159,7 +153,13 @@ def run_recalc(with_routes: bool = True, force: bool = False) -> Tuple[bool, str
     cmd = [sys.executable, "-m", "src.pipeline"]
     if with_routes:
         cmd.append("--with-routes")
-    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=900)
+    # 编码要两端对齐：子进程 stdout 接管道后按系统 locale 写（中文 Windows = GBK），
+    # 父进程再按 UTF-8 解就成乱码摘要。写端用 PYTHONIOENCODING=utf-8 钉死，
+    # 读端显式 encoding="utf-8"，本地中文 Windows 与 CI（Ubuntu/UTF-8）行为一致。
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=900, env=env)
     tail = (proc.stdout or "").strip().splitlines()[-3:]
     summary = " / ".join(line.strip() for line in tail if line.strip())
     return proc.returncode == 0, summary or "退出码 %d" % proc.returncode

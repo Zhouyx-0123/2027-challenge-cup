@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""情景演算冒烟测试（tools/）：内核数值 + 与 evaluator 公式对拍 + 新页面 AppTest。
+"""情景演算内核冒烟测试：数值合理性 + 与 evaluator 公式对拍。
 
 运行：python -m tools.scenarios_smoke_test
 退出码 0 = 全部通过。这是 docs/20 §11 演算页纪律的验收命令之一。
@@ -35,7 +35,7 @@ def close(a: float, b: float, tol: float = 1e-6) -> bool:
 
 def main() -> int:
     print("=" * 70)
-    print("情景演算冒烟测试（scenarios + evaluator 对拍 + AppTest）")
+    print("情景演算冒烟测试（scenarios + evaluator 对拍）")
     print("=" * 70)
 
     # ---- 1. 内核：电动化测算数值合理性 ----
@@ -119,18 +119,6 @@ def main() -> int:
     check("我们强度低于行业默认", cmp_r["our_g_per_tkm"] < cmp_r["industry_g_per_tkm"])
     check("行业法总量可算", cmp_r["industry_total_t"] is not None
           and cmp_r["industry_total_t"] > cmp_r["our_total_t"])
-
-    # ---- 5. AppTest：新页面无异常 ----
-    print("\n⑤ 新页面 AppTest")
-    try:
-        from streamlit.testing.v1 import AppTest
-    except ImportError:
-        print("  [SKIP] streamlit.testing 不可用")
-    else:
-        for page in ("7_电动化测算.py", "8_车队TCO沙盘.py"):
-            at = AppTest.from_file(str(ROOT / "app" / "pages" / page), default_timeout=60)
-            at.run()
-            check("%s 渲染 0 异常" % page, not at.exception)
 
     print("\n" + "=" * 70)
     if FAILED:

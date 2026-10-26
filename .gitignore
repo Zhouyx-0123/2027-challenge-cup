@@ -2,6 +2,9 @@
 config/amap_key.txt
 config/amap_js_key.txt
 config/amap_js_code.txt
+config/deepseek_key.txt
+config/amap_js_key.txt
+config/amap_js_security_code.txt
 config/*.key
 config/*_secret.txt
 # 天地图 token（底图用）：永不入库
@@ -66,6 +69,25 @@ _tmp*
 .dsh-office-*/
 ~$*
 *.tmp
+
+# ===== 发票智能录入产物：含车牌 / 发票号 / 金额，永不入库 =====
+# 依据 docs/42 §8 隐私要求与 docs/44 §6；原始发票图片在 data/raw/ 下已被上面的规则挡住。
+outputs/invoice_ledger.csv
+outputs/invoice_report.json
+outputs/invoice_*.csv
+outputs/invoice_*.json
+
+# ===== 车辆·路段油耗审计产物：含车牌 / 发票号 / 偏差结论，永不入库 =====
+# 依据 docs/45 §8；CSV 已被上面的 *.csv 挡住，这里补 JSON。
+outputs/fleet_*.json
+outputs/fleet_*.csv
+
+# ===== 实时监测（单片机 · 颗粒物）产物：含车牌 / 设备ID / 采样数据，永不入库 =====
+# 依据 docs/46 §8。报告里的 rejected 明细含原始读数（可能带车牌），一并挡住。
+outputs/pm_*.json
+outputs/pm_*.csv
+outputs/telemetry_*.json
+outputs/telemetry_*.csv
 
 # ===== WorkBuddy 项目数据（本地记忆/会话记录，不入库）=====
 .workbuddy/

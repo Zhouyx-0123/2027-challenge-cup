@@ -1,7 +1,19 @@
 [theme]
+# v2 暗色电影感（scrolltide ink 底 + tide 蓝）——首帧就必须是暗色，
+# 否则 CSS 注入前会闪一下旧浅色主题。
 base = "dark"
-primaryColor = "#5EE7FF"
+primaryColor = "#46B7FF"
 backgroundColor = "#07080A"
-secondaryBackgroundColor = "#11151C"
+secondaryBackgroundColor = "#101318"
 textColor = "#F3F5F8"
 font = "sans serif"
+
+[client]
+toolbarMode = "minimal"
+showSidebarNavigation = false
+
+[server]
+# 静态资源：极光底图 bg_tide_glow.jpg / 碳网络纹理 hero_carbon_mesh.jpg /
+# 品牌标志 brand_mark.png。走 Streamlit 自带的 /app/static/ 服务，
+# 断网也能加载（图片是本地文件，不走 CDN）。
+enableStaticServing = true

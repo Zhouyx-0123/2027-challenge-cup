@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""单入口导航：页面由 st.navigation 统一管理，不再手工维护多页 URL。"""
+"""物流企业碳感知智能决策系统：顶部定制导航与全局状态入口。"""
 import sys
 from pathlib import Path
 
@@ -9,17 +9,37 @@ APP_DIR = Path(__file__).resolve().parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
-PAGES = [
-    st.Page("pages/0_概览.py", title="概览", url_path="概览", default=True),
-    st.Page("pages/1_基准核算.py", title="核算", url_path="基准核算"),
-    st.Page("pages/2_高排放诊断.py", title="诊断", url_path="高排放诊断"),
-    st.Page("pages/3_替代方案.py", title="方案", url_path="替代方案"),
-    st.Page("pages/4_成本效益.py", title="成本", url_path="成本效益"),
-    st.Page("pages/5_碳会计台账.py", title="台账", url_path="碳会计台账"),
-    st.Page("pages/6_路线实验室.py", title="路线", url_path="路线实验室"),
-    st.Page("pages/7_电动化测算.py", title="测算", url_path="电动化测算"),
-    st.Page("pages/8_车队TCO沙盘.py", title="TCO", url_path="车队TCO沙盘"),
-]
+# 页面配置必须先于重型模块导入，避免用户在 pymoo/pandas 加载期间看到裸界面。
+st.set_page_config(
+    page_title="物流企业碳感知智能决策系统",
+    page_icon="🌿",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-pg = st.navigation(PAGES, position="hidden")
-pg.run()
+# theme 仅依赖 Streamlit；关键 CSS 先于算法、图表和业务视图注入。
+from components import theme
+st.markdown(theme.CSS, unsafe_allow_html=True)  # 只注入样式，不加载旧导航 JS / iframe。
+
+from components.main_nav import register_pages, render_main_nav
+from demo_state import init_state
+from main_views import (
+    render_dashboard,
+    render_invoice,
+    render_ledger,
+    render_routes,
+    render_sensor,
+)
+
+init_state()
+PAGES = [
+    st.Page(render_dashboard, title="🏠 首页概览", url_path="dashboard", default=True),
+    st.Page(render_invoice, title="📄 发票数据感知", url_path="invoice"),
+    st.Page(render_sensor, title="📡 云边端硬件监控", url_path="sensor"),
+    st.Page(render_routes, title="🗺️ 减碳路线沙盘", url_path="routes"),
+    st.Page(render_ledger, title="📊 碳核算与台账", url_path="ledger"),
+]
+page = st.navigation(PAGES, position="hidden")
+register_pages(PAGES)
+render_main_nav(page.url_path, PAGES)
+page.run()

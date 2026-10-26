@@ -1,0 +1,16 @@
+{
+  "version": "invoice-spend-factors-v1",
+  "updated": "2026-10-25",
+  "owner": "FM 财务与碳核算负责人共同维护；每个因子必须经来源复核",
+  "notes": "支出法仅作活动数据缺失时的兜底。默认不放任何金额因子，禁止使用无来源的行业均值或万能系数。新增因子时按 factors.<emission_category> 登记。",
+  "factor_contract": {
+    "value": "正数",
+    "unit": "kgCO2e/CNY",
+    "source": "可核查的数据库、文献或供应商因子来源",
+    "price_year": "因子价格年，例如 2023",
+    "price_basis": "including_tax 或 excluding_tax",
+    "scope": "通常为 scope_3",
+    "gas_coverage": "CO2、CO2e 或因子实际覆盖范围"
+  },
+  "factors": {}
+}

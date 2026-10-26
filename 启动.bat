@@ -92,7 +92,7 @@ echo     停止服务：在此窗口按 Ctrl+C
 echo     --------------------------------------------------------------
 echo.
 
-%PY% -m streamlit run app/app.py --server.port 8501 --browser.gatherUsageStats false
+%PY% -m streamlit run app/app.py --server.port 8501 --browser.gatherUsageStats false --client.showSidebarNavigation false --client.toolbarMode minimal
 
 echo.
 echo 服务已停止。

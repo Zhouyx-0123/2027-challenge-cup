@@ -1349,6 +1349,10 @@ def quality_report(wide: pd.DataFrame, raw_rows: int, source: str, reason: str) 
         "fill_vehicle": int(pd.to_numeric(unique["fill_vehicle"], errors="coerce").fillna(0).sum()),
         "fill_load": int(pd.to_numeric(unique["fill_load"], errors="coerce").fillna(0).sum()),
         "fill_invoice": int(pd.to_numeric(unique["fill_invoice"], errors="coerce").fillna(0).sum()),
+        # 发票源是否存在：invoice_ok == -1 表示原始附件根本没有发票字段（不适用）。
+        # 披露说明要按这个口径条件式表述，不能无条件声称"未匹配发票按均价估算"。
+        "invoice_applicable": int((pd.to_numeric(unique["invoice_ok"], errors="coerce")
+                                   .fillna(-1) != -1).sum()),
         "fill_duration": int(pd.to_numeric(unique["fill_duration"], errors="coerce").fillna(0).sum()),
         "valid_speed_rows": int(valid_speed.sum()),
         "avg_speed": None if avg_speed is None else round(avg_speed, 4),

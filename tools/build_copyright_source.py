@@ -12,10 +12,8 @@ LINES_PER_PAGE = 50
 PAGES = 30
 
 ORDER = [
-    "app/app.py", "app/home_view.py", "app/services.py",
-    "app/pages/0_概览.py", "app/pages/1_基准核算.py", "app/pages/2_高排放诊断.py",
-    "app/pages/3_替代方案.py", "app/pages/4_成本效益.py", "app/pages/5_碳会计台账.py",
-    "app/pages/6_路线实验室.py", "app/pages/7_电动化测算.py", "app/pages/8_车队TCO沙盘.py",
+    "app/app.py", "app/main_views.py", "app/demo_state.py",
+    "app/services.py", "server.py",
 ]
 
 

@@ -16,6 +16,7 @@ docs/20 §11 增补（情景演算页）：第 7/8 页是"用户输入→即时�
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,13 @@ if str(ROOT) not in sys.path:  # noqa: E402
 from src import schema  # noqa: E402  ← 只取常量（文件名/列名），不调算法
 from src import scenarios as _kernel  # noqa: E402  ← 全 app/ 唯一一处演算内核（docs/20 §11）
                                        # 别名：避免与本文件 scenarios()（结果表读取）撞名
+from src import invoice as _invoice  # noqa: E402  ← 发票内核（docs/44）：识别 + 口径，全 app/ 仅此一处
+from src import sensor as _sensor  # noqa: E402  ← 云边端协同：传感器读取 + 突发碳成本
+from src.routing import amap_client as _amap_client  # noqa: E402  ← 路线沙盘：高德 REST
+from src.routing import amap_js as _amap_js  # noqa: E402  ← 路线沙盘：JS API 2.0 凭据
+from src.routing import route_carbon as _route_carbon  # noqa: E402  ← 路线沙盘：即时碳核算
+from src import disclosure as _disclosure  # noqa: E402  ← DeepSeek 披露附注
+from src.routing import evolve_routes as _evolution  # noqa: E402  ← 四维 NSGA-II + Q-learning
 
 # ---- 结果文件清单 / 列契约：唯一来源是 src/schema.py（此处只做别名） ----
 RESULT_FILES: Dict[str, str] = schema.RESULT_FILES
@@ -302,6 +310,139 @@ def calc_fleet_tco(params: Dict[str, Any]) -> Dict[str, Any]:
 def tonne_km_comparison(our_g_per_tkm: float, **kwargs: Any) -> Dict[str, Any]:
     """口径对照：行业吨公里法 vs 我们段级自底向上（EcoTransIT 式）。"""
     return _kernel.tonne_km_comparison(our_g_per_tkm, **kwargs)
+
+
+# ---------------- 发票智能录入桥（docs/44） ----------------
+# 识别与口径都在 src/invoice.py；本节只转发，页面不写一行业务公式。
+# 纪律同演算桥：结果绝不写回结果表，也不进 kpi/gate（对拍口径与情景推演分列）。
+
+#: DeepSeek key 的读取顺序：环境变量 → config/deepseek_key.txt（永不入库、永不进前端代码）
+def invoice_api_key() -> str:
+    """读取 DeepSeek API key（服务端读取）。读不到返回空串，页面据此禁用识别。"""
+    key = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+    if key:
+        return key
+    key_file = ROOT / "config" / "deepseek_key.txt"
+    if key_file.exists():
+        text = key_file.read_text(encoding="utf-8", errors="ignore").strip()
+        if text.upper().startswith("DEEPSEEK_API_KEY="):
+            text = text.split("=", 1)[1].strip()
+        if text and not text.startswith("请至"):
+            return text
+    return ""
+
+
+def extract_invoice(image_bytes: bytes, filename: str = "invoice.jpg") -> Dict[str, Any]:
+    """第 9 页：识别发票图片 → 归一字段。逻辑在 src/invoice.py，本函数只转发。"""
+    return _invoice.extract_invoice_fields(image_bytes, invoice_api_key(), filename)
+
+
+def invoice_summary(fuel_liters: Optional[float], distance_km: Optional[float],
+                    **kwargs: Any) -> Dict[str, Any]:
+    """第 9 页：发票碳核算（油量直算轨 + 里程因子表轨 + 交叉校验）。只转发。"""
+    return _invoice.invoice_summary(fuel_liters, distance_km, **kwargs)
+
+
+def calc_carbon(load: float, distance: float, truck_type: Any = "重型") -> float:
+    """兼容既有业务入口：载重(t) + 里程(km) + 车型 -> 碳排量(kgCO2)。"""
+    return _invoice.calc_carbon(load, distance, truck_type=truck_type)
+
+
+def amap_key_available() -> bool:
+    return bool(_amap_client.load_amap_key())
+
+
+def amap_driving_routes(origin: str, destination: str) -> List[Dict[str, Any]]:
+    """路线沙盘：高德驾车规划 2.0，返回全部备选路线及 polyline。"""
+    return _amap_client.fetch_driving_routes(origin, destination)
+
+
+def amap_js_available() -> bool:
+    return _amap_js.js_available()
+
+
+def amap_js_credentials() -> tuple[str, str]:
+    """仅在生成内嵌地图 HTML 时调用；Key 不进入日志或页面正文。"""
+    return _amap_js.load_js_credentials()
+
+
+def calc_carbon_for_route(route: Dict[str, Any], truck_type: str,
+                          load: float) -> Dict[str, Any]:
+    return _route_carbon.calc_carbon_for_route(route, truck_type, load)
+
+
+def evaluate_amap_routes(origin: str, destination: str, truck_type: str,
+                         load: float, carbon_price: float) -> List[Dict[str, Any]]:
+    routes = amap_driving_routes(origin, destination)
+    return _route_carbon.evaluate_routes(routes, truck_type, load, carbon_price)
+
+
+def evaluate_route_records(routes: List[Dict[str, Any]], truck_type: str, load: float,
+                           carbon_price: float, energy_cost_per_km: float = 0.0) -> List[Dict[str, Any]]:
+    return _route_carbon.evaluate_routes(
+        routes, truck_type, load, carbon_price, energy_cost_per_km)
+
+
+def baseline_route_choices(routes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return _route_carbon.as_route_choices(routes)
+
+
+def evolve_route_options(routes: List[Dict[str, Any]], **kwargs: Any) -> List[Dict[str, Any]]:
+    return _evolution.evolve_routes(routes, **kwargs)
+
+
+def route_memory() -> pd.DataFrame:
+    return _evolution.load_route_memory()
+
+
+def save_route_memory(route: Dict[str, Any]) -> Dict[str, Any]:
+    return _evolution.save_route_to_memory(route)
+
+
+def invoice_fuel_with_estimation(value: Any) -> tuple[float, bool]:
+    return _invoice.fuel_with_estimation(value)
+
+
+def sensor_data() -> pd.DataFrame:
+    """实时读取边缘端 CSV，不缓存，供 2 秒 fragment 刷新。"""
+    return _sensor.read_sensor_data(ROOT / "sensor_data.csv")
+
+
+def sensor_warning_ledger(frame: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+    return _sensor.build_warning_ledger(frame, **kwargs)
+
+
+def highlight_sensor_warning(row: pd.Series) -> List[str]:
+    return _sensor.highlight_warning(row)
+
+
+def invoice_carbon(record: Dict[str, Any]) -> Dict[str, Any]:
+    """通用财务发票核算桥：活动数据优先、支出法兜底；只转发内核。"""
+    return _invoice.calculate_invoice_carbon(record)
+
+
+def invoice_factors() -> Dict[str, Any]:
+    """发票页用的柴油因子（来自 config/calc_factors.json，唯一口径来源）。"""
+    return _invoice.diesel_factors()
+
+
+def invoice_consumption_table() -> Dict[int, float]:
+    """车型大类 → 油耗基准（L/100km）假设值。页面据此打黄框。"""
+    return dict(_invoice.TRUCK_CONSUMPTION)
+
+
+def invoice_vclass_names() -> Dict[int, str]:
+    """车型大类中文名。"""
+    return dict(_invoice.VCLASS_NAME)
+
+
+def invoice_mock_mode() -> bool:
+    """是否处于 mock 模式（不联网、返回演示识别值）。页面据此显式标注。"""
+    return bool(_invoice.MOCK_MODE)
+
+
+def generate_disclosure_note(snapshot: Dict[str, Any]) -> str:
+    return _disclosure.generate_disclosure_note(snapshot, invoice_api_key())
 
 
 def source() -> Dict[str, Any]:

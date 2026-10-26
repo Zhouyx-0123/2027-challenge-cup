@@ -1,0 +1,155 @@
+{
+  "version": "telemetry-contract-v1",
+  "updated": "2026-10-25",
+  "owner": "周嬴鑫（PM 统一维护）；设备侧由环境工程同学实现单片机固件",
+  "notes": "实时监测（单片机 · 颗粒物 PM）的数据接口契约。设备端与后端共用这一份，避免两边各写一套。",
+  "scope": {
+    "what_this_is": "设备端上报的**连续采样读数**的字段契约与落盘位置。",
+    "what_this_is_not": "不是 CO₂ 排放口径。颗粒物是污染物（mg/m³），**不进 E₀ 主账、不进闸门目标值**。",
+    "why_it_matters": "PM 实测是排放因子的**独立旁证**，角色与「发票油量」相同：发票给的是消耗了多少油（实测），PM 给的是实际排了多少颗粒（实测），因子表给的是估算值。三者交叉才能审计因子表、标定路段系数、标记油耗/排放异常。",
+    "hard_requirement": "**必须能算出 g/km 的质量排放率**。只有瞬时浓度是不够的 —— 需要「浓度 + 流量 + 里程（或速度）」三者齐全。这是整个接口能挂上碳账的前提。"
+  },
+  "field_contract": {
+    "required": "缺任意一条即判定该读数不可用（needs_review），不是丢弃也不是默默填 0。",
+    "units": "字段名后缀即单位，不可省略、不可换算后混用。",
+    "time": "ts 必须是带时区偏移的 ISO8601（例 2026-10-25T14:03:22+08:00）。裸时间戳（无偏移）视为无效。",
+    "float_format": "小数点分隔，不带千分位逗号；空值写 null，不写 0、不写 NaN。",
+    "null_handling": "读不到的字段写 null 并置对应 qc 标记；**禁止用 0 冒充缺失**。"
+  },
+  "fields": {
+    "device_id": {
+      "type": "string", "required": true,
+      "desc": "设备唯一标识，全局唯一。建议 PDM-GZ-001 这种「类型-区域-序号」。",
+      "example": "PDM-GZ-001"
+    },
+    "ts": {
+      "type": "string(ISO8601+tz)", "required": true,
+      "desc": "采样时刻（带时区偏移）。设备须做 NTP 对时；对时失败置 qc 标志 clock_drift。",
+      "example": "2026-10-25T14:03:22+08:00"
+    },
+    "pm25_mg_m3": {
+      "type": "number >= 0", "required": true,
+      "desc": "PM2.5 质量浓度，单位 mg/m³（注意不是 μg/m³）。",
+      "example": 0.142
+    },
+    "flow_m3h": {
+      "type": "number > 0", "required": true,
+      "desc": "采样流量，单位 m³/h。**必填** —— 没有流量就算不出 g/km，读数对碳账没有价值。",
+      "example": 2.4
+    },
+    "dist_km": {
+      "type": "number >= 0", "required": false,
+      "desc": "本条读数对应的累计行驶里程（km）。用于直接算 g/km。与 speed_kmh 二选一给出。",
+      "example": 1234.5
+    },
+    "speed_kmh": {
+      "type": "number >= 0", "required": false,
+      "desc": "车速（km/h）。若给了 speed_kmh 而没给 dist_km，后端按速度积分折算里程（需累计里程仪读数）。",
+      "example": 62.5
+    },
+    "od_key": {
+      "type": "string", "required": false,
+      "desc": "本条读数所属的起终点，格式与项目 route_od.parquet 的 od_key 完全一致：「起点网点|终点网点」。车载设备通常给不了（那属于运单数据），路侧站可给。",
+      "example": "上海车墩集货分拣中心|广州增城集货分拣中心"
+    },
+    "plate": {
+      "type": "string", "required": false,
+      "desc": "车牌。**可选** —— 传感器装在车上才有；路侧站没有。属可识别业务信息，台账与报告里须脱敏（docs/42 §8）。",
+      "example": "苏US3126"
+    },
+    "pm10_mg_m3": {
+      "type": "number >= 0", "required": false,
+      "desc": "PM10 质量浓度，mg/m³。",
+      "example": 0.207
+    },
+    "co2_ppm": {
+      "type": "number >= 0", "required": false,
+      "desc": "CO₂ **浓度**（ppm）。⚠️ 这是浓度不是排放量，**不可直接当碳排**；要做碳排必须有浓度×流量×时间，并说明排放源（尾气 / 环境本底）。",
+      "example": 485.0
+    },
+    "so2_mg_m3": {
+      "type": "number >= 0", "required": false,
+      "desc": "SO₂ 质量浓度，mg/m³。",
+      "example": 0.011
+    },
+    "nox_mg_m3": {
+      "type": "number >= 0", "required": false,
+      "desc": "NOx 质量浓度，mg/m³。",
+      "example": 0.048
+    },
+    "temp_c": {
+      "type": "number", "required": false,
+      "desc": "环境温度（°C），用于温压补偿。",
+      "example": 21.5
+    },
+    "press_hpa": {
+      "type": "number", "required": false,
+      "desc": "环境压力（hPa），用于温压补偿。",
+      "example": 1013.2
+    },
+    "load_kg": {
+      "type": "number >= 0", "required": false,
+      "desc": "该采样窗的载重（kg）。用于按载重分档比对理论排放因子。",
+      "example": 18000
+    },
+    "engine_rpm": {
+      "type": "number >= 0", "required": false,
+      "desc": "发动机转速（rpm），工况判别的辅助量。",
+      "example": 1450
+    },
+    "fuel_type": {
+      "type": "string", "required": false,
+      "desc": "燃料类型，如 柴油 / 汽油 / 天然气。与项目宽表 fuel_type 同义。",
+      "example": "柴油"
+    },
+    "qc_flags": {
+      "type": "array<string>", "required": false,
+      "desc": "质控标记位，见 qc_flags 定义。空数组表示本条数据有效。",
+      "example": ["preheat"]
+    }
+  },
+  "qc_flags": {
+    "preheat": "传感器预热中，数据不可用于校准",
+    "sensor_fault": "传感器自检失败",
+    "calib_stale": "标定已过期（超过标定有效期）",
+    "low_flow": "采样流量异常偏低",
+    "overflow": "量程溢出",
+    "power_reset": "断电重启后未重新预热",
+    "clock_drift": "设备时钟未对时或漂移",
+    "duplicate": "与上一条读数重复",
+    "manual": "人工录入，非设备自动采样"
+  },
+  "delivery": {
+    "primary": {
+      "mode": "file_drop",
+      "desc": "**首选**。设备把当批读数写成 CSV，落到共享目录（网盘 / 局域网共享 / SD 卡回传）。",
+      "path_pattern": "data/raw/实时/pm_YYYYMMDD[_批次].csv",
+      "encoding": "UTF-8（带 BOM 亦可）",
+      "header": "必须含表头行，列名用本契约的字段名；多批追加时表头只写一次"
+    },
+    "secondary": {
+      "mode": "http_post",
+      "desc": "设备有稳定网络时可直传。接收端只做「校验 → 落盘 → 记账」，**不做业务计算**。",
+      "endpoint": "POST /ingest/pm",
+      "content_type": "application/json; charset=utf-8",
+      "body": "单个读数对象，或 {\"readings\": [ ... ]} 批量",
+      "auth": "X-Device-Token 头（token 由接收端本地配置文件给定，不进版本库）"
+    },
+    "reserved": {
+      "mode": "mqtt",
+      "desc": "预留。topic 建议 pm/{device_id}/telemetry，payload 与 HTTP body 同构。设备端选型确定后再启用。",
+      "topic_pattern": "pm/{device_id}/telemetry",
+      "qos": 1,
+      "retain": false
+    }
+  },
+  "backend_landing": {
+    "read_point": "src/telemetry.py（契约校验与归一，纯函数，可单测）",
+    "cli": "tools/ingest_pm.py（接收端：文件轮询 / HTTP / 预留 MQTT，只落盘不算账）",
+    "raw_dir": "data/raw/实时/",
+    "processed_hook": "将来由 src/preprocess.py 读取并汇总到结果表；**在真实数据接入前不改动 preprocess**，闸门保持 28 项不变。",
+    "gate": "接入真实数据后新增「颗粒物采样有效率 / 里程覆盖率」对拍项；接入前该项应 SKIP，不得 FAIL。",
+    "privacy": "台账与报告里 plate 必须脱敏（docs/42 §8）；outputs/ 下的产物已在 .gitignore 内。",
+    "no_fake_factors": "**本契约不含任何 PM→碳排 或 PM→油耗 的换算系数。** 没有可核查来源的系数一律不写，宁可空着等实测标定（照 config/invoice_spend_factors.json 的纪律：默认不放任何无来源因子）。"
+  }
+}

@@ -8,3 +8,6 @@ pyarrow>=14.0.0
 plotly>=5.20.0
 pyyaml>=6.0
 requests>=2.31.0
+Flask>=3.0.0
+flask-cors>=4.0.0
+pymoo>=0.6.1

@@ -16,10 +16,14 @@ TIMEOUT_SECONDS = 15
 
 
 def load_amap_key() -> str:
-    """读取 Web 服务 Key：环境变量优先，其次本地 config/amap_key.txt。"""
-    key = (os.environ.get("AMAP_WEB_SERVICE_KEY") or "").strip()
-    if not key and KEY_PATH.exists():
-        key = KEY_PATH.read_text(encoding="utf-8").strip()
+    """读取 Web 服务 Key。
+
+    分层来源（src/config.py）：环境变量 → 挂载密钥目录 → 本地 config/amap_key.txt。
+    占位符不算密钥。
+    """
+    from .. import config as app_config
+
+    key = app_config.secret("AMAP_WEB_SERVICE_KEY", files=("amap_key.txt",))
     if not key or key.startswith(PLACEHOLDER):
         return ""
     return key

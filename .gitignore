@@ -17,6 +17,32 @@ data/reference/
 *.csv
 !config/*.csv
 
+# ===== 备份包：含不可再生的原始证据与代码快照，永不入库 =====
+backups/
+
+# ===== 传感器审计日志：含设备 ID 与来源 IP，永不入库 =====
+outputs/sensor_audit.jsonl
+
+# ===== run 快照与生效指针：机器本地状态（可由流水线重建）永不入库 =====
+data/processed/_runs/
+data/processed/current_run.json
+
+# ===== 原生部署与体检的运行产物：日志、PID、安装日志 =====
+logs/
+_shots/
+deploy/install_docker.log
+deploy/env
+
+# ===== 本机设备注册表与真实令牌摘要：只保留模板，运行状态不入库 =====
+config/devices.json
+
+# ===== 固件本地配置：含真实设备令牌，永不入库 =====
+hardware/esp32/config.h
+hardware/esp32/*.local.h
+
+# ===== 批量下发的明文令牌清单（含 device_id + token），永不入库 =====
+outputs/device_tokens.csv
+
 # ===== 流水线产出：只有三个结果表入库 =====
 data/processed/*
 !data/processed/wide_data.parquet

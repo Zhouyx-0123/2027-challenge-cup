@@ -39,7 +39,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src import evaluator, optimizer, preprocess, scenarios, schema  # noqa: E402
+from src import evaluator, optimizer, preprocess, run_manifest, scenarios, schema  # noqa: E402
 
 PROCESSED = ROOT / "data" / "processed"
 WIDE_PATH = PROCESSED / "wide_data.parquet"
@@ -211,6 +211,7 @@ def _run_stage(index: int, stage: Dict[str, Any], simulate: bool = False) -> Dic
 
 def _fail(run_log: Dict[str, Any], stage_name: str, message: str) -> int:
     run_log["exit_code"] = 1
+    run_log["published"] = False
     run_log["total_seconds"] = round(time.perf_counter() - run_log.pop("_t0"), 3)
     _write_json(RUN_LOG_PATH, run_log)
     _write_json(GATE_PATH, {
@@ -225,7 +226,20 @@ def _fail(run_log: Dict[str, Any], stage_name: str, message: str) -> int:
         }],
         "counts": {"pass": 0, "fail": 1, "skip": 0},
     })
+    # 发布语义（docs/50 §2）：失败**不发布**，并回滚到上一生效版本，
+    # 免得半成品结果表被页面当成有效数据读走。
+    try:
+        run_manifest.record_failure(
+            str(run_log.get("run_id") or "unknown"), {}, run_log,
+            reason="stage_failed")
+        rollback = run_manifest.rollback_to_last_published()
+        run_log["rollback"] = rollback
+        _write_json(RUN_LOG_PATH, run_log)
+    except Exception:
+        traceback.print_exc()
     print("\n流水线中断：%s" % stage_name)
+    if run_log.get("rollback", {}).get("ok"):
+        print("已回滚到上一生效版本 %s" % run_log["rollback"]["run_id"])
     print("详见 %s" % RUN_LOG_PATH)
     return 1
 
@@ -352,6 +366,8 @@ def build_disclosure(kpi: Dict[str, Any], quality: Dict[str, Any], source: str) 
 def build_kpi(seg: pd.DataFrame, wide: pd.DataFrame, schemes: pd.DataFrame,
               band: pd.DataFrame, quality: Dict[str, Any], source: str) -> Dict[str, Any]:
     total_kg = float(pd.to_numeric(seg["kg_co2"], errors="coerce").fillna(0).sum())
+    gross_kg = float(pd.to_numeric(
+        seg["kg_co2_gross"], errors="coerce").fillna(0).sum()) if "kg_co2_gross" in seg.columns else total_kg
     trip_view = seg.drop_duplicates("trip_id") if "trip_id" in seg.columns else seg
     km_col = "trip_km" if "trip_km" in trip_view.columns else "dist_km"
     total_km = float(pd.to_numeric(trip_view[km_col], errors="coerce").fillna(0).sum())
@@ -383,6 +399,8 @@ def build_kpi(seg: pd.DataFrame, wide: pd.DataFrame, schemes: pd.DataFrame,
         "generated_at": _now(),
         "total_kg": total_kg,
         "e0_t": total_kg / 1000.0,
+        # 运单关联毛值：仅用于与业务台账对账，不替代法定物理主账。
+        "gross_t": gross_kg / 1000.0,
         "total_km": total_km,
         "segments": int(len(seg)),
         "physical_trips": int(len(trip_view)),
@@ -986,10 +1004,34 @@ def _print_gate(report: Dict[str, Any]) -> None:
 # G5 · 一键入口
 # ---------------------------------------------------------------------------
 
+def _has_raw_inputs() -> bool:
+    raw = ROOT / "data" / "raw"
+    return raw.exists() and any(
+        p.is_file() and p.suffix.lower() in {".xlsx", ".xls", ".csv"}
+        for p in raw.iterdir())
+
+
 def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
-                with_routes: bool = False) -> int:
+                with_routes: bool = False, allow_demo_overwrite: bool = False,
+                runs_keep: int = run_manifest.DEFAULT_KEEP) -> int:
+    # 数据安全闸：无原始附件时默认不得用演示样本覆盖已入库真实结果。
+    previous_source = str(_read_json(SOURCE_PATH).get("source", "unknown"))
+    if not _has_raw_inputs() and previous_source == "real" and not allow_demo_overwrite:
+        print("=" * 78)
+        print("[SAFE] data/raw 为空，现有结果表来源为 real。")
+        print("       为防止演示样本覆盖真实结果，本次拒绝执行。")
+        print("       如确认要重建演示数据，请显式追加 --allow-demo-overwrite。")
+        print("=" * 78)
+        return 1
+
+    # run 身份：时间戳 + 输入指纹 + 代码版本（钉死"这一次算的"）
+    fingerprint = run_manifest.input_fingerprint()
+    run_id = run_manifest.make_run_id(fingerprint)
     run_log: Dict[str, Any] = {
         "generated_at": _now(),
+        "run_id": run_id,
+        "code_version": run_manifest.code_version(),
+        "input_fingerprint": fingerprint,
         "source": "unknown",
         "mode": "strict" if strict else "auto",
         "stages": [],
@@ -1000,6 +1042,8 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
     print("=" * 78)
     print("物流企业碳感知智能决策系统 · 一键复算")
     print("时间：%s" % run_log["generated_at"])
+    print("run ：%s（代码 %s｜输入指纹 %s）"
+          % (run_id, run_log["code_version"], fingerprint))
     print("=" * 78)
 
     start_index = simulate_fail or -1
@@ -1126,12 +1170,39 @@ def run_pipeline(strict: bool = False, simulate_fail: Optional[int] = None,
         "gate_counts": report.get("counts", {}),
         "total_seconds": round(time.perf_counter() - run_log.pop("_t0"), 3),
     })
-    _write_json(RUN_LOG_PATH, run_log)
-    print("\n本次耗时 %.2f s｜结果目录 %s" % (run_log["total_seconds"], PROCESSED))
+
     if report.get("passed"):
+        # ---- 发布：快照 → 生效指针 → 索引（先落本次日志，快照才带上它）----
+        run_log["published"] = True
+        _write_json(RUN_LOG_PATH, run_log)
+        pointer = run_manifest.publish(run_id, report, run_log)
+        removed = run_manifest.prune(runs_keep)
+        run_log["published_run_id"] = pointer["run_id"]
+        if removed:
+            run_log["pruned_runs"] = removed
+        _write_json(RUN_LOG_PATH, run_log)
+        print("\n本次耗时 %.2f s｜结果目录 %s" % (run_log["total_seconds"], PROCESSED))
+        print("已发布 run %s（生效指针：data/processed/current_run.json）"
+              % pointer["run_id"])
+        if removed:
+            print("已清理旧快照 %d 个（保留最近 %d 个）" % (len(removed), runs_keep))
         print("流水线全部跑通 [OK]")
         return 0
-    print("流水线跑完，但闸门未通过 [FAIL]（退出码 1）")
+
+    # ---- 闸门未通过：不发布 + 回滚到上一生效版本 ----
+    run_log["published"] = False
+    _write_json(RUN_LOG_PATH, run_log)
+    run_manifest.record_failure(run_id, report, run_log, reason="gate_failed")
+    rollback = run_manifest.rollback_to_last_published()
+    run_log["rollback"] = rollback
+    _write_json(RUN_LOG_PATH, run_log)
+    print("\n本次耗时 %.2f s｜结果目录 %s" % (run_log["total_seconds"], PROCESSED))
+    print("流水线跑完，但闸门未通过 [FAIL]（退出码 1）——本次结果**未发布**")
+    if rollback.get("ok"):
+        print("已回滚到上一生效版本 %s（恢复 %d 个文件）"
+              % (rollback["run_id"], len(rollback["restored"])))
+    else:
+        print("[!] %s" % rollback.get("note", ""))
     return 1
 
 
@@ -1143,9 +1214,26 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="验收自测：模拟第 N 段失败（G1 定位段名）")
     parser.add_argument("--with-routes", action="store_true",
                         help="启用 T7 路线情景段（需先跑 python -m tools.route_fetch）")
+    parser.add_argument("--allow-demo-overwrite", action="store_true",
+                        help="明确允许在 data/raw 为空时用演示样本覆盖现有结果表")
+    parser.add_argument("--runs-keep", type=int, default=run_manifest.DEFAULT_KEEP,
+                        help="保留最近 N 个 run 快照（默认 %d）" % run_manifest.DEFAULT_KEEP)
+    parser.add_argument("--adopt-current", action="store_true",
+                        help="不重算：把当前结果目录认领为生效版本（补出生证明）")
     args = parser.parse_args(argv)
+    if args.adopt_current:
+        try:
+            pointer = run_manifest.adopt_current()
+        except ValueError as exc:
+            print("[FAIL] %s" % exc)
+            return 1
+        print("[OK] 已认领当前结果为生效版本：%s" % pointer["run_id"])
+        print("     生效指针：data/processed/current_run.json")
+        return 0
     return run_pipeline(strict=args.strict, simulate_fail=args.simulate_fail,
-                        with_routes=args.with_routes)
+                        with_routes=args.with_routes,
+                        allow_demo_overwrite=args.allow_demo_overwrite,
+                        runs_keep=args.runs_keep)
 
 
 if __name__ == "__main__":

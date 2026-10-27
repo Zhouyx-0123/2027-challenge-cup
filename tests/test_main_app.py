@@ -23,11 +23,11 @@ def _run(script, *args) -> AppTest:
 def test_invoice_writes_shared_carbon_state(monkeypatch):
     import main_views
 
-    monkeypatch.setattr(main_views.services, "extract_invoice", lambda *args: {
+    monkeypatch.setattr(main_views.live_services, "extract_invoice", lambda *args: {
         "fuel_liters": 65.5, "mock": False})
-    monkeypatch.setattr(main_views.services, "invoice_summary", lambda **kwargs: {
+    monkeypatch.setattr(main_views.live_services, "invoice_summary", lambda **kwargs: {
         "distance_km": 233.9})
-    monkeypatch.setattr(main_views.services, "calc_carbon", lambda *args: 210.5)
+    monkeypatch.setattr(main_views.live_services, "calc_carbon", lambda *args: 210.5)
 
     class Uploaded:
         name = "invoice.jpg"
@@ -49,6 +49,32 @@ def test_invoice_writes_shared_carbon_state(monkeypatch):
     assert len(at.session_state["invoice_history"]) == 1
 
 
+def test_failed_invoice_does_not_create_carbon(monkeypatch):
+    import main_views
+
+    monkeypatch.setattr(main_views.live_services, "extract_invoice", lambda *args: {
+        "status": "failed", "note": "未识别出发票内容", "fuel_liters": None})
+
+    class Uploaded:
+        name = "broken.jpg"
+
+        @staticmethod
+        def getvalue():
+            return b"image"
+
+    def script(uploaded_cls):
+        from demo_state import init_state
+        from main_views import _run_invoice
+        init_state()
+        _run_invoice(uploaded_cls())
+
+    at = _run(script, Uploaded)
+    assert at.session_state["current_invoice_result"] is None
+    assert at.session_state["current_invoice_carbon"] == 0.0
+    assert at.session_state["today_invoice_count"] == 0
+    assert "未识别出发票内容" in at.session_state["invoice_error"]
+
+
 def test_sensor_warning_writes_penalty_state(monkeypatch):
     import main_views
 
@@ -56,7 +82,7 @@ def test_sensor_warning_writes_penalty_state(monkeypatch):
         "timestamp": pd.to_datetime(["2026-10-26 16:00:00"]),
         "device_id": ["env_01"], "co2": [1200.0], "temp": [26.5],
     })
-    monkeypatch.setattr(main_views.services, "sensor_data", lambda: frame)
+    monkeypatch.setattr(main_views.live_services, "sensor_data", lambda: frame)
 
     def script():
         from demo_state import init_state
@@ -84,6 +110,7 @@ def test_shared_snapshot_updates_gap_and_financial_risk():
 
     at = _run(script)
     snap = at.session_state["test_snapshot"]
+    assert snap["base_source"] == "result"
     assert snap["total_t"] == 4505.04
     assert snap["gap_t"] == 3.0
     assert snap["balance_t"] == -3.0

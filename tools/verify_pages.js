@@ -16,11 +16,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const EDGE_CANDIDATES = [
+  // 浏览器路径可用环境变量指定（CI / Linux）：CHROME_PATH=/usr/bin/google-chrome
+  process.env.CHROME_PATH,
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-];
+  // Linux 常见路径（GitHub Actions ubuntu-latest 自带 Google Chrome）
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+].filter(Boolean);
 const PORT = Number(process.env.CDP_PORT || 9336);
 const base = (process.argv[2] || 'http://localhost:8501').replace(/\/$/, '');
 const outDir = process.argv[3] || '_shots';

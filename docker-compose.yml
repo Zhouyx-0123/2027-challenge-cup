@@ -1,0 +1,151 @@
+# ==========================================================================
+# 物流企业碳感知智能决策系统 · 容器编排
+#
+#   app     ：Streamlit 决策台（8501）
+#   sensor  ：Flask 传感器网关（5000），ESP32 直连入口
+#   caddy   ：内网 TLS 网关（8443 HTTPS / 8080 HTTP→HTTPS）
+#
+# 用法：
+#   docker compose --env-file deploy/env up -d --build
+#   docker compose ps
+#   docker compose logs -f app
+#   docker compose down
+#
+# 变量约定：全部用 ${VAR:-默认值} 从宿主环境读；
+#   · 宿主 shell 环境变量 > --env-file 指定的文件 > compose 默认值。
+#   · 密钥只走环境变量或只读挂载，绝不写进本文件。
+# ==========================================================================
+name: carbontide
+
+services:
+  # ---------------------------------------------------------------------
+  # 决策台：Streamlit 五页（首页 / 发票 / 传感器 / 路线沙盘 / 碳台账）
+  # ---------------------------------------------------------------------
+  app:
+    image: ${IMAGE_NAME:-carbontide:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: carbontide-app
+    restart: unless-stopped
+    command:
+      - python
+      - -m
+      - streamlit
+      - run
+      - app/app.py
+      - --server.port
+      - "8501"
+      - --server.address
+      - "0.0.0.0"
+      - --server.headless
+      - "true"
+    ports:
+      - "${APP_PORT:-8501}:8501"
+    environment:
+      # --- 地图与模型服务凭据（缺失时页面降级，不崩溃）---
+      AMAP_WEB_SERVICE_KEY: ${AMAP_WEB_SERVICE_KEY:-}
+      AMAP_JS_API_KEY: ${AMAP_JS_API_KEY:-}
+      AMAP_JS_KEY: ${AMAP_JS_KEY:-}
+      AMAP_JS_SECURITY_CODE: ${AMAP_JS_SECURITY_CODE:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      # --- 演示 / 离线开关 ---
+      SENSOR_MOCK: ${SENSOR_MOCK:-1}
+      INVOICE_OCR_MOCK: ${INVOICE_OCR_MOCK:-0}
+      # --- 传感器网关参数（鉴权 fail-closed：默认开启，未登记设备一律 401）---
+      SENSOR_AUTH: ${SENSOR_AUTH:-1}
+      SENSOR_ALLOWED_ORIGINS: ${SENSOR_ALLOWED_ORIGINS:-}
+      SENSOR_DEVICES_FILE: ${SENSOR_DEVICES_FILE:-/app/config/devices.json}
+      SENSOR_RATE_LIMIT_PER_MIN: ${SENSOR_RATE_LIMIT_PER_MIN:-60}
+      # 读数落盘到挂载卷（app 与 sensor 共用同一个文件，否则容器重建即丢）
+      SENSOR_DATA_FILE: ${SENSOR_DATA_FILE:-/app/data/sensor_data.csv}
+      # --- Streamlit 运行参数 ---
+      STREAMLIT_SERVER_PORT: "8501"
+      STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      # 结果表与原始数据：宿主目录，容器内可写（流水线产物落地）
+      - ./data:/app/data
+      # 配置：只读。宿主 config/ 必须存在（含因子 JSON），它会遮蔽镜像内的副本
+      - ./config:/app/config:ro
+      # 审计产物：宿主目录
+      - ./outputs:/app/outputs
+      # 备份目录：宿主目录（首次启动由 Docker 自动创建）
+      - ./backups:/app/backups
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health',timeout=4).status==200 else 1)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 45s
+
+  # ---------------------------------------------------------------------
+  # 传感器网关：ESP32 → POST /api/upload_sensor → sensor_data.csv
+  # 与 app 共用同一镜像（同一份 server.py 与依赖）
+  # ---------------------------------------------------------------------
+  sensor:
+    image: ${IMAGE_NAME:-carbontide:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: carbontide-sensor
+    restart: unless-stopped
+    command: ["python", "server.py"]
+    ports:
+      - "${SENSOR_PORT:-5000}:5000"
+    environment:
+      SENSOR_AUTH: ${SENSOR_AUTH:-1}
+      SENSOR_ALLOWED_ORIGINS: ${SENSOR_ALLOWED_ORIGINS:-}
+      SENSOR_DEVICES_FILE: ${SENSOR_DEVICES_FILE:-/app/config/devices.json}
+      SENSOR_RATE_LIMIT_PER_MIN: ${SENSOR_RATE_LIMIT_PER_MIN:-60}
+      SENSOR_DATA_FILE: ${SENSOR_DATA_FILE:-/app/data/sensor_data.csv}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+      - ./outputs:/app/outputs
+      - ./backups:/app/backups
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/api/health',timeout=4).status==200 else 1)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------
+  # 内网 TLS 网关：统一入口，ESP32 只需打 https://<主机>:8443/api/upload_sensor
+  # ---------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: carbontide-caddy
+    restart: unless-stopped
+    ports:
+      - "${HTTPS_PORT:-8443}:8443"
+      - "${HTTP_PORT:-8080}:8080"
+    environment:
+      # 对外端口：只影响 8080 的跳转目标，容器内监听端口固定 8443 / 8080
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # 命名卷：保住 Caddy 自签 CA 与证书，容器重建后不换 CA
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+      sensor:
+        condition: service_healthy
+    healthcheck:
+      # Caddy 管理端点在容器内 localhost:2019，alpine 自带 busybox wget
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  caddy_data:
+  caddy_config:

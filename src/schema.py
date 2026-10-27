@@ -71,14 +71,21 @@ RESULT_FILES: Dict[str, str] = {
 # --------------------------------------------------------------------------
 # 宽表 / 段表
 # --------------------------------------------------------------------------
+#: 数据层一次固化的碳因子与双轨碳排列
+WIDE_CARBON_COLUMNS: List[str] = [
+    "factor_gkm", "er_gs", "kg_co2", "kg_co2_phys",
+    "delta_pct", "factor_version", "flag_factor_x",
+]
+
 WIDE_REQUIRED: List[str] = [
     "waybill_no", "plate", "vehicle_type", "vclass", "load_t", "origin", "dest",
     "od_pair", "od_site", "dist_km", "month",
     "flag_dup", "flag_anomaly", "flag_basis", "flag_estimated",
+    *WIDE_CARBON_COLUMNS,
 ]
 
-#: 段表在宽表基础上新增的派生列（由 optimizer 写）
-SEG_DERIVED: List[str] = ["factor_gkm", "kg_co2", "kg_co2_phys", "delta_pct"]
+#: 段表在宽表基础上新增的派生列（分摊层写入，不再重复算因子）
+SEG_DERIVED: List[str] = ["kg_co2_gross", "trip_id", "allocation_share"]
 SEG_REQUIRED: List[str] = WIDE_REQUIRED + SEG_DERIVED
 
 #: 冻结的段表列（只增不改）；页面画图依赖它

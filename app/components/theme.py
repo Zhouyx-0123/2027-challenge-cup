@@ -892,7 +892,21 @@ input:focus, textarea:focus, [data-baseweb="select"] > div:focus-within{
   box-shadow:0 0 0 2px rgba(70,183,255,.55) !important;
 }
 [data-testid="stRadio"] label{ font-family:var(--ct-font-body); font-weight:600; font-size:13px; color:var(--ct-ink-2); }
-[data-testid="stSlider"] [role="slider"]{ background:var(--ct-blue) !important; }
+/* 原生滑条兜底皮肤：Streamlit 1.4x 起滑条是 react-aria 实现，
+   DOM 里没有 [role="slider"]，也没有 [data-baseweb="slider"]，
+   旧选择器全部落空（这正是原生滑条看起来"土"的根因）。
+   真实结构：div[style*="position: relative"] > 轨道div + div[style*="position: absolute"] 旋钮。
+   正式界面用 components/slider_kit.py 的自绘滑条，这里只保证万一露出时不难看。 */
+[data-testid="stSlider"] div[style*="position: relative"] > div:first-child{
+  background:rgba(255,255,255,.12) !important; border-radius:999px !important; height:6px !important;
+}
+[data-testid="stSlider"] div[style*="position: absolute"]{
+  width:20px !important; height:20px !important; border-radius:50% !important;
+  background:radial-gradient(circle at 34% 30%,#FFFFFF,#9FC4DE) !important;
+  box-shadow:0 0 0 1px rgba(255,255,255,.5), 0 0 16px rgba(70,183,255,.45) !important;
+}
+[data-testid="stSliderThumbValue"] p{ font-variant-numeric:tabular-nums; color:var(--ct-blue) !important; }
+[data-testid="stSliderTickBar"] p{ font-size:11px !important; color:var(--ct-ink-4) !important; }
 [data-testid="stProgress"] > div > div > div{ background:var(--ct-blue) !important; border-radius:100px !important; }
 [data-testid="stProgress"] > div{ background:rgba(255,255,255,.09) !important; border-radius:100px !important; }
 [data-testid="stAlert"]{
@@ -1310,16 +1324,6 @@ pre, [data-testid="stCode"]{
 [data-testid="stExpander"] summary{ color:var(--ct-ink) !important; }
 [data-testid="stExpander"] svg{ fill:var(--ct-ink-3) !important; }
 [data-testid="stExpander"] [data-testid="stExpanderIcon"] svg path{ fill:var(--ct-ink-3) !important; }
-[data-testid="stSlider"] [role="slider"]{
-  background:var(--ct-blue) !important;
-  box-shadow:0 0 0 5px rgba(70,183,255,.18) !important;
-}
-[data-testid="stSlider"] [data-baseweb="slider"] div[role="track"]{
-  background:rgba(255,255,255,.12) !important;
-}
-[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"]{
-  border-color:var(--ct-blue) !important;
-}
 [data-testid="stRadio"] label p{ color:var(--ct-ink-2) !important; }
 [data-testid="stCheckbox"] label p{ color:var(--ct-ink-2) !important; }
 [data-testid="stFileUploader"]{

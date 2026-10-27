@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "_note": "设备注册表模板。复制为 config/devices.json 后，用 python -m tools.device_tokens add --device-id <设备号> 登记。该运行文件只存令牌摘要，但不进版本库。",
+  "devices": []
+}

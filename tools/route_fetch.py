@@ -96,14 +96,15 @@ def _throttle() -> None:
 # ---------------------------------------------------------------------------
 
 def load_key() -> str:
-    """env → config/amap_key.txt → 占位符。占位符 = 演示回退模式，不报错。"""
-    env = os.environ.get("AMAP_WEB_SERVICE_KEY", "").strip()
-    if env and not env.startswith(PLACEHOLDER):
-        return env
-    if KEY_PATH.exists():
-        text = KEY_PATH.read_text(encoding="utf-8").strip()
-        if text and not text.startswith(PLACEHOLDER):
-            return text
+    """env → 挂载密钥目录 → config/amap_key.txt → 占位符。
+
+    占位符 = 演示回退模式，不报错。
+    """
+    from src import config as app_config
+
+    key = app_config.secret("AMAP_WEB_SERVICE_KEY", files=("amap_key.txt",))
+    if key and not key.startswith(PLACEHOLDER):
+        return key
     return PLACEHOLDER
 
 

@@ -1,0 +1,58 @@
+# ==========================================================================
+# 构建上下文排除表
+# 纪律：原始数据（data/raw）永不入镜像；密钥文件永不入镜像。
+# 说明：data/processed 不在此列 —— 结果表随镜像走一份，开箱即用；
+#       运行时由 compose 挂载宿主 ./data 覆盖（宿主缺表会遮蔽镜像内的副本）。
+# ==========================================================================
+
+# ---- 版本控制与 CI ----
+.git
+.gitignore
+.github
+
+# ---- Python 缓存与虚拟环境 ----
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.venv
+venv
+env
+
+# ---- 原始数据：含发票图 / 车牌等敏感附件，绝不能进镜像 ----
+data/raw
+data/reference
+data/interim
+
+# ---- 运行时产物：宿主机挂载提供，镜像里不需要 ----
+outputs
+backups
+_shots
+wheels
+*.log
+
+# ---- 密钥：config 下的 *.txt 全是凭据文件，一律不进镜像 ----
+#      （镜像里只 COPY config/*.json 与 config/README.md，这里再加一道保险）
+config/*.txt
+config/*.key
+config/*_secret.txt
+config/devices.json
+deploy/env
+.streamlit/secrets.toml
+.env
+
+# ---- 文档与开发期目录 ----
+# 注意：docs/、tests/ 不进镜像（减小体积、避免带入评审材料）
+docs
+tests
+node_modules
+.workbuddy
+.idea
+.vscode
+.DS_Store
+
+# ---- 注意：不要排除 *.png / *.jpg ----
+# app/static/ 下的品牌标志与极光底图是首页首帧素材，
+# 排除后首页会缺图、截图体积骤降，验收脚本的判据会失效。

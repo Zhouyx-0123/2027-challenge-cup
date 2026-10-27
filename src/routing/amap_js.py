@@ -17,13 +17,17 @@ SECURITY_CODE_PATH = CONFIG_DIR / "amap_js_security_code.txt"
 
 
 def _read(path: Path, env_name: str) -> str:
-    value = (os.environ.get(env_name) or "").strip()
-    if value:
+    """读取一个 JS 侧凭据。
+
+    分层来源（src/config.py）：环境变量 → 挂载密钥目录 → 本地 config 文件。
+    保留旧参数 ``path`` 以兼容既有调用；实际取文件以 ``config/`` 下的同名文件为准。
+    """
+    from .. import config as app_config
+
+    name = path.name
+    value = app_config.secret(env_name, files=(name,))
+    if value and not value.startswith("请至高德"):
         return value
-    if path.exists():
-        value = path.read_text(encoding="utf-8").strip()
-        if not value.startswith("请至高德"):
-            return value
     return ""
 
 

@@ -102,17 +102,17 @@ def check_gate() -> Tuple[bool, str]:
 
 def check_amap() -> Tuple[bool, str]:
     """分别检查后端 REST Key 与前端 JS API 地图凭据。"""
+    from src import config as app_config
     from src.routing import amap_js
-    path = CONFIG / "amap_key.txt"
-    web_ready = False
-    if path.exists():
-        text = path.read_text(encoding="utf-8").strip()
-        web_ready = bool(text and not text.startswith("请至高德"))
+
+    key, source = app_config.secret_with_source(
+        "AMAP_WEB_SERVICE_KEY", files=("amap_key.txt",))
+    web_ready = bool(key and not key.startswith("请至高德"))
     js_ready = amap_js.js_available()
     if web_ready and js_ready:
         return True, "REST Key + JS API 凭据齐备 → 路线规划与 3D 地图可用"
     if web_ready:
-        return True, "REST Key 已配置；缺 JS API Key/安全密钥 → 精细地图待接入"
+        return True, "REST Key 已配置（来源 %s）；缺 JS API Key/安全密钥 → 精细地图待接入" % source
     return True, "未配置高德凭据 → 路线沙盘会显示配置指引，不影响其他页面"
 
 

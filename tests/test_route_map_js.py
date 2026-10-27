@@ -44,7 +44,9 @@ def test_prepare_routes_orders_best_cost_and_assigns_colors():
 def test_map_html_uses_webgl_darkblue_and_live_layers():
     from components.route_map import build_route_map_html
     html = build_route_map_html(
-        _routes(), "121.0,31.0", "122.0,32.0", "js-key-test", "security-test")
+        _routes(), "121.0,31.0", "122.0,32.0", "js-key-test", "security-test",
+        origin_label="上海虹桥站", destination_label="北京南站")
+    assert "上海虹桥站" in html and "北京南站" in html
     assert "AMapLoader.load" in html
     assert "amap://styles/darkblue" in html
     assert "viewMode:'3D'" in html
@@ -68,7 +70,7 @@ def test_map_html_escapes_script_breakout():
 
 def test_missing_js_credentials_shows_setup(monkeypatch):
     from components import route_map
-    monkeypatch.setattr(route_map.services, "amap_js_available", lambda: False)
+    monkeypatch.setattr(route_map.live_services, "amap_js_available", lambda: False)
 
     def script(routes):
         from components import route_map

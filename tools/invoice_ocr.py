@@ -83,17 +83,13 @@ def _now() -> str:
 
 
 def load_api_key() -> str:
-    """读 key：环境变量 → config/deepseek_key.txt。永不入库、只在本机读。"""
-    key = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
-    if key:
-        return key
-    if KEY_PATH.exists():
-        text = KEY_PATH.read_text(encoding="utf-8", errors="ignore").strip()
-        if text.upper().startswith("DEEPSEEK_API_KEY="):
-            text = text.split("=", 1)[1].strip()
-        if text and not text.startswith("请至"):
-            return text
-    return ""
+    """读 key（分层：env → 挂载密钥目录 → config/deepseek_key.txt）。
+
+    永不入库、只在本机或部署环境读。
+    """
+    from src import config as app_config
+
+    return app_config.secret("DEEPSEEK_API_KEY", files=("deepseek_key.txt",))
 
 
 def read_ledger(path: Path) -> Dict[str, Dict[str, str]]:

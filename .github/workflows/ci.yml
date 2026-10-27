@@ -32,3 +32,90 @@ jobs:
       # 放下附件后同一命令即切真实模式，验收标准不变。
       - name: 引擎闸门 + 前端 AppTest + 弃用 API 防线
         run: pytest -q tests/
+
+  # ==========================================================================
+  # 容器化交付冒烟：构建镜像 → 起 app 容器 → 跑 4 个前端验收脚本
+  #
+  # 依赖：GitHub 的 ubuntu-latest runner 自带 Google Chrome（/usr/bin/google-chrome），
+  #       4 个 verify 脚本通过 CHROME_PATH 环境变量定位浏览器（Windows 路径仍兼容）。
+  # 冒烟依赖：Node 20 的全局 WebSocket 还在实验性开关后面（脚本用内置 WebSocket
+  #       直连 CDP，不装 puppeteer），故设置 NODE_OPTIONS=--experimental-websocket。
+  # ==========================================================================
+  docker-smoke:
+    name: docker · 构建 + 前端冒烟
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 校验 compose 语法
+        run: docker compose config -q
+
+      - name: 构建镜像
+        run: docker build -t carbontide:ci .
+
+      - name: 启动 app 容器
+        env:
+          IMAGE_NAME: carbontide:ci
+        run: docker compose up -d --no-build app
+
+      - name: 等待容器就绪（最多 ~120s）
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8501/_stcore/health > /dev/null 2>&1; then
+              echo "app healthy after $((i * 2))s"
+              exit 0
+            fi
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "waiting... $((i * 2))s"
+              docker compose ps
+            fi
+            sleep 2
+          done
+          echo "::error::app 未在 120s 内就绪"
+          docker compose ps
+          docker compose logs --tail 100 app
+          exit 1
+
+      - name: 前端冒烟（4 个验收脚本）
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          NODE_OPTIONS: --experimental-websocket
+        run: |
+          node tools/verify_pages.js http://localhost:8501 _shots
+          node tools/verify_nav.js http://localhost:8501
+          node tools/verify_sliders.js http://localhost:8501 _shots
+          node tools/verify_dashboard_layout.js http://localhost:8501 _shots
+
+      - name: 上传冒烟截图（失败时便于排查）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-smoke-shots
+          path: _shots
+          if-no-files-found: ignore
+
+      - name: 清理容器
+        if: always()
+        run: docker compose down -v
+
+      - name: 登录镜像仓库（可选）
+        if: ${{ secrets.REGISTRY != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: 推送镜像（可选，需配置 REGISTRY secret）
+        if: ${{ secrets.REGISTRY != '' }}
+        run: |
+          docker tag carbontide:ci ${{ secrets.REGISTRY }}/carbontide:${{ github.sha }}
+          docker push ${{ secrets.REGISTRY }}/carbontide:${{ github.sha }}

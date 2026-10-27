@@ -6,7 +6,21 @@ from typing import Any, Dict
 
 import streamlit as st
 
-BASE_TOTAL_T = 4502.04
+import services
+
+BASE_TOTAL_T = 4502.04  # 仅在结果表完全缺失时兜底
+
+
+def _base_snapshot() -> tuple[float, str]:
+    """优先读 kpi 结果表；缺失时才使用静态演示值。"""
+    kpi = services.kpis()
+    try:
+        gross = float(kpi.get("gross_t"))
+        if gross > 0:
+            return round(gross, 2), "result"
+    except (TypeError, ValueError):
+        pass
+    return BASE_TOTAL_T, "static"
 DEFAULTS = {
     "current_invoice_carbon": 0.0,       # kgCO2
     "current_invoice_fuel": None,        # L
@@ -49,7 +63,7 @@ def carbon_snapshot() -> Dict[str, float]:
     """
     invoice_t = _nonnegative(st.session_state.get("current_invoice_carbon")) / 1000.0
     sensor_t = _nonnegative(st.session_state.get("sensor_excess_carbon_t"))
-    base_t = BASE_TOTAL_T
+    base_t, base_source = _base_snapshot()
     quota_t = _nonnegative(st.session_state.get("carbon_quota_t"))
     price = _nonnegative(st.session_state.get("carbon_price"))
     total_t = base_t + invoice_t + sensor_t
@@ -58,6 +72,7 @@ def carbon_snapshot() -> Dict[str, float]:
     sensor_cost = _nonnegative(st.session_state.get("sensor_penalty"))
     return {
         "base_t": base_t,
+        "base_source": base_source,
         "invoice_t": invoice_t,
         "sensor_t": sensor_t,
         "total_t": total_t,

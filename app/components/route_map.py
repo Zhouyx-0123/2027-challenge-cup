@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Sequence
 import streamlit as st
 from streamlit.components import v1 as components
 
-import services
+import live_services
 
 MAP_HEIGHT = 590
 MAX_POINTS = 1800
@@ -388,10 +388,10 @@ function buildMap(AMap){
 
   const pin = (position, type, label) => new AMap.Marker({
     position, anchor:'bottom-center', zIndex:240,
-    content:`<div class="${type}"><i></i><span>${label}</span></div>`
+    content:`<div class="${type}"><i></i><span>${escapeHtml(label)}</span></div>`
   });
-  const startPin = pin(start, 'startpin', '起点');
-  const endPin = pin(end, 'endpin', '终点');
+  const startPin = pin(start, 'startpin', '起点 · ' + BOOT.originLabel);
+  const endPin = pin(end, 'endpin', '终点 · ' + BOOT.destinationLabel);
   map.add([startPin, endPin]);
 
   trafficLayer = new AMap.TileLayer.Traffic({
@@ -464,7 +464,9 @@ if (typeof AMapLoader === 'undefined') {
 
 
 def build_route_map_html(routes: List[Dict[str, Any]], origin: str, destination: str,
-                         key: str, security: str) -> str:
+                         key: str, security: str,
+                         origin_label: str = "起点",
+                         destination_label: str = "终点") -> str:
     prepared = prepare_routes(routes)
     if not prepared:
         raise ValueError("当前路线没有可绘制的真实几何")
@@ -472,6 +474,8 @@ def build_route_map_html(routes: List[Dict[str, Any]], origin: str, destination:
         raise ValueError("缺少高德 Web 端（JS API）Key 或安全密钥")
     payload = {
         "origin": origin.strip(), "destination": destination.strip(),
+        "originLabel": str(origin_label).strip() or "起点",
+        "destinationLabel": str(destination_label).strip() or "终点",
         "key": key.strip(), "security": security.strip(), "routes": prepared,
     }
     return HTML_TEMPLATE.replace("__BOOTSTRAP__", _json(payload))
@@ -501,13 +505,16 @@ def render_setup() -> None:
 </div>""", unsafe_allow_html=True)
 
 
-def render_route_map(routes: List[Dict[str, Any]], origin: str, destination: str) -> None:
-    if not services.amap_js_available():
+def render_route_map(routes: List[Dict[str, Any]], origin: str, destination: str,
+                     origin_label: str = "起点", destination_label: str = "终点") -> None:
+    if not live_services.amap_js_available():
         render_setup()
         return
-    key, security = services.amap_js_credentials()
+    key, security = live_services.amap_js_credentials()
     try:
-        html = build_route_map_html(routes, origin, destination, key, security)
+        html = build_route_map_html(
+            routes, origin, destination, key, security,
+            origin_label=origin_label, destination_label=destination_label)
     except ValueError as exc:
         st.warning(str(exc))
         return

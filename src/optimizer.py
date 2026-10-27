@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""引擎层：宽表 → 段级碳排（法定轨 + 物理轨）。
+"""引擎层：宽表 → 有效段表（法定轨 + 物理轨分摊）。
 
-只做一件事：读 wide_data.parquet，写 baseline_carbon.parquet。
-不读原始表、不读 data/raw、不碰前端。
+只做一件事：读已含碳列的 wide_data.parquet，写 baseline_carbon.parquet。
+不读原始表、不读 data/raw、不碰前端，也不重新定义因子。
 
 口径（docs/08 排放节的最小实现）：
     O1 因子表 FACTOR_MAP：吴睿中等（2024）表 8，按载重锚点线性内插
@@ -11,9 +11,10 @@
     O4 段级碳排 + 双轨偏差
     O5 baseline 汇总（E₀ 由 pipeline 从本表累加，避免二次口径）
 
-为什么因子不放在 preprocess：
-    因子是“口径”不是“数据”。改因子只重算碳排、不动宽表，闸门立刻能对拍 14.67/12.68%。
-    这是 docs/17 §2.2 修正一，也是本文件与数据层的唯一边界。
+因子边界：
+    `src/factor_model.py` 是唯一实现，`preprocess` 在落宽表前调用一次，
+    宽表保存 factor_gkm / kg_co2 / kg_co2_phys。本层只复用它；只有旧宽表
+    缺列或版本不一致时才兜底重算，保证历史数据仍可读。
 """
 
 from __future__ import annotations
@@ -25,6 +26,25 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
+from src.factor_model import (  # noqa: E402
+    CARBON_COLUMNS,
+    FACTOR_ANCHORS,
+    FACTOR_BY_CLASS_LOAD,
+    FACTOR_SOURCE,
+    FACTOR_VERSION,
+    INDUSTRY_SPEED_KMH,
+    LOAD_ANCHORS,
+    REF_SPEED_KMH,
+    SECONDS_PER_HOUR,
+    VSP_MULT,
+    VSP_X,
+    attach_carbon_columns as compute_carbon_columns,
+    er_at,
+    factor_lookup,
+    self_test,
+    vsp_from_speed,
+)
 
 # Windows GBK 控制台兜底（python -m src.optimizer 独立运行时）。
 for _stream in (sys.stdout, sys.stderr):
@@ -40,85 +60,7 @@ BASELINE_PATH = PROCESSED_DIR / "baseline_carbon.parquet"
 ROUTE_CANDIDATES_PATH = PROCESSED_DIR / "route_candidates.parquet"
 ROUTE_CANDIDATE_CARBON_PATH = PROCESSED_DIR / "route_candidate_carbon.parquet"
 
-FACTOR_VERSION = "JCB2023-BASE-v1"
-FACTOR_SOURCE = "吴睿中等（2024）VSP 排放率；v=50 km/h；2023年基准碳排放计算结果.xlsx 因子表"
-
-# O1 · 因子表：载重锚点(t) → 法定因子(g CO₂/km)
-# 兜底内插的 6 个锚点**全部**取自下方 2023 基准因子表（FACTOR_BY_CLASS_LOAD）：
-# 4.5 t → (1, 4.5) 394.56｜12 t → (2, 12) 544.752｜18 t → (2, 18) 759.24
-# 30 t → (3, 30) 1055.952（50 km/h 下 14.666 g/s）｜40 t → (3, 40) 1374.672｜45 t → (3, 45) 1581.84
-# 旧版首锚点 3.0 t → 320.18 在因子表里没有任何出处（轻型 1.0–8.0 t 统一 394.56），已移除；
-# 载重 < 4.5 t 时 np.interp 自动夹紧到 394.56，与轻型统一口径一致。
-LOAD_ANCHORS = np.array([4.5, 12.0, 18.0, 30.0, 40.0, 45.0], dtype=float)
-FACTOR_ANCHORS = np.array([394.56, 544.752, 759.24, 1055.952, 1374.672, 1581.84], dtype=float)
-
-# 2023 基准因子表（来自《2023年基准碳排放计算结果.xlsx》路段明细）：
-#   class 1（轻）统一 394.56；class 2 按 10/12/18/25 t；class 3 按 30/32/35/38/40/45/49 t。
-# 这是关联毛值 4,502,042.41 kg 的因子口径；物理主账按 12,167 趟首行因子得 2,258,438.38 kg。
-# factor_lookup 仍保留为未知车型/演示数据的兜底。
-FACTOR_BY_CLASS_LOAD: Dict[Tuple[int, float], float] = {
-    (1, 1.0): 394.560000,
-    (1, 1.5): 394.560000,
-    (1, 2.0): 394.560000,
-    (1, 4.5): 394.560000,
-    (1, 6.0): 394.560000,
-    (1, 8.0): 394.560000,
-    (2, 10.0): 458.928000,
-    (2, 12.0): 544.752000,
-    (2, 18.0): 759.240000,
-    (2, 25.0): 896.592000,
-    (3, 30.0): 1055.952000,
-    (3, 32.0): 1119.696000,
-    (3, 35.0): 1215.312000,
-    (3, 38.0): 1310.928000,
-    (3, 40.0): 1374.672000,
-    (3, 45.0): 1581.840000,
-    (3, 49.0): 1581.840000,
-}
-
-
-# O3 · VSP 修正：以 VSP=2（50 km/h 巡航）为 1.0
-VSP_X = np.array([0.0, 1.0, 2.0, 3.0, 4.0], dtype=float)
-VSP_MULT = np.array([0.82, 0.92, 1.00, 1.1268, 1.24], dtype=float)
-
-REF_SPEED_KMH = 50.0
-SECONDS_PER_HOUR = 3600.0
-INDUSTRY_SPEED_KMH = 50.0
-
-
-# ---------------------------------------------------------------------------
-# 因子 / 内插
-# ---------------------------------------------------------------------------
-
-def factor_lookup(load_t: Any) -> np.ndarray:
-    """载重 → 法定排放因子(g/km)。超出锚点范围自动夹紧（并由 flag_factor_x 标出）。"""
-    arr = np.asarray(load_t, dtype=float)
-    return np.interp(np.nan_to_num(arr, nan=30.0), LOAD_ANCHORS, FACTOR_ANCHORS)
-
-
-def er_at(load_t: float, vsp: float = 2.0) -> float:
-    """O2：给定载重与 VSP，返回瞬时排放率(g/s)。30 t / VSP=2 → 14.666。"""
-    base = float(factor_lookup(load_t)) / 72.0
-    mult = float(np.interp(vsp, VSP_X, VSP_MULT))
-    return base * mult
-
-
-def vsp_from_speed(speed_kmh: Any) -> np.ndarray:
-    """速度 → VSP 代理：30→1, 50→2, 70→3, 90→4。"""
-    arr = np.asarray(speed_kmh, dtype=float)
-    return np.clip(1.0 + (arr - 30.0) / 20.0, 0.0, 4.0)
-
-
-def self_test() -> Dict[str, float]:
-    """O7：因子表自测——与数据无关，任何模式下都该全绿。"""
-    er2 = er_at(30.0, 2.0)
-    er3 = er_at(30.0, 3.0)
-    dev = (er3 - er2) / er2 * 100.0
-    return {
-        "er30_vsp2": round(er2, 4),
-        "er30_vsp3": round(er3, 4),
-        "vsp3_dev_pct": round(dev, 4),
-    }
+# 因子常量与纯计算由 src/factor_model.py 统一提供。
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +68,7 @@ def self_test() -> Dict[str, float]:
 # ---------------------------------------------------------------------------
 
 def compute_baseline(wide: pd.DataFrame) -> pd.DataFrame:
+    """去重后的有效路段；宽表已含同版本碳列时直接复用。"""
     if wide is None or len(wide) == 0:
         raise ValueError("宽表为空，无法计算基准碳排")
 
@@ -136,43 +79,12 @@ def compute_baseline(wide: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         raise ValueError("去重后没有有效路段")
 
-    for col in ("dist_km", "load_t", "speed_kmh", "vclass"):
-        if col not in df.columns:
-            raise ValueError("宽表缺少契约列：" + col)
+    reusable = all(col in df.columns for col in CARBON_COLUMNS)
+    if reusable and "factor_version" in df.columns:
+        versions = set(df["factor_version"].dropna().astype(str).unique())
+        reusable = versions == {FACTOR_VERSION}
 
-    dist = pd.to_numeric(df["dist_km"], errors="coerce").fillna(0.1).clip(lower=0.1)
-    load_raw = pd.to_numeric(df["load_t"], errors="coerce").fillna(12.0)
-    load = load_raw.clip(lower=1.0, upper=60.0)
-    speed = pd.to_numeric(df["speed_kmh"], errors="coerce")
-    speed = speed.where(speed > 1.0, INDUSTRY_SPEED_KMH).clip(lower=1.0, upper=130.0)
-
-    # 法定轨：优先按 (vclass, load_t) 查 2023 基准因子表；未知车型再走内插兜底
-    vclass = pd.to_numeric(df["vclass"], errors="coerce").fillna(2).astype(int).to_numpy()
-    keys = list(zip(vclass, np.round(load, 2)))
-    factor = np.array([FACTOR_BY_CLASS_LOAD.get((int(c), float(l)), np.nan)
-                       for c, l in keys], dtype=float)
-    miss = np.isnan(factor)
-    if miss.any():
-        factor[miss] = factor_lookup(load[miss])
-    kg_legal = factor * dist / 1000.0
-
-    # 物理轨：瞬时排放率(g/s) × 行驶秒数
-    vsp = vsp_from_speed(speed)
-    er = factor / 72.0 * np.interp(vsp, VSP_X, VSP_MULT)
-    kg_phys = er * (dist / speed) * SECONDS_PER_HOUR / 1000.0
-
-    delta = np.where(kg_legal > 0, (kg_phys - kg_legal) / kg_legal * 100.0, 0.0)
-    out_range = np.array([(int(c), float(l)) not in FACTOR_BY_CLASS_LOAD for c, l in keys])
-
-    df["factor_gkm"] = np.round(factor, 6)
-    df["er_gs"] = np.round(er, 6)
-    df["kg_co2"] = kg_legal.astype(float)
-    df["kg_co2_phys"] = kg_phys.astype(float)
-    df["delta_pct"] = np.round(delta, 4)
-    df["factor_version"] = FACTOR_VERSION
-    df["flag_factor_x"] = out_range.astype(int)
-
-    return df
+    return df if reusable else compute_carbon_columns(df)
 
 
 def allocate_physical_baseline(df: pd.DataFrame) -> pd.DataFrame:

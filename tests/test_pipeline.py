@@ -71,6 +71,17 @@ def test_pipeline_exit_zero_and_gate_green(sandbox: Path):
     assert gate["counts"]["fail"] == 0, "闸门有 FAIL 项：%s" % gate.get("targets")
 
 
+def test_no_raw_data_refuses_to_overwrite_real_results(monkeypatch, capsys):
+    from src import pipeline
+
+    monkeypatch.setattr(pipeline, "_has_raw_inputs", lambda: False)
+    monkeypatch.setattr(pipeline, "_read_json", lambda path: {"source": "real"})
+    assert pipeline.run_pipeline() == 1
+    output = capsys.readouterr().out
+    assert "拒绝执行" in output
+    assert "--allow-demo-overwrite" in output
+
+
 def test_simulate_fail_reports_stage_and_exit_one(sandbox: Path):
     """人为触发第 2 段故障：必须报得出段名、退出码为 1。"""
     result = _run_pipeline(sandbox, "--simulate-fail", "2")

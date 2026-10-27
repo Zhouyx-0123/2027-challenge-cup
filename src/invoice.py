@@ -45,7 +45,7 @@ from pathlib import Path
 import requests
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from . import optimizer
+from . import factor_model
 
 ROOT = Path(__file__).resolve().parents[1]
 FACTORS_PATH = ROOT / "config" / "calc_factors.json"
@@ -157,8 +157,8 @@ def factor_for(vclass: int, load_t: float) -> float:
     """因子表口径的排放因子（g CO₂/km）。
 
     与 src/carbon_model._factor 同规则：优先查 2023 基准表
-    optimizer.FACTOR_BY_CLASS_LOAD[(vclass, load)]，未命中退回
-    optimizer.factor_lookup 的 6 锚点内插（并夹紧到量程两端）。
+    factor_model.FACTOR_BY_CLASS_LOAD[(vclass, load)]，未命中退回
+    factor_model.factor_lookup 的 6 锚点内插（并夹紧到量程两端）。
     tests/test_invoice.py 有一条用例把两者逐格比对，防止口径漂移。
     """
     try:
@@ -170,9 +170,9 @@ def factor_for(vclass: int, load_t: float) -> float:
     except (TypeError, ValueError):
         load = 12.0
     key = (vc, round(load, 2))
-    if key in optimizer.FACTOR_BY_CLASS_LOAD:
-        return float(optimizer.FACTOR_BY_CLASS_LOAD[key])
-    return float(optimizer.factor_lookup(load))
+    if key in factor_model.FACTOR_BY_CLASS_LOAD:
+        return float(factor_model.FACTOR_BY_CLASS_LOAD[key])
+    return float(factor_model.factor_lookup(load))
 
 
 # ---------------------------------------------------------------------------

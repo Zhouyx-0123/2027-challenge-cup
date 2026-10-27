@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>企业级演进路线图 · 物流企业碳感知智能决策系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f5f0;
+    --card:#ffffff;
+    --line:#e9e3d6;
+    --line-soft:#f0ece2;
+    --ink:#14171e;
+    --ink-2:#3a4256;
+    --muted:#7c7a72;
+    --primary:#2f6f5e;
+    --primary-soft:rgba(47,111,94,.09);
+    --accent:#c97b3f;
+    --accent-soft:rgba(201,123,63,.11);
+    --rose:#b06367;
+    --rose-soft:rgba(176,99,103,.10);
+    --sans:'Outfit','PingFang SC','Microsoft YaHei',sans-serif;
+    --serif:'DM Serif Display','Songti SC','STSong',Georgia,serif;
+    --mono:'JetBrains Mono',Consolas,'Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:14.5px;line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(900px 480px at 12% -8%, rgba(47,111,94,.055), transparent 60%),
+      radial-gradient(760px 420px at 92% 4%, rgba(201,123,63,.05), transparent 62%);
+    background-repeat:no-repeat;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:44px 24px 72px;}
+
+  /* ---------- eyebrow / hero ---------- */
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--primary);background:var(--primary-soft);
+    border:1px solid rgba(47,111,94,.18);border-radius:999px;padding:5px 13px;
+  }
+  .eyebrow svg{width:13px;height:13px;}
+  h1{
+    font-family:var(--serif);font-weight:400;font-size:35px;line-height:1.24;
+    letter-spacing:-.01em;margin:20px 0 0;color:var(--ink);
+  }
+  h1 em{font-style:normal;color:var(--primary);}
+  .lead{margin:16px 0 0;max-width:74ch;color:var(--ink-2);font-size:15.5px;}
+  .lead b{color:var(--ink);font-weight:600;}
+
+  .stat-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:28px;
+  }
+  .stat{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;
+    box-shadow:0 2px 8px rgba(20,23,30,.035);
+  }
+  .stat .num{
+    font-family:var(--serif);font-size:27px;line-height:1.1;color:var(--ink);
+    display:flex;align-items:baseline;gap:6px;
+  }
+  .stat .num small{font-family:var(--sans);font-size:12px;color:var(--muted);font-weight:500;}
+  .stat .lbl{margin-top:6px;font-size:12.5px;color:var(--muted);line-height:1.45;}
+  .stat.warn .num{color:var(--accent);}
+  .stat.bad .num{color:var(--rose);}
+
+  /* ---------- section ---------- */
+  section{margin-top:52px;}
+  .sec-head{display:flex;align-items:center;gap:11px;margin-bottom:6px;}
+  .sec-head svg{width:19px;height:19px;color:var(--primary);flex:none;}
+  h2{
+    font-family:var(--serif);font-weight:400;font-size:25px;line-height:1.3;margin:0;
+    letter-spacing:-.005em;
+  }
+  .sec-note{color:var(--muted);font-size:13px;margin:0 0 20px;max-width:82ch;}
+
+  /* ---------- ladder ---------- */
+  .ladder{display:flex;flex-direction:column;gap:8px;}
+  .rung{
+    display:grid;grid-template-columns:62px 1fr 108px;gap:16px;align-items:center;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 16px;
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .rung:hover{transform:translateY(-2px);box-shadow:0 6px 18px -6px rgba(20,23,30,.12);}
+  .rung .lv{
+    font-family:var(--mono);font-size:12px;font-weight:500;color:var(--muted);
+    border:1px solid var(--line);border-radius:7px;padding:3px 0;text-align:center;background:var(--line-soft);
+  }
+  .rung .t{font-size:14px;font-weight:600;color:var(--ink);}
+  .rung .d{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.45;}
+  .rung.now{border-color:rgba(47,111,94,.4);background:linear-gradient(0deg,var(--primary-soft),var(--primary-soft)),var(--card);}
+  .rung.now .lv{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .rung.now .t{color:var(--primary);}
+  .chip{
+    font-size:11.5px;padding:4px 10px;border-radius:999px;text-align:center;white-space:nowrap;
+    border:1px solid var(--line);background:var(--line-soft);color:var(--muted);
+  }
+  .chip.ok{background:var(--primary-soft);border-color:rgba(47,111,94,.22);color:var(--primary);}
+  .chip.part{background:var(--accent-soft);border-color:rgba(201,123,63,.26);color:#9a5f2e;}
+  .chip.no{background:var(--rose-soft);border-color:rgba(176,99,103,.24);color:var(--rose);}
+
+  /* ---------- architecture ---------- */
+  .arch{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 18px;box-shadow:0 4px 16px -2px rgba(20,23,30,.06);}
+  .layer{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start;padding:11px 0;border-bottom:1px dashed var(--line);}
+  .layer:last-child{border-bottom:0;}
+  .layer .lname{font-family:var(--mono);font-size:11.5px;color:var(--muted);letter-spacing:.06em;padding-top:6px;}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;}
+  .box{
+    font-size:12.8px;padding:6px 11px;border-radius:9px;border:1px solid var(--line);
+    background:#fcfbf8;color:var(--ink-2);
+  }
+  .box b{color:var(--ink);font-weight:600;}
+  .box.new{background:var(--accent-soft);border-color:rgba(201,123,63,.34);color:#8d5528;}
+  .box.new b{color:#7d4a20;}
+  .box.gov{background:var(--primary-soft);border-color:rgba(47,111,94,.24);color:#27564a;}
+  .box.gov b{color:#1f463c;}
+  .tag{
+    font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    padding:2px 6px;border-radius:5px;margin-left:7px;vertical-align:1px;
+  }
+  .tag.now{background:rgba(47,111,94,.13);color:var(--primary);}
+  .tag.add{background:rgba(201,123,63,.16);color:#9a5f2e;}
+
+  /* ---------- bench ---------- */
+  .bench-list{display:flex;flex-direction:column;gap:3px;}
+  .bench{display:grid;grid-template-columns:186px 1fr 46px;gap:14px;align-items:center;padding:6px 0;}
+  .bench-label{font-size:13.2px;color:var(--ink-2);}
+  .bench-track{height:14px;background:var(--line-soft);border-radius:7px;overflow:hidden;}
+  .bench-fill{height:100%;border-radius:7px;background:var(--primary);transition:width .5s ease;}
+  .bench-fill.mid{background:var(--accent);}
+  .bench-fill.low{background:var(--rose);}
+  .bench-val{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;}
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  th,td{text-align:left;padding:10px 13px;font-size:13px;vertical-align:top;border-bottom:1px solid var(--line-soft);}
+  th{background:#fbf9f4;font-weight:600;font-size:12px;letter-spacing:.03em;color:var(--muted);}
+  tr:last-child td{border-bottom:0;}
+  td code{font-family:var(--mono);font-size:11.8px;color:var(--primary);background:var(--primary-soft);padding:1px 5px;border-radius:4px;}
+  .pri{font-family:var(--mono);font-size:11px;font-weight:500;padding:2px 8px;border-radius:6px;white-space:nowrap;}
+  .pri.p0{background:var(--rose-soft);color:var(--rose);}
+  .pri.p1{background:var(--accent-soft);color:#9a5f2e;}
+  .pri.p2{background:var(--primary-soft);color:var(--primary);}
+
+  /* ---------- module cards ---------- */
+  .mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;}
+  .mod{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px 18px;
+    box-shadow:0 2px 8px rgba(20,23,30,.035);transition:transform .2s ease,box-shadow .2s ease;
+  }
+  .mod:hover{transform:translateY(-2px);box-shadow:0 8px 22px -8px rgba(20,23,30,.14);}
+  .mod h3{display:flex;align-items:center;gap:9px;margin:0 0 4px;font-size:15px;font-weight:600;color:var(--ink);}
+  .mod h3 svg{width:17px;height:17px;color:var(--primary);flex:none;}
+  .mod .now{font-size:12.6px;color:var(--muted);line-height:1.5;margin:0 0 11px;}
+  .mod ol{margin:0;padding-left:17px;}
+  .mod ol li{font-size:13px;color:var(--ink-2);line-height:1.5;margin-bottom:5px;}
+  .mod ol li b{color:var(--ink);font-weight:600;}
+  .mod .acc{
+    margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);
+    font-size:12.4px;color:var(--primary);display:flex;gap:7px;align-items:flex-start;
+  }
+  .mod .acc svg{width:13px;height:13px;flex:none;margin-top:3px;}
+
+  /* ---------- timeline ---------- */
+  .timeline{list-style:none;padding:0;margin:0;position:relative;}
+  .timeline::before{content:"";position:absolute;left:9px;top:8px;bottom:8px;width:2px;background:var(--primary);opacity:.3;}
+  .timeline li{position:relative;padding:0 0 26px 34px;}
+  .timeline li::before{
+    content:"";position:absolute;left:2px;top:5px;width:16px;height:16px;border-radius:50%;
+    background:var(--bg);border:2px solid var(--primary);
+  }
+  .tl-head{display:flex;flex-wrap:wrap;align-items:center;gap:9px;}
+  .tl-head h3{margin:0;font-size:15px;font-weight:600;color:var(--ink);font-family:var(--serif);font-weight:400;font-size:17px;}
+  .tl-when{font-family:var(--mono);font-size:11.5px;color:var(--muted);}
+  .tl-goal{font-size:13.2px;color:var(--ink-2);margin:5px 0 0;}
+  .tl-goal b{color:var(--primary);}
+  .tl-list{margin:8px 0 0;padding-left:17px;}
+  .tl-list li{font-size:12.8px;color:var(--ink-2);margin-bottom:3px;line-height:1.5;}
+
+  /* ---------- decisions ---------- */
+  .dec{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px;}
+  .dec-item{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px 16px;}
+  .dec-item .q{font-size:13.6px;font-weight:600;color:var(--ink);display:flex;gap:8px;align-items:flex-start;}
+  .dec-item .q .n{font-family:var(--mono);font-size:11px;color:var(--accent);padding-top:2px;}
+  .dec-item .r{font-size:12.6px;color:var(--muted);margin-top:7px;line-height:1.5;}
+  .dec-item .r b{color:var(--primary);font-weight:600;}
+
+  /* ---------- redlines ---------- */
+  .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;}
+  .rule{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px 16px;}
+  .rule h4{margin:0 0 6px;font-size:13.6px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px;}
+  .rule h4 svg{width:15px;height:15px;color:var(--primary);flex:none;}
+  .rule p{margin:0;font-size:12.6px;color:var(--muted);line-height:1.55;}
+
+  footer{
+    margin-top:56px;padding-top:20px;border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;
+    font-size:12.2px;color:var(--muted);
+  }
+  footer code{font-family:var(--mono);font-size:11.5px;color:var(--primary);}
+
+  @media (max-width:860px){
+    .stat-grid{grid-template-columns:repeat(2,1fr);}
+    .rung{grid-template-columns:52px 1fr;}
+    .rung .chip{grid-column:2;justify-self:start;}
+    .layer{grid-template-columns:1fr;gap:6px;}
+    .layer .lname{padding-top:0;}
+    .bench{grid-template-columns:118px 1fr 42px;gap:9px;}
+    h1{font-size:28px;}
+    h2{font-size:21px;}
+  }
+  @media (max-width:520px){
+    .wrap{padding:28px 15px 56px;}
+    .stat-grid{grid-template-columns:1fr;}
+    table{font-size:12px;}
+    th,td{padding:8px 9px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= HERO ================= -->
+  <header>
+    <span class="eyebrow">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>
+      物流企业碳感知智能决策系统 · 企业级演进
+    </span>
+    <h1>最难的部分你们已经做完了，<br><em>缺的是运行时</em>。</h1>
+    <p class="lead">
+      契约、闸门、血缘、只读边界、217 项回归测试——这是大多数"企业级"项目最缺、也最难补的地基，你们已经按 L2/L3 标准建好了。
+      真正卡住企业化的是另一层：<b>身份与权限、持久化数据库、任务调度、可观测告警、容器化发布、备份恢复</b>。
+      所以路线不是重写系统，而是<b>把已经算对的东西，放进一个能被别人安全、稳定、并发使用的运行时里</b>。
+    </p>
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="num">L1<small>形态</small></div>
+        <div class="lbl">单机/内网运行，发布靠手工<br>但工程地基已达 L2 标准</div>
+      </div>
+      <div class="stat">
+        <div class="num">28<small>闸门 PASS</small></div>
+        <div class="lbl">gate_report：0 FAIL / 0 SKIP<br>可直接改造成发布门禁</div>
+      </div>
+      <div class="stat">
+        <div class="num">217<small>项测试</small></div>
+        <div class="lbl">21 个测试文件 + CI 矩阵<br>平台化改造的回归网</div>
+      </div>
+      <div class="stat bad">
+        <div class="num">0<small>身份体系</small></div>
+        <div class="lbl">无账号、无 DB、无队列<br>数据无出域约束</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= LADDER ================= -->
+  <section>
+    <div class="sec-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+      <h2>先量一下现在站在哪</h2>
+    </div>
+    <p class="sec-note">同一把尺子量五次。L4 现在不必追——<code>docs/25</code> 已警告"为了显得庞大而加的功能"反而暴露堆料。</p>
+    <div class="ladder">
+      <div class="rung">
+        <div class="lv">L0</div>
+        <div><div class="t">脚本 / 笔记本</div><div class="d">手工跑，产出 CSV，出了错要自己看</div></div>
+        <div class="chip">—</div>
+      </div>
+      <div class="rung now">
+        <div class="lv">L1</div>
+        <div><div class="t">单机工具</div><div class="d">一个人在自己机器上跑，文件即数据库，<code>启动.bat</code> 手动拉起</div></div>
+        <div class="chip">当前主形态</div>
+      </div>
+      <div class="rung">
+        <div class="lv">L2</div>
+        <div><div class="t">部门级服务</div><div class="d">多人共用、有身份、数据持久化、有发布流程</div></div>
+        <div class="chip part">局部达到</div>
+      </div>
+      <div class="rung">
+        <div class="lv">L3</div>
+        <div><div class="t">企业平台</div><div class="d">多租户隔离、审计完整、SLA/可观测、灾备演练</div></div>
+        <div class="chip no">未开始</div>
+      </div>
+      <div class="rung">
+        <div class="lv">L4</div>
+        <div><div class="t">产品化 SaaS</div><div class="d">对外运营、计费、弹性伸缩、自助接入</div></div>
+        <div class="chip no">暂不建议</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ARCH ================= -->
+  <section>
+    <div class="sec-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      <h2>目标架构：不推翻分层，补运行时</h2>
+    </div>
+    <p class="sec-note">决策台保持只读、长任务入队、大宽表继续留 Parquet。账号不进本系统——走企业 IdP 反代认证，与 <code>docs/43</code> "V1.0 不添加登录界面" 的边界不冲突，且成本最低。</p>
+    <div class="arch">
+      <div class="layer">
+        <div class="lname">接入层</div>
+        <div class="chips">
+          <span class="box"><b>浏览器 / 移动端 / 大屏</b></span>
+          <span class="box new"><b>企业 SSO 反代</b><span class="tag add">new</span>OIDC 认证</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="lname">应用层</div>
+        <div class="chips">
+          <span class="box"><b>决策台 Streamlit</b> — 现有 5 页基本不动<span class="tag now">现有</span></span>
+          <span class="box new"><b>业务 API</b> 传感器 / OCR / 路线<span class="tag add">new</span></span>
+          <span class="box new"><b>任务服务（队列）</b> 复算 / 进化 / 抓取<span class="tag add">new</span></span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="lname">数据层</div>
+        <div class="chips">
+          <span class="box new"><b>PostgreSQL</b> 传感器时序 / 任务 / 审批 / 审计 / 台账版本链<span class="tag add">new</span></span>
+          <span class="box"><b>data/processed/runs/&lt;run_id&gt;/</b> 大宽表继续 Parquet<span class="tag now">改造</span></span>
+          <span class="box new"><b>对象存储</b> 原始发票图 / 备份，加密 + 留存策略<span class="tag add">new</span></span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="lname">治理层</div>
+        <div class="chips">
+          <span class="box gov"><b>schema.py 契约</b><span class="tag now">现有</span></span>
+          <span class="box gov"><b>闸门 28 项</b><span class="tag now">现有</span></span>
+          <span class="box gov"><b>run_log 血缘</b><span class="tag now">现有</span></span>
+          <span class="box new"><b>审批 + 审计表</b><span class="tag add">new</span></span>
+          <span class="box new"><b>数据分级 / 脱敏</b><span class="tag add">new</span></span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="lname">基础设施</div>
+        <div class="chips">
+          <span class="box new"><b>Docker / Compose</b><span class="tag add">new</span></span>
+          <span class="box new"><b>反代 + TLS</b><span class="tag add">new</span></span>
+          <span class="box new"><b>CI/CD</b> 构建→冒烟→灰度→回滚<span class="tag add">new</span></span>
+          <span class="box new"><b>监控告警</b><span class="tag add">new</span></span>
+          <span class="box new"><b>备份恢复演练</b><span class="tag add">new</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= READINESS ================= -->
+  <section>
+    <div class="sec-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <h2>企业级就绪度：哪里强，哪里是空的</h2>
+    </div>
+    <p class="sec-note">基于 2026-10-27 实读代码的人工评估（非度量指标）。左侧是你们已经建好的，右侧是运行时——差距集中在运行时，这反而是好事：运行时是标准件，不是发明题。</p>
+    <div class="bench-list">
+      <div class="bench"><span class="bench-label">数据契约与口径</span><div class="bench-track"><div class="bench-fill" style="width:90%"></div></div><span class="bench-val">90</span></div>
+      <div class="bench"><span class="bench-label">测试与回归</span><div class="bench-track"><div class="bench-fill" style="width:85%"></div></div><span class="bench-val">85</span></div>
+      <div class="bench"><span class="bench-label">前端与可视化</span><div class="bench-track"><div class="bench-fill" style="width:80%"></div></div><span class="bench-val">80</span></div>
+      <div class="bench"><span class="bench-label">血缘与审计</span><div class="bench-track"><div class="bench-fill mid" style="width:68%"></div></div><span class="bench-val">68</span></div>
+      <div class="bench"><span class="bench-label">发布与部署</span><div class="bench-track"><div class="bench-fill mid" style="width:28%"></div></div><span class="bench-val">28</span></div>
+      <div class="bench"><span class="bench-label">备份与灾备</span><div class="bench-track"><div class="bench-fill mid" style="width:22%"></div></div><span class="bench-val">22</span></div>
+      <div class="bench"><span class="bench-label">持久化与数据服务</span><div class="bench-track"><div class="bench-fill low" style="width:18%"></div></div><span class="bench-val">18</span></div>
+      <div class="bench"><span class="bench-label">可观测与告警</span><div class="bench-track"><div class="bench-fill low" style="width:15%"></div></div><span class="bench-val">15</span></div>
+      <div class="bench"><span class="bench-label">任务调度与异步</span><div class="bench-track"><div class="bench-fill low" style="width:10%"></div></div><span class="bench-val">10</span></div>
+      <div class="bench"><span class="bench-label">身份与权限</span><div class="bench-track"><div class="bench-fill low" style="width:5%"></div></div><span class="bench-val">5</span></div>
+    </div>
+  </section>
+
+  <!-- ================= GAPS ================= -->
+  <section>
+    <div class="sec-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <h2>五个真正会"堵住企业"的缺口</h2>
+    </div>
+    <p class="sec-note">其余缺口（可观测、台账版本链、审批流）在路线图后段处理。这五个不补，系统只能停在"演示级"。</p>
+    <table>
+      <thead>
+        <tr><th style="width:150px">缺口</th><th style="width:280px">现状证据</th><th>不补的后果</th><th style="width:64px">优先</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>无身份与权限</b></td>
+          <td>全仓无 login/jwt/oauth 命中</td>
+          <td>谁都能看全部数据、谁都能改参数</td>
+          <td><span class="pri p2">P2</span></td>
+        </tr>
+        <tr>
+          <td><b>无数据库</b></td>
+          <td>只有 <code>*.parquet</code> / <code>sensor_data.csv</code> / <code>outputs/*.csv</code></td>
+          <td>高频写入、单用户覆盖写、多人并发全都不成立</td>
+          <td><span class="pri p1">P1</span></td>
+        </tr>
+        <tr>
+          <td><b>无任务调度</b></td>
+          <td>复算靠手工 <code>python -m src.pipeline</code></td>
+          <td>数据不会自动变新，企业系统退化成演示系统</td>
+          <td><span class="pri p1">P1</span></td>
+        </tr>
+        <tr>
+          <td><b>外部 API 无治理</b></td>
+          <td><code>amap_client.py</code> 固定 15s 超时，无重试/缓存/配额</td>
+          <td>高德配额打爆、账单失控、演示时当场失败</td>
+          <td><span class="pri p1">P1</span></td>
+        </tr>
+        <tr>
+          <td><b>传感器接口无鉴权</b></td>
+          <td><code>server.py:20</code> CORS <code>"*"</code>，POST 只校验字段</td>
+          <td>局域网任意设备可伪造读数写入数据</td>
+          <td><span class="pri p0">P0</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ================= MODULES ================= -->
+  <section>
+    <div class="sec-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      <h2>分模块怎么继续做得更好</h2>
+    </div>
+    <p class="sec-note">每张卡三到四步，都是在现有页面上做加法，不改口径、不改引擎闸门。</p>
+    <div class="mods">
+
+      <div class="mod">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-9 8 9 8 9-8-9-8Z"/><path d="m3 3 9 8 9-8"/></svg>首页概览</h3>
+        <p class="now">现状：静态读 kpi/gate/ledger → 指标卡 + 决策面板 + 步骤卡；重叠问题已用 CDP 量盒模型验收（7/7）。</p>
+        <ol>
+          <li><b>信任信号上首屏</b>：<code>run_log.generated_at</code> + 闸门 28/28 + <code>source=real</code> 常驻显示——现在这些只在 JSON 里。</li>
+          <li><b>概览 → 作业看板</b>：决策面板接三类可行动项（闸门 FAIL / 方案目标差距 / 传感器越限），可点击跳转。</li>
+          <li><b>异常优先排序</b>：用四类 <code>flag_*</code> 标记做待处理清单，<b>按影响排放量排序</b>，不按行数。</li>
+          <li><b>角色化视图</b>（P2 后）：管理层 / 车队调度 / 财务 / 审计只读，各看各的。</li>
+        </ol>
+        <div class="acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>首屏能回答"数是什么时候算的、过没过闸门、我该管哪三件事"。</div>
+      </div>
+
+      <div class="mod">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>发票数据感知</h3>
+        <p class="now">现状：OCR → 解析 → 与油量/碳账对账；<code>MOCK_MODE</code> 纪律清晰，mock 必标注"演示用"；产物含车牌发票号，永不入库。</p>
+        <ol>
+          <li><b>置信度闭环</b>：从"有没有 mock 标记"升级为"识别置信度 → 自动入账 / 转人工复核"，低置信字段进复核队列。</li>
+          <li><b>成本与配额治理</b>：识别次数/金额预算、同票去重缓存、退避重试、超额熔断。</li>
+          <li><b>异步化</b>：请求线程不再等网络识别，提交→队列→结果可取→通知。</li>
+          <li><b>数据分级</b>：原图加密留存、导出默认掩码车牌、原图与结构化结果分离。</li>
+        </ol>
+        <div class="acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>任何一条入账记录可回到原图与识别原文；重复发票不重复计费。</div>
+      </div>
+
+      <div class="mod">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>云边端硬件监控</h3>
+        <p class="now">现状：ESP32 → Flask → 追加 CSV（线程锁）；字段校验完整；PM 严格隔离在碳账外；1000ppm 阈值仅为一条线。</p>
+        <ol>
+          <li><b>设备身份与准入</b>（最明确的安全敞口）：设备注册表 + 请求签名校验，非法设备 401，CORS 从 <code>*</code> 收敛。</li>
+          <li><b>文件 → 时序库</b>：高频下 CSV 追加不可用；原始读数设 TTL，长期只留窗口聚合。</li>
+          <li><b>断网续传与乱序</b>：现在时间戳由服务端生成，补传必失真；改设备端带时间戳+序号，服务端幂等去重。</li>
+          <li><b>设备健康度 + 告警闭环</b>：在线率/丢包率看板；越限 → 告警 → 处置 → 复盘。</li>
+        </ol>
+        <div class="acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>未注册设备 100% 被拒；断网 24h 补传数据不重不乱。</div>
+      </div>
+
+      <div class="mod">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>减碳路线沙盘</h3>
+        <p class="now">现状：高德 JS 地图 + 碳价滑条三线敏感度图 + Q-learning/NSGA-II；真路线覆盖 295/310；<code>seed=42</code> 硬编码已实测退化。</p>
+        <ol>
+          <li><b>算法变离线实验</b>（最值钱一步）：固定输入集 + 多 seed 批量跑 + 记录 Q 表/收敛曲线 + 模型版本 + <b>晋级门槛</b>，达标才允许上线到页面。</li>
+          <li><b>高德缓存与配额</b>：按 OD 对 + 因子版本缓存路线结果，配额账本 + 限流 + 熔断，降级要明示状态。</li>
+          <li><b>情景快照</b>：参数 + 代码版本 + 因子版本 + run_id 可完整回放；沙盘结果永不进台账。</li>
+          <li><b>多人并发</b>：长任务入队 + task_id 取回 + 并发上限，避免互相抢 CPU。</li>
+        </ol>
+        <div class="acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>同 seed + 同输入 100% 复现同一 Q 表；退化种子被门槛自动拦下。</div>
+      </div>
+
+      <div class="mod">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>碳核算与台账</h3>
+        <p class="now">现状：台账六字段 + 披露六要素 + 因子版本 + 双轨碳；闸门同源自校验（台账总碳 = 首页总碳）；已有审计轨迹。</p>
+        <ol>
+          <li><b>账本化</b>：现在每次复算覆盖写。改 append-only 版本链，修正走红字冲正分录。</li>
+          <li><b>编制→复核→批准</b>：批准后不可改，只能出修订版；审批人/时间/意见落审计表。</li>
+          <li><b>披露与第三方核查</b>：六要素映射 GHG Protocol / ISO 14064 / GB-T 32150；一键导证据包。</li>
+          <li><b>披露自动化</b>：按期间自动生成 + 到期提醒 + 变更留痕。</li>
+        </ol>
+        <div class="acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>任意历史期间台账可原样重现；证据包能独立复算出同一 E₀。</div>
+      </div>
+
+      <div class="mod">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>引擎层 src/（全站地基）</h3>
+        <p class="now">现状：四段式 pipeline + run_log + 28 项闸门 + schema 唯一契约；全量复算 14.9s，当前规模无压力。</p>
+        <ol>
+          <li><b>幂等 + run_id 版本化</b>（P0 就做）：产出 <code>runs/&lt;run_id&gt;/</code>，"当前生效 run"用指针表示——越早做越省事。</li>
+          <li><b>闸门变发布门禁</b>：FAIL → 不发布、不更新生效指针，gate_report 挂发布记录。</li>
+          <li><b>计算与存储分离</b>：算→纯函数服务、存→仓储层。这是能否把计算搬进队列的分水岭。</li>
+          <li><b>参数治理闭环</b>：参数随 run 固化，历史结果可按当期参数重放。</li>
+        </ol>
+        <div class="acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>所有"多版本、可追溯、可回放"能力的地基——它改目录结构，越晚迁移越贵。</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= ROADMAP ================= -->
+  <section>
+    <div class="sec-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <h2>分阶段路线图</h2>
+    </div>
+    <p class="sec-note">工期为建议值，最终排期由 PM 定。每阶段都以硬判据收尾，不以"功能做了"收尾。</p>
+    <ol class="timeline">
+      <li>
+        <div class="tl-head"><h3>P0 · 交付形态</h3><span class="tl-when">建议 2–3 周</span></div>
+        <p class="tl-goal">目标：<b>能交给别人部署、能安全跑</b>。</p>
+        <ul class="tl-list">
+          <li>run_id 版本化 run 目录；Dockerfile + compose；配置/密钥外置分层；反代 + TLS</li>
+          <li>CI 扩展：构建镜像 → 推 registry → 部署 → 跑现成冒烟脚本（verify_pages / verify_nav / verify_sliders / verify_dashboard_layout）</li>
+          <li><code>data/raw</code> 备份脚本 + <b>一次恢复演练</b>；传感器加设备鉴权，CORS 收敛</li>
+        </ul>
+        <p class="tl-goal" style="margin-top:6px;">验收：全新机器 30 分钟起服务 · 冒烟全绿 · 零明文密钥 · 未注册设备被拒 · 闸门 FAIL 不发布</p>
+      </li>
+      <li>
+        <div class="tl-head"><h3>P1 · 数据平台化</h3><span class="tl-when">建议 3–4 周</span></div>
+        <p class="tl-goal">目标：<b>数据会自己变新，长任务不阻塞页面</b>。</p>
+        <ul class="tl-list">
+          <li>Postgres：传感器 / 任务 / 审批 / 审计 / 台账版本链；任务队列 + 调度器</li>
+          <li>高德缓存 + 配额账本 + 熔断；算法离线实验管线（多 seed + 晋级门槛）</li>
+          <li>幂等复算 + 计算存储分离（为 P2/P3 的审批与版本链腾位置）</li>
+        </ul>
+        <p class="tl-goal" style="margin-top:6px;">验收：定时复算产出新 run 与新指针 · 长任务不阻塞 · 配额耗尽自动降级且明示 · 同 seed 100% 复现</p>
+      </li>
+      <li>
+        <div class="tl-head"><h3>P2 · 身份与权限</h3><span class="tl-when">建议 2–3 周</span></div>
+        <p class="tl-goal">目标：<b>多人安全共用</b>。</p>
+        <ul class="tl-list">
+          <li>企业 SSO 反代认证（本系统不建账号，符合 docs/43 边界）</li>
+          <li>应用级角色：管理员 / 碳管理 / 车队调度 / 审计只读；按公司·车队的数据行级隔离</li>
+          <li>全操作审计表；改参数、批台账可追溯到人</li>
+        </ul>
+        <p class="tl-goal" style="margin-top:6px;">验收：不同角色可见性不同 · 越权 100% 被拒并记审计</p>
+      </li>
+      <li>
+        <div class="tl-head"><h3>P3 · 产品闭环</h3><span class="tl-when">持续</span></div>
+        <p class="tl-goal">目标：<b>从"看数"到"管事"</b>。企业化的后半程是运营，不是开发。</p>
+        <ul class="tl-list">
+          <li>首页作业看板 + 告警闭环（企微/钉钉/邮件）；台账 append-only + 三态审批</li>
+          <li>披露生成器 + 证据包导出；大屏与移动端；SLA 监控与容量压测</li>
+        </ul>
+        <p class="tl-goal" style="margin-top:6px;">验收：一次碳核查全流程无需手工拼文件 · 台账任一历史期间可原样重现</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ================= DECISIONS ================= -->
+  <section>
+    <div class="sec-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+      <h2>需要 PM 拍板的 6 件事</h2>
+    </div>
+    <p class="sec-note">其中第 1 条是硬前提：不放开依赖约束，P1/P2 无法实施。</p>
+    <div class="dec">
+      <div class="dec-item">
+        <div class="q"><span class="n">01</span><span>放开依赖约束（现由 PM 统一管、禁加依赖）</span></div>
+        <div class="r">建议放行最小集：<b>psycopg / redis(或 celery) / prometheus-client</b> + 容器构建件。走反代认证则连 authlib 都不需要。不放开则数据平台化无从下手。</div>
+      </div>
+      <div class="dec-item">
+        <div class="q"><span class="n">02</span><span>部署形态与客户环境</span></div>
+        <div class="r">建议先定<b>单企业内网单实例 + compose</b>，可平滑升多副本。决定 P1/P2 的深度与多租户是否要做。</div>
+      </div>
+      <div class="dec-item">
+        <div class="q"><span class="n">03</span><span>认证方式</span></div>
+        <div class="r">建议<b>企业 IdP 反代认证</b>，本系统不建账号——与 docs/43「V1.0 不添加登录界面」不冲突，成本最低。</div>
+      </div>
+      <div class="dec-item">
+        <div class="q"><span class="n">04</span><span>数据出域约束</span></div>
+        <div class="r">建议<b>敏感数据不出内网</b>，只输出脱敏聚合报表。直接决定 DB 与对象存储选型、能否上云。</div>
+      </div>
+      <div class="dec-item">
+        <div class="q"><span class="n">05</span><span>旧 11 页前端是否恢复（当前 5 页）</span></div>
+        <div class="r">建议<b>不恢复</b>，按 5 页演进。注意 docs/43 按 8 页写，口径需同步修订，否则文档与实现对不上。</div>
+      </div>
+      <div class="dec-item">
+        <div class="q"><span class="n">06</span><span>Q-learning 三条修复是否实施</span></div>
+        <div class="r">建议<b>实施①改种子策略 + ②奖励加动作归因</b>，并由 P1 的实验门槛自动把关。属"改口径"，需点头。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= REDLINES ================= -->
+  <section>
+    <div class="sec-head">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      <h2>四条不可破的红线</h2>
+    </div>
+    <p class="sec-note">平台化改造最容易顺手破坏的就是这四条——请写进代码评审清单。</p>
+    <div class="rules">
+      <div class="rule">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>口径零改动 + 闸门先行</h4>
+        <p>不得改变 E₀ / KPI / 台账的计算结果；所有改造仍须过同一套 28 项闸门，<b>FAIL 不得发布生效版本</b>。</p>
+      </div>
+      <div class="rule">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>Mock 纪律与通道隔离</h4>
+        <p>演示数据必须显式标注；实时演示通道的结果<b>永不</b>进入 E₀ / KPI / 闸门 / 台账。</p>
+      </div>
+      <div class="rule">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>原始数据永不入库 + 分级</h4>
+        <p><code>data/raw</code> 不入 Git、不进结果区；发票/车牌级数据加密留存、导出脱敏、最小权限、可审计。</p>
+      </div>
+      <div class="rule">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 2.4 6.2H21l-5.3 4 2 6.3-5.7-4-5.7 4 2-6.3-5.3-4h6.6L12 2Z"/></svg>令牌唯一真源</h4>
+        <p>视觉令牌仍只认 <code>theme.py</code> 的 <code>:root</code>；新增页面/组件不得另起 CSS 变量。</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>依据 2026-10-27 仓库实读：<code>schema.py</code> · <code>gate_report.json</code> · <code>run_log.json</code> · <code>ci.yml</code> · <code>server.py</code> · <code>route_sandbox.py:175</code> · <code>amap_client.py</code></span>
+    <span>规划文档：<code>docs/49_企业级演进路线图.md</code></span>
+  </footer>
+
+</div>
+</body>
+</html>

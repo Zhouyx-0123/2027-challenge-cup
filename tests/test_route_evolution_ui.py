@@ -41,7 +41,7 @@ def test_plotly_figures_group_and_highlight_routes():
 
 def test_empty_state_does_not_crash(monkeypatch):
     from components import route_sandbox
-    monkeypatch.setattr(route_sandbox.services, "amap_key_available", lambda: False)
+    monkeypatch.setattr(route_sandbox.live_services, "amap_key_available", lambda: False)
 
     def script():
         from components.route_sandbox import render
@@ -51,23 +51,30 @@ def test_empty_state_does_not_crash(monkeypatch):
     at.run()
     assert not at.exception
     assert any("请在左侧输入参数并生成方案" in item.value for item in at.markdown)
+    labels = [item.label for item in at.text_input]
+    assert "起点" in labels and "终点" in labels
+    assert not any("经纬度" in label for label in labels)
 
 
 def test_generate_persists_results_and_accept_saves_memory(monkeypatch):
     from components import route_sandbox
     saved = []
-    monkeypatch.setattr(route_sandbox.services, "amap_key_available", lambda: True)
-    monkeypatch.setattr(route_sandbox.services, "amap_driving_routes", lambda *args: [{}])
-    monkeypatch.setattr(route_sandbox.services, "evaluate_route_records", lambda *args: [{}])
+    monkeypatch.setattr(route_sandbox.live_services, "amap_key_available", lambda: True)
+    monkeypatch.setattr(route_sandbox.live_services, "resolve_route_place", lambda value: {
+        "label": value, "location": "121.0,31.0" if "上海" in value else "116.0,39.0",
+        "formatted_address": value,
+    })
+    monkeypatch.setattr(route_sandbox.live_services, "amap_driving_routes", lambda *args: [{}])
+    monkeypatch.setattr(route_sandbox.live_services, "evaluate_route_records", lambda *args: [{}])
 
     def fake_evolve(routes, **kwargs):
         kwargs["decision_log"].append("检测到多样性下降，执行上调变异率动作")
         return _records()
 
-    monkeypatch.setattr(route_sandbox.services, "evolve_route_options", fake_evolve)
-    monkeypatch.setattr(route_sandbox.services, "save_route_memory",
+    monkeypatch.setattr(route_sandbox.live_services, "evolve_route_options", fake_evolve)
+    monkeypatch.setattr(route_sandbox.live_services, "save_route_memory",
                         lambda route: saved.append(route) or route)
-    monkeypatch.setattr(route_sandbox.services, "route_memory", lambda: pd.DataFrame())
+    monkeypatch.setattr(route_sandbox.live_services, "route_memory", lambda: pd.DataFrame())
 
     def script():
         from components.route_sandbox import render
@@ -80,6 +87,10 @@ def test_generate_persists_results_and_accept_saves_memory(monkeypatch):
     assert not at.exception
     assert len(at.session_state["route_evolution_records"]) == 2
     assert at.session_state["route_decision_log"]
+    od = at.session_state["route_origin_destination"]
+    assert od["origin_name"] == "上海虹桥站"
+    assert od["destination_name"] == "北京南站"
+    assert od["origin"] == "121.0,31.0"
     assert len(at.dataframe) >= 1
 
     accept = next(b for b in at.button if b.label == "✅ 采纳推荐路线")

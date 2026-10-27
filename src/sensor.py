@@ -2,6 +2,7 @@
 """云边端协同内核：传感器读取与超标碳成本估算，纯函数、可单测。"""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,20 @@ AIR_DENSITY_KG_M3 = 1.2
 CO2_MOLAR_MASS = 44.01
 AIR_MOLAR_MASS = 28.97
 WARNING_COLUMNS = ["日期", "设备ID", "超标碳排量", "额外碳配额成本(元)", "is_warning"]
+
+#: 读数文件默认位置（仓库根下）；可用环境变量 ``SENSOR_DATA_FILE`` 覆盖
+#: （容器部署时指向挂载卷，例如 /app/data/sensor_data.csv）
+DEFAULT_SENSOR_DATA_PATH = Path(__file__).resolve().parents[1] / "sensor_data.csv"
+
+
+def sensor_data_path() -> Path:
+    """读数文件路径：环境变量 ``SENSOR_DATA_FILE`` > 默认（仓库根 sensor_data.csv）。
+
+    接收端（``server.py``）与读取端（``app/live_services.py``）**共用这一个函数**，
+    避免两边路径写死导致"写了读不到"。
+    """
+    raw = (os.environ.get("SENSOR_DATA_FILE") or "").strip()
+    return Path(raw) if raw else DEFAULT_SENSOR_DATA_PATH
 
 
 def read_sensor_data(path: Path) -> pd.DataFrame:

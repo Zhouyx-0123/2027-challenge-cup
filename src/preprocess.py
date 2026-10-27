@@ -4,9 +4,10 @@
 铁律（按工程师踩坑意见落地）：
 1. **脏数据绝不抛 Exception**：里程缺失、车型找不到、载重缺失、发票匹配不上、
    时长异常……全部用「同线历史均值 / 行业均值 / 车型额定值」填补，并打 FLAG；
-2. **一次做完**：清洗、匹配、口径换算、标记都在本文件；下游只看宽表；
+2. **一次做完**：清洗、匹配、口径换算、标记、碳因子和双轨碳排都在本文件；
+   下游算法只消费这一张宽表，不再回头访问原始表；
 3. **只产出两张文件**：data/processed/wide_data.parquet + data_quality.json；
-   碳因子与碳排属于“口径”，按蓝图 §2.2 修正一留在 optimizer.py；
+   碳列写入宽表后由算法层复用，避免同一路段在不同层重复套因子；
 4. **真数据不在就回退演示数据**：data/raw 为空或列名识别失败时，自动生成
    确定性的合成样本（带脏数据），并把来源写进 _source.json，前端明确标注。
 
@@ -220,6 +221,9 @@ WIDE_COLUMNS: List[str] = [
     "order_matched", "vehicle_matched", "source_waybill_row", "speed_method",
     "order_no_fallback", "cargo_weight_missing", "cargo_volume_missing",
     "cargo_pieces_missing", "origin_site_fallback", "dest_site_fallback",
+    # 数据层一次算清的碳因子与双轨碳排；算法层只读，不再重复计算。
+    "factor_gkm", "er_gs", "kg_co2", "kg_co2_phys",
+    "delta_pct", "factor_version", "flag_factor_x",
 ]
 
 # 原始列名别名：真数据列名没冻结前，先尽量认；认不出就回退演示数据
@@ -985,7 +989,7 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
 
     m = work["dist_km"].isna() | (work["dist_km"] <= 0)
     work.loc[m, "dist_km"] = DEFAULT_DIST_KM
-    dist_source[m] = "global_median"
+    dist_source[m] = "global_default_300km"
     work["dist_km"] = work["dist_km"].clip(lower=0.1)
     work["dist_source"] = dist_source
 
@@ -998,8 +1002,10 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
         work["fuel_type"] = work["vehicle_type"].map(VEHICLE_FUEL).fillna("柴油")
 
     rated = work["vehicle_type"].map(RATED_LOAD)
+    # 先用合法载重推断车型；负值/零必须先隔离，否则 -5 t 会被误判成轻型。
+    load_for_class = work["load_t"].where(work["load_t"] > 0)
     vc_guess = np.select(
-        [work["load_t"] <= 5, work["load_t"] <= 20, work["load_t"] > 20],
+        [load_for_class <= 5, load_for_class <= 20, load_for_class > 20],
         [1, 2, 3], default=np.nan)
     work["vclass"] = work["vclass"].where(work["vclass"].isin([1, 2, 3]))
     work["vclass"] = work["vclass"].fillna(pd.Series(vc_guess, index=work.index))
@@ -1013,7 +1019,7 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     rated = work["vehicle_type"].map(RATED_LOAD)
 
     load_missing_raw = work["load_t"].isna() | (work["load_t"] <= 0)
-    work["load_t"] = work["load_t"].where(work["load_t"] > 0)
+    work["load_t"] = load_for_class
     # 有车型登记表就用额定载重——这是“匹配”，不是估算，不打 flag_estimated
     work["load_t"] = work["load_t"].fillna(rated)
     raw_load = work["load_raw_t"].where(work["load_raw_t"] > 0)
@@ -1129,11 +1135,13 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     notes = pd.Series("", index=work.index, dtype=object)
     notes = _add_note(notes, work["dist_source"] == "od_mean", "里程缺失→同线历史均值")
     notes = _add_note(notes, work["dist_source"] == "haversine", "里程缺失→行业绕行系数估算")
-    notes = _add_note(notes, work["dist_source"] == "global_median", "里程缺失→全样本中位数")
+    notes = _add_note(notes, work["dist_source"] == "global_default_300km",
+                      "里程缺失→全局兜底 300 km")
     notes = _add_note(notes, inferred_vehicle, "车型未匹配→按载重推断")
     notes = _add_note(notes, work["flag_load_mapping_fallback"] == 1,
                       "车型未命中62类基准映射→使用补充车型规则/目录载重兜底")
-    notes = _add_note(notes, load_still_missing, "载重缺失→按同类别中位/行业均值填补")
+    notes = _add_note(notes, load_missing_raw & work["load_t"].notna(),
+                      "载重缺失/非法→按车型额定值或同类别中位填补")
     notes = _add_note(notes, work["invoice_ok"] == 0, "发票未匹配→按同类别历史均价估算")
     notes = _add_note(notes, bad_time, "时间戳异常→按行业均速 50 km/h 估算")
     notes = _add_note(notes, no_speed_info, "速度缺失→行业均速填补")
@@ -1153,6 +1161,24 @@ def clean_frame(raw: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
     work["fill_invoice"] = (work["invoice_ok"] == 0).astype(int)
     work["fill_duration"] = bad_time.astype(int)
     work["data_source"] = source
+
+    # ---- 碳因子 + 双轨碳排：数据层一次算清，算法层只读 ----
+    try:
+        from src.factor_model import attach_carbon_columns
+        carbon = attach_carbon_columns(work)
+        for col in ("factor_gkm", "er_gs", "kg_co2", "kg_co2_phys",
+                    "delta_pct", "factor_version", "flag_factor_x"):
+            work[col] = carbon[col]
+    except Exception:
+        # 极端脏数据也不阻断宽表；算法层会按同一因子表重算并暴露契约问题。
+        traceback.print_exc()
+        work["factor_gkm"] = 0.0
+        work["er_gs"] = 0.0
+        work["kg_co2"] = 0.0
+        work["kg_co2_phys"] = 0.0
+        work["delta_pct"] = 0.0
+        work["factor_version"] = "factor_attach_failed"
+        work["flag_factor_x"] = 1
 
     # 列顺序按契约冻结
     for col in WIDE_COLUMNS:
@@ -1408,6 +1434,35 @@ def _minimal_wide() -> pd.DataFrame:
     return pd.DataFrame(rows)[WIDE_COLUMNS]
 
 
+def _fallback_quality_report(wide: pd.DataFrame, raw_rows: int,
+                             source: str, reason: str, error: Exception) -> Dict[str, Any]:
+    """质量报告自身异常时仍产出一份可被前端消费的最小报告。"""
+    def count(col: str) -> int:
+        if col not in wide.columns:
+            return 0
+        return int(pd.to_numeric(wide[col], errors="coerce").fillna(0).sum())
+
+    valid = wide
+    if "flag_dup" in valid.columns:
+        valid = valid[pd.to_numeric(valid["flag_dup"], errors="coerce").fillna(0) == 0]
+    speed = pd.to_numeric(valid.get("speed_kmh"), errors="coerce") if "speed_kmh" in valid else pd.Series(dtype=float)
+    speed = speed[(speed > 1) & (speed <= 100)]
+    return {
+        "generated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "source": source, "reason": reason, "rows_raw": int(raw_rows),
+        "rows_wide": int(len(wide)), "rows_dedup": int(len(valid)),
+        "dup_rows": count("flag_dup"), "anomaly_rows": count("flag_anomaly"),
+        "basis_rows": count("flag_basis"), "estimated_rows": count("flag_estimated"),
+        "estimated_rows_wide": count("flag_estimated"),
+        "imputation_free_rate": round(1.0 - count("flag_estimated") / max(len(valid), 1), 6),
+        "estimate_reason_counts": {}, "total_km": round(float(pd.to_numeric(
+            valid.get("dist_km"), errors="coerce").fillna(0).sum()), 2) if "dist_km" in valid else 0.0,
+        "valid_speed_rows": int(speed.notna().sum()),
+        "avg_speed": round(float(speed.mean()), 2) if len(speed) else None,
+        "report_error": "%s: %s" % (type(error).__name__, error),
+    }
+
+
 def build_wide_table() -> pd.DataFrame:
     """P5 唯一出口：宽表 + 质量报告；任何异常都降级，不向上抛脏数据错误。"""
     raw_rows = 0
@@ -1443,7 +1498,11 @@ def build_wide_table() -> pd.DataFrame:
 
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     _save_parquet(wide, WIDE_PATH)
-    report = quality_report(wide, raw_rows, source, reason)
+    try:
+        report = quality_report(wide, raw_rows, source, reason)
+    except Exception as exc:
+        traceback.print_exc()
+        report = _fallback_quality_report(wide, raw_rows, source, reason, exc)
     _write_json(QUALITY_PATH, report)
     _write_json(SOURCE_PATH, {
         "source": source,

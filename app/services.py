@@ -1,22 +1,16 @@
-"""数据读取层（A0）：前端唯一的数据入口。
+"""只读结果层：主页面的唯一数据入口。
 
-规矩：
-1. 只读 data/processed/；只从 src/schema.py 取常量（文件名/列名/校验），
-   不调用任何核心算法（A0 规则针对算法，不针对常量——契约必须只有一份）；
-2. 缺文件、缺列、文件损坏一律返回空表 + 原因，不抛异常（答辩现场不能红屏）；
-3. 页面只能通过本模块取数，不允许直接 pd.read_parquet；
-4. 结果表由 python -m src.pipeline 预先生成，页面里没有一行业务公式。
-
-docs/20 §11 增补（情景演算页）：第 7/8 页是"用户输入→即时算"的演算页，
-与对拍链路隔离。全 app/ 只在本文件出现一次 ``from src import scenarios``
-（演算内核）；``from src import schema`` 只取列名/文件名常量，不调算法。
-页面仍只 import services——自证命令见 docs/20 §4。
+边界：
+1. 只读 data/processed/ 的宽表与结果表，只从 src/schema.py 取契约常量；
+2. 不导入、不调用任何核心算法或联网模型，页面不在请求线程里做数据准备；
+3. 文件缺失/损坏返回空表或静态快照，不向用户抛业务异常；
+4. 用户触发的 OCR、传感器和路线场景走独立的 ``live_services``，
+   且结果不进入 E₀、KPI 或闸门。
 """
 
 from __future__ import annotations
 
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -31,15 +25,6 @@ if str(ROOT) not in sys.path:  # noqa: E402
     sys.path.insert(0, str(ROOT))
 
 from src import schema  # noqa: E402  ← 只取常量（文件名/列名），不调算法
-from src import scenarios as _kernel  # noqa: E402  ← 全 app/ 唯一一处演算内核（docs/20 §11）
-                                       # 别名：避免与本文件 scenarios()（结果表读取）撞名
-from src import invoice as _invoice  # noqa: E402  ← 发票内核（docs/44）：识别 + 口径，全 app/ 仅此一处
-from src import sensor as _sensor  # noqa: E402  ← 云边端协同：传感器读取 + 突发碳成本
-from src.routing import amap_client as _amap_client  # noqa: E402  ← 路线沙盘：高德 REST
-from src.routing import amap_js as _amap_js  # noqa: E402  ← 路线沙盘：JS API 2.0 凭据
-from src.routing import route_carbon as _route_carbon  # noqa: E402  ← 路线沙盘：即时碳核算
-from src import disclosure as _disclosure  # noqa: E402  ← DeepSeek 披露附注
-from src.routing import evolve_routes as _evolution  # noqa: E402  ← 四维 NSGA-II + Q-learning
 
 # ---- 结果文件清单 / 列契约：唯一来源是 src/schema.py（此处只做别名） ----
 RESULT_FILES: Dict[str, str] = schema.RESULT_FILES
@@ -104,6 +89,52 @@ def _read_json(filename: str) -> Dict[str, Any]:
         return json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+@st.cache_data(show_spinner=False)
+def current_run() -> Dict[str, Any]:
+    """当前**生效版本**的 run 信息（企业级 P0 · docs/50 §2）。
+
+    读 ``data/processed/current_run.json``——由 ``src/pipeline.py`` 在闸门通过时写入，
+    闸门失败时**不动**（所以这里读到的永远是"对外生效的那一版"）。
+
+    返回 ``{"published": bool, "run_id": str, "published_at": str,
+    "gate_counts": {...}, "source": str, "code_version": str, ...}``；
+    没有指针时 ``published=False``，页面据此显示"未发布"。
+    """
+    payload = _read_json("current_run.json")
+    if not payload or not payload.get("run_id"):
+        return {"published": False, "run_id": "", "published_at": "",
+                "gate_counts": {}, "source": "", "code_version": ""}
+    out = dict(payload)
+    out["published"] = True
+    out.setdefault("gate_counts", {})
+    return out
+
+
+@st.cache_data(show_spinner=False)
+def run_history(limit: int = 8) -> list:
+    """最近的 run 记录（读 ``data/processed/_runs/index.jsonl``）。
+
+    只读审计视图：谁在什么时候跑过、过了没有。文件缺失时返回空列表。
+    """
+    path = PROCESSED / "_runs" / "index.jsonl"
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for line in lines[-int(limit):]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(item, dict):
+            out.append(item)
+    return list(reversed(out))
 
 
 # ---------------- 主表 ----------------
@@ -288,161 +319,7 @@ def fleet_stats() -> Dict[str, Any]:
     return _read_json(RESULT_FILES["fleet_stats"])
 
 
-# ---------------- 情景演算桥（docs/20 §11） ----------------
-# 全 app/ 唯一调用 src 的地方；页面只经此处，不直接 import src。
-# 演算结果绝不写回结果表，也不进 kpi/gate（对拍口径与情景推演分列）。
-
-def calc_factors() -> Dict[str, Any]:
-    """口径配置 config/calc_factors.json（计算器的假设值来源）。"""
-    return _kernel.load_factors()
-
-
-def calc_electrification(params: Dict[str, Any]) -> Dict[str, Any]:
-    """第 7 页：电动车队测算。逻辑在 src/scenarios.py，本函数只转发。"""
-    return _kernel.calc_electrification(params)
-
-
-def calc_fleet_tco(params: Dict[str, Any]) -> Dict[str, Any]:
-    """第 8 页：车队 TCO 多路线对比。逻辑在 src/scenarios.py，本函数只转发。"""
-    return _kernel.calc_fleet_tco(params)
-
-
-def tonne_km_comparison(our_g_per_tkm: float, **kwargs: Any) -> Dict[str, Any]:
-    """口径对照：行业吨公里法 vs 我们段级自底向上（EcoTransIT 式）。"""
-    return _kernel.tonne_km_comparison(our_g_per_tkm, **kwargs)
-
-
-# ---------------- 发票智能录入桥（docs/44） ----------------
-# 识别与口径都在 src/invoice.py；本节只转发，页面不写一行业务公式。
-# 纪律同演算桥：结果绝不写回结果表，也不进 kpi/gate（对拍口径与情景推演分列）。
-
-#: DeepSeek key 的读取顺序：环境变量 → config/deepseek_key.txt（永不入库、永不进前端代码）
-def invoice_api_key() -> str:
-    """读取 DeepSeek API key（服务端读取）。读不到返回空串，页面据此禁用识别。"""
-    key = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
-    if key:
-        return key
-    key_file = ROOT / "config" / "deepseek_key.txt"
-    if key_file.exists():
-        text = key_file.read_text(encoding="utf-8", errors="ignore").strip()
-        if text.upper().startswith("DEEPSEEK_API_KEY="):
-            text = text.split("=", 1)[1].strip()
-        if text and not text.startswith("请至"):
-            return text
-    return ""
-
-
-def extract_invoice(image_bytes: bytes, filename: str = "invoice.jpg") -> Dict[str, Any]:
-    """第 9 页：识别发票图片 → 归一字段。逻辑在 src/invoice.py，本函数只转发。"""
-    return _invoice.extract_invoice_fields(image_bytes, invoice_api_key(), filename)
-
-
-def invoice_summary(fuel_liters: Optional[float], distance_km: Optional[float],
-                    **kwargs: Any) -> Dict[str, Any]:
-    """第 9 页：发票碳核算（油量直算轨 + 里程因子表轨 + 交叉校验）。只转发。"""
-    return _invoice.invoice_summary(fuel_liters, distance_km, **kwargs)
-
-
-def calc_carbon(load: float, distance: float, truck_type: Any = "重型") -> float:
-    """兼容既有业务入口：载重(t) + 里程(km) + 车型 -> 碳排量(kgCO2)。"""
-    return _invoice.calc_carbon(load, distance, truck_type=truck_type)
-
-
-def amap_key_available() -> bool:
-    return bool(_amap_client.load_amap_key())
-
-
-def amap_driving_routes(origin: str, destination: str) -> List[Dict[str, Any]]:
-    """路线沙盘：高德驾车规划 2.0，返回全部备选路线及 polyline。"""
-    return _amap_client.fetch_driving_routes(origin, destination)
-
-
-def amap_js_available() -> bool:
-    return _amap_js.js_available()
-
-
-def amap_js_credentials() -> tuple[str, str]:
-    """仅在生成内嵌地图 HTML 时调用；Key 不进入日志或页面正文。"""
-    return _amap_js.load_js_credentials()
-
-
-def calc_carbon_for_route(route: Dict[str, Any], truck_type: str,
-                          load: float) -> Dict[str, Any]:
-    return _route_carbon.calc_carbon_for_route(route, truck_type, load)
-
-
-def evaluate_amap_routes(origin: str, destination: str, truck_type: str,
-                         load: float, carbon_price: float) -> List[Dict[str, Any]]:
-    routes = amap_driving_routes(origin, destination)
-    return _route_carbon.evaluate_routes(routes, truck_type, load, carbon_price)
-
-
-def evaluate_route_records(routes: List[Dict[str, Any]], truck_type: str, load: float,
-                           carbon_price: float, energy_cost_per_km: float = 0.0) -> List[Dict[str, Any]]:
-    return _route_carbon.evaluate_routes(
-        routes, truck_type, load, carbon_price, energy_cost_per_km)
-
-
-def baseline_route_choices(routes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return _route_carbon.as_route_choices(routes)
-
-
-def evolve_route_options(routes: List[Dict[str, Any]], **kwargs: Any) -> List[Dict[str, Any]]:
-    return _evolution.evolve_routes(routes, **kwargs)
-
-
-def route_memory() -> pd.DataFrame:
-    return _evolution.load_route_memory()
-
-
-def save_route_memory(route: Dict[str, Any]) -> Dict[str, Any]:
-    return _evolution.save_route_to_memory(route)
-
-
-def invoice_fuel_with_estimation(value: Any) -> tuple[float, bool]:
-    return _invoice.fuel_with_estimation(value)
-
-
-def sensor_data() -> pd.DataFrame:
-    """实时读取边缘端 CSV，不缓存，供 2 秒 fragment 刷新。"""
-    return _sensor.read_sensor_data(ROOT / "sensor_data.csv")
-
-
-def sensor_warning_ledger(frame: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
-    return _sensor.build_warning_ledger(frame, **kwargs)
-
-
-def highlight_sensor_warning(row: pd.Series) -> List[str]:
-    return _sensor.highlight_warning(row)
-
-
-def invoice_carbon(record: Dict[str, Any]) -> Dict[str, Any]:
-    """通用财务发票核算桥：活动数据优先、支出法兜底；只转发内核。"""
-    return _invoice.calculate_invoice_carbon(record)
-
-
-def invoice_factors() -> Dict[str, Any]:
-    """发票页用的柴油因子（来自 config/calc_factors.json，唯一口径来源）。"""
-    return _invoice.diesel_factors()
-
-
-def invoice_consumption_table() -> Dict[int, float]:
-    """车型大类 → 油耗基准（L/100km）假设值。页面据此打黄框。"""
-    return dict(_invoice.TRUCK_CONSUMPTION)
-
-
-def invoice_vclass_names() -> Dict[int, str]:
-    """车型大类中文名。"""
-    return dict(_invoice.VCLASS_NAME)
-
-
-def invoice_mock_mode() -> bool:
-    """是否处于 mock 模式（不联网、返回演示识别值）。页面据此显式标注。"""
-    return bool(_invoice.MOCK_MODE)
-
-
-def generate_disclosure_note(snapshot: Dict[str, Any]) -> str:
-    return _disclosure.generate_disclosure_note(snapshot, invoice_api_key())
+# 实时演示通道已拆分到 live_services.py；本层只读结果表。
 
 
 def source() -> Dict[str, Any]:

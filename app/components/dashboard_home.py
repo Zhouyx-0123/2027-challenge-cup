@@ -95,6 +95,29 @@ CSS = """
   background:rgba(255,255,255,.07); box-shadow:0 0 0 1px rgba(255,255,255,.12);
   font-size:12px; color:var(--dh-muted);
 }
+/* 信任信号条：这批数是哪一次算出来的（企业级 P0 · docs/50 §2） */
+.dh-trust{
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:12px 18px; margin:16px 0 4px;
+  border-radius:16px;
+  background:rgba(255,255,255,.045);
+  box-shadow:0 0 0 1px rgba(255,255,255,.09);
+  font-size:12.5px; color:var(--dh-muted);
+  animation:dh-rise .7s .05s both;
+}
+.dh-trust span{ white-space:nowrap; }
+.dh-trust b{
+  color:var(--dh-ink); font-weight:600; font-variant-numeric:tabular-nums;
+}
+.dh-trust .dh-trust-tag{
+  padding:3px 10px; border-radius:var(--ct-r-pill);
+  background:rgba(139,243,230,.12); box-shadow:0 0 0 1px rgba(139,243,230,.28);
+  color:var(--dh-mint); font-size:11px; letter-spacing:.08em; font-weight:600;
+}
+.dh-trust .dh-trust-warn{
+  background:rgba(255,138,91,.14); color:#FF8A5B;
+  box-shadow:0 0 0 1px rgba(255,138,91,.30);
+}
 /* coolors 标志性的色板条 */
 .dh-palette{
   display:grid; grid-template-columns:repeat(5,1fr); height:56px; overflow:hidden;
@@ -141,7 +164,7 @@ div[class*="st-key-dh_cta_1"] [data-testid="stPageLink-NavLink"]:hover{
 /* Hero 右侧实时卡 */
 .dh-visual{ position:relative; animation:dh-rise .7s var(--ct-ease-spring) both; }
 .dh-live-card{
-  position:relative; z-index:2; padding:26px;
+  position:relative; z-index:2; padding:26px 26px 58px;
   border-radius:26px; background:rgba(255,255,255,.07);
   -webkit-backdrop-filter:var(--ct-blur); backdrop-filter:var(--ct-blur);
   box-shadow:var(--ct-shadow-lg), 0 0 0 1px rgba(255,255,255,.12);
@@ -173,8 +196,10 @@ div[class*="st-key-dh_cta_1"] [data-testid="stPageLink-NavLink"]:hover{
   font-family:var(--ct-font-display); font-size:14px; font-weight:600; color:var(--dh-ink);
   font-variant-numeric:tabular-nums;
 }
+/* 悬浮徽章：只允许压住实时卡底部的留白，不能盖住卡片里的任何内容。
+   （旧版 bottom:-26px 时徽章会压住「传感器」小卡，实测重叠 88×49px） */
 .dh-float{
-  position:absolute; z-index:3; right:-18px; bottom:-26px; padding:14px 18px;
+  position:absolute; z-index:3; right:-18px; bottom:-38px; padding:14px 18px;
   border-radius:18px; background:rgba(12,16,22,.86);
   -webkit-backdrop-filter:var(--ct-blur); backdrop-filter:var(--ct-blur);
   box-shadow:var(--ct-shadow-lg), 0 0 0 1px rgba(255,255,255,.12);
@@ -264,6 +289,10 @@ div[class*="st-key-dh_kpi_"] [data-testid="stPageLink-NavLink"] p{
 }
 
 /* ---------------- 步骤流（同样可点击） ---------------- */
+/* 决策面板与步骤卡之间必须留出间距：
+   两者盒模型紧贴时，决策面板的大圆角底边 + 阴影会把步骤卡顶角「咬」掉一块，
+   视觉上等同于重叠。 */
+div[class*="st-key-dh_steps"]{ margin-top:34px; }
 .dh-flow{
   display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:20px;
 }
@@ -340,6 +369,45 @@ def _page_link(url_path: str, label: str) -> None:
     st.page_link(page, label=label)
 
 
+def _trust_strip() -> None:
+    """信任信号条：这批数是哪一次算出来的、闸门过没过（企业级 P0 · docs/50 §2）。
+
+    只读 ``data/processed/current_run.json``——闸门失败时指针不动，所以这里
+    永远是"对外生效的那一版"。没有指针（还没发布过）就明说"未发布"，不编。
+    """
+    import services
+
+    info = services.current_run()
+    if not info.get("published"):
+        st.markdown(
+            "<div class='dh-trust'><span class='dh-trust-tag dh-trust-warn'>未发布</span>"
+            "<span>尚未产生生效版本——执行 <b>python -m src.pipeline</b> 复算并通过闸门后显示</span>"
+            "</div>", unsafe_allow_html=True)
+        return
+
+    counts = info.get("gate_counts") or {}
+    passed = int(counts.get("pass") or 0)
+    failed = int(counts.get("fail") or 0)
+    skipped = int(counts.get("skip") or 0)
+    source = str(info.get("source") or "")
+    source_text = "真实数据" if source == "real" else ("演示数据" if source else "未知来源")
+    published_at = str(info.get("published_at") or "").replace("T", " ")
+
+    gate_tag = ("dh-trust-tag" if not failed else "dh-trust-tag dh-trust-warn")
+    st.markdown(
+        "<div class='dh-trust'>"
+        "<span class='%s'>生效版本</span>"
+        "<span>run <b>%s</b></span>"
+        "<span>发布于 <b>%s</b></span>"
+        "<span>闸门 <b>%d PASS</b> / <b>%d FAIL</b> / <b>%d SKIP</b></span>"
+        "<span>来源 <b>%s</b></span>"
+        "<span>代码 <b>%s</b></span>"
+        "</div>" % (gate_tag, _e(str(info.get("run_id") or "")),
+                    _e(published_at), passed, failed, skipped,
+                    _e(source_text), _e(str(info.get("code_version") or ""))),
+        unsafe_allow_html=True)
+
+
 def render_dashboard_home(snap: Dict[str, float]) -> None:
     co2 = st.session_state.get("sensor_co2")
     sensor_warning = bool(st.session_state.get("sensor_is_warning"))
@@ -405,6 +473,9 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
             % (snap["total_t"], invoice_count, _e(sensor_text), snap["balance_t"]),
             unsafe_allow_html=True)
 
+    # ---------------------------------------------------- 信任信号（生效版本）
+    _trust_strip()
+
     # ---------------------------------------------------------------- KPI 区
     st.markdown(
         "<section class='dh-section'><div class='dh-section-head'>"
@@ -439,7 +510,8 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
 
     # ---------------------------------------------------------------- 决策区
     rows = [
-        ("基准碳账", "4502.04 tCO2e", "已载入"),
+        ("基准碳账", "%.4f tCO2e" % snap["base_t"],
+         "结果表载入" if snap.get("base_source") == "result" else "静态演示快照"),
         ("发票数据感知", "新增 %.6f tCO2e" % snap["invoice_t"], invoice_status),
         ("云边端硬件监控", "突发成本 ¥%.4f" % snap["sensor_cost_yuan"], sensor_text),
         ("财务风险", "¥%.2f" % snap["financial_risk_yuan"],
@@ -461,14 +533,17 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
         ("03", "路线进化", "NSGA-II 与 Q-learning 协同寻优", ROUTE_ROUTES, "去路线沙盘 →"),
         ("04", "台账披露", "配额缺口与披露附注实时生成", ROUTE_LEDGER, "去碳台账 →"),
     ]
-    step_cols = st.columns(4, gap="medium")
-    for col, (num, title, desc, target, cta) in zip(step_cols, steps):
-        with col:
-            with st.container(key="dh_step_" + num):
-                st.markdown(
-                    "<div class='dh-step'><i>%s</i><b>%s</b><p>%s</p></div>"
-                    % (num, _e(title), _e(desc)), unsafe_allow_html=True)
-                _page_link(target, cta)
+    # st.columns() 会就地渲染，必须在容器内部调用，否则列是容器的兄弟节点，
+    # 容器的 margin-top 管不到它们。
+    with st.container(key="dh_steps"):
+        step_cols = st.columns(4, gap="medium")
+        for col, (num, title, desc, target, cta) in zip(step_cols, steps):
+            with col:
+                with st.container(key="dh_step_" + num):
+                    st.markdown(
+                        "<div class='dh-step'><i>%s</i><b>%s</b><p>%s</p></div>"
+                        % (num, _e(title), _e(desc)), unsafe_allow_html=True)
+                    _page_link(target, cta)
 
 
 __all__ = ["render_dashboard_home"]

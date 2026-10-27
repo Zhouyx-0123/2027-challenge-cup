@@ -28,5 +28,6 @@
   "main_reduction_pct": 83.24781931272416,
   "main_calculation_mode": "parameterized",
   "main_decision_eligible": true,
-  "factor_version": "JCB2023-BASE-v1"
+  "factor_version": "JCB2023-BASE-v1",
+  "gross_t": 4502.0424
 }

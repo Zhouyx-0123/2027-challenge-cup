@@ -8,8 +8,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-import services
-from components import route_map
+import live_services
+from components import route_map, slider_kit
+from demo_state import carbon_snapshot
 
 AXIS_OPTIONS = {
     "碳排放": ("carbon", "碳排放 (kgCO2)"),
@@ -159,17 +160,21 @@ def _generate(origin: str, destination: str, truck_type: str, load: float,
               carbon_price: float, energy_rate: float, evolve_enabled: bool) -> None:
     logs: List[str] = []
     try:
-        with st.spinner("高德路线与四维智能体正在协同求解…"):
-            raw = services.amap_driving_routes(origin, destination)
-            evaluated = services.evaluate_route_records(
+        with st.spinner("正在解析地点并生成四维路线方案…"):
+            start = live_services.resolve_route_place(origin)
+            end = live_services.resolve_route_place(destination)
+            logs.append("起点已定位：%s → %s" % (start["label"], start["location"]))
+            logs.append("终点已定位：%s → %s" % (end["label"], end["location"]))
+            raw = live_services.amap_driving_routes(start["location"], end["location"])
+            evaluated = live_services.evaluate_route_records(
                 raw, truck_type, load, carbon_price, energy_rate)
             if evolve_enabled:
-                records = services.evolve_route_options(
+                records = live_services.evolve_route_options(
                     evaluated, explore_prob=0.2, carbon_price=carbon_price,
                     energy_cost_per_km=energy_rate, n_gen=8, pop_size=16,
                     seed=42, decision_log=logs)
             else:
-                records = services.baseline_route_choices(evaluated)
+                records = live_services.baseline_route_choices(evaluated)
                 logs.append("智能体进化未开启：采用高德备选路线的最低成本利用策略")
         if not records:
             raise RuntimeError("未获得可展示的路线，请调整起终点后重试")
@@ -178,7 +183,12 @@ def _generate(origin: str, destination: str, truck_type: str, load: float,
             key=lambda item: float(item.get("total_cost_yuan", 0.0)))
         st.session_state[STATE_ROUTES] = records
         st.session_state[STATE_GEOMETRY] = geometry
-        st.session_state[STATE_OD] = {"origin": origin, "destination": destination}
+        st.session_state[STATE_OD] = {
+            "origin": start["location"], "destination": end["location"],
+            "origin_name": start["label"], "destination_name": end["label"],
+            "origin_address": start["formatted_address"],
+            "destination_address": end["formatted_address"],
+        }
         st.session_state[STATE_LOGS] = logs
         st.session_state[STATE_ERROR] = ""
         st.toast("✅ 四维调度方案已生成")
@@ -189,7 +199,7 @@ def _generate(origin: str, destination: str, truck_type: str, load: float,
 
 def _save(route: Dict[str, Any]) -> None:
     try:
-        services.save_route_memory(route)
+        live_services.save_route_memory(route)
         st.toast("✅ 数据已入库，系统已进化！")
     except Exception as exc:
         st.error("路线写入记忆库失败：%s" % exc)
@@ -200,7 +210,9 @@ def _route_map(geometry: List[Dict[str, Any]]) -> None:
     origin, destination = od.get("origin"), od.get("destination")
     if not geometry or not origin or not destination:
         return
-    route_map.render_route_map(geometry, origin, destination)
+    route_map.render_route_map(
+        geometry, origin, destination,
+        od.get("origin_name") or "起点", od.get("destination_name") or "终点")
 
 
 def _table(frame: pd.DataFrame) -> None:
@@ -228,8 +240,85 @@ def _table(frame: pd.DataFrame) -> None:
     }), width="stretch", hide_index=True)
 
 
+def _carbon_price_chart(current: int) -> Dict[str, Any]:
+    """碳价敏感度联动图。
+
+    三条线全部由当前碳账快照真实算出（口径与 demo_state.carbon_snapshot 一致）：
+      · 当期全额碳成本 = 当期总碳排(t) × 碳价   —— 情景口径：假设全部碳排都按碳价计价
+      · 配额抵扣额度   = 当期配额(t)   × 碳价   —— 配额覆盖部分不计成本
+      · 配额缺口采购成本 = 配额缺口(t) × 碳价   —— 需要自己掏钱的部分
+    另外把当期财务风险（发票新增 + 硬件突发）写进副标题，避免与上面三条混淆。
+    """
+    snap = carbon_snapshot()
+    total_t = float(snap["total_t"])
+    quota_t = float(snap["quota_t"])
+    gap_t = float(snap["gap_t"])
+    invoice_t = float(snap["invoice_t"])
+    sensor_cost = float(snap["sensor_cost_yuan"])
+    prices = list(range(80, 201, 5))
+    gross = [[p, total_t * p] for p in prices]
+    covered = [[p, quota_t * p] for p in prices]
+    gap_cost = [[p, gap_t * p] for p in prices]
+    palette = slider_kit.PALETTE
+    subtitle = ("总碳排 %.2f t · 配额 %.2f t · 缺口 %.2f t · 发票新增 %.4f t · 硬件成本 ¥%.2f"
+                % (total_t, quota_t, gap_t, invoice_t, sensor_cost))
+    return {
+        "title": "碳价敏感度",
+        "subtitle": subtitle,
+        "x_name": "碳价 (元/tCO2)",
+        "y_name": "元",
+        "x_domain": [80, 200],
+        "y_decimals": 1,
+        "y_divisor": 10000.0,
+        "y_suffix": "万",
+        "hover_decimals": 0,
+        "hover_suffix": "元",
+        "series": [
+            # 配额抵扣额度画成面积：它与全额碳成本几乎重合时，
+            # 面积能直观看出「配额刚好盖住多少」，不会像两条重合的线那样看不见。
+            {"name": "配额抵扣额度", "points": covered, "color": palette["foam"],
+             "area": True, "width": 0},
+            {"name": "当期全额碳成本（情景）", "points": gross, "color": palette["tide"],
+             "width": 2.2},
+            {"name": "配额缺口采购成本", "points": gap_cost, "color": palette["coral"],
+             "width": 1.8},
+        ],
+        "cursor": {"follow": "value", "label": "当前碳价 {v} 元/t", "series": 1},
+        "interact": "set_x",
+        "legend": [
+            {"name": "配额抵扣额度", "color": palette["foam"], "style": "opacity:.55"},
+            {"name": "全额碳成本（情景）", "color": palette["tide"]},
+            {"name": "缺口采购成本", "color": palette["coral"]},
+        ],
+    }
+
+
+def _carbon_price_lab(default_carbon_price: float) -> int:
+    """碳价实验室：高级滑条 + 敏感度联动图（放在表单外，改价即时生效）。"""
+    value = int(min(200, max(80, default_carbon_price)))
+    value = int(round(value / 5.0) * 5)
+    # 用户在碳台账页改了全局碳价时，沙盘参数回到全局值，避免两边显示不一致
+    seen = st.session_state.get("route_carbon_price_global_seen")
+    if seen is not None and abs(float(seen) - float(default_carbon_price)) > 1e-9:
+        st.session_state["route_carbon_price"] = float(value)
+    st.session_state["route_carbon_price_global_seen"] = float(default_carbon_price)
+    return int(slider_kit.render_lab(
+        key="route_carbon_price",
+        label="碳价 (元/tCO2) · 沙盘情景",
+        min_value=80, max_value=200, step=5, value=value,
+        unit="元/t",
+        sub="拖动旋钮，右侧财务敏感度实时联动",
+        hint="← → 方向键微调 5 元/tCO2，Home / End 直达端点；在图上点击可直接设定碳价。"
+             "默认值取碳台账页的全局碳价（¥%d）；本参数只影响沙盘里的成本与碳排权衡，"
+             "不修改主碳账。" % value,
+        chart=_carbon_price_chart(value),
+        height=330,
+    ))
+
+
 def render(default_carbon_price: float) -> None:
     st.markdown(STYLE, unsafe_allow_html=True)
+    carbon_price = _carbon_price_lab(default_carbon_price)
     st.markdown(
         "<div class='rs-panel'><div class='rs-panel-title'>四维碳感知调度控制台</div>"
         "<div class='rs-panel-sub'>真实路线为基因 · 成本 / 碳排 / 时间 / 距离协同寻优</div>",
@@ -237,25 +326,28 @@ def render(default_carbon_price: float) -> None:
     with st.form("route_evolution_control"):
         left, right = st.columns(2, gap="large")
         with left:
-            origin = st.text_input("起点（GCJ-02 经度,纬度）", "121.471000,31.233000")
-            destination = st.text_input("终点（GCJ-02 经度,纬度）", "116.404000,39.915000")
+            origin = st.text_input(
+                "起点", "上海虹桥站",
+                placeholder="地点、车站或地址，例如：上海虹桥站")
+            destination = st.text_input(
+                "终点", "北京南站",
+                placeholder="地点、车站或地址，例如：北京南站")
+            st.caption("输入地点名称即可，系统自动解析经纬度；也兼容直接输入坐标。")
             truck_type = st.selectbox("车型", ["重型", "中型", "轻型"])
             load = st.number_input("载重 (t)", 0.0, 60.0, 18.0, 0.5)
         with right:
-            carbon_price = st.slider(
-                "碳价 (元/tCO2)", 80, 200,
-                int(min(200, max(80, default_carbon_price))), 5)
             energy_rate = st.number_input(
                 "能耗成本假设 (元/km)", 0.0, 10.0, 0.8, 0.1,
                 help="仅用于沙盘综合成本，不修改主碳账")
             evolve_enabled = st.toggle("🌟 开启智能体进化探索", value=True)
             st.caption("NSGA-II · Q-learning 自适应变异 · Epsilon-Greedy 0.2")
+            st.caption("碳价参数见上方「碳价实验室」，当前为 %d 元/tCO2。" % carbon_price)
         submitted = st.form_submit_button(
             "🚀 生成四维碳感知调度方案", width="stretch",
-            disabled=not services.amap_key_available())
+            disabled=not live_services.amap_key_available())
     st.markdown("</div>", unsafe_allow_html=True)
 
-    if not services.amap_key_available():
+    if not live_services.amap_key_available():
         st.warning("未配置高德 Web 服务 Key，请设置 AMAP_WEB_SERVICE_KEY 或 config/amap_key.txt。")
     if submitted:
         _generate(origin, destination, truck_type, load, carbon_price,
@@ -284,6 +376,10 @@ def render(default_carbon_price: float) -> None:
     c2.metric("推荐碳排放", f"{best['carbon']:.2f} kg")
     c3.metric("推荐行驶时间", f"{best['duration']:.1f} min")
     c4.metric("候选 / 探索", f"{len(frame)} / {int(frame['is_exploration'].sum())}")
+    od = st.session_state.get(STATE_OD) or {}
+    if od.get("origin_name") and od.get("destination_name"):
+        st.caption("本次行程：%s → %s　地点已自动解析为路线坐标。" % (
+            od["origin_name"], od["destination_name"]))
 
     st.markdown(
         "<div class='rs-section'><h3>路线空间格局</h3><span>REAL ROUTE GEOMETRY</span></div>",
@@ -340,7 +436,7 @@ def render(default_carbon_price: float) -> None:
             st.caption("暂无决策日志，生成方案后这里会展示 Q-learning 的动作与奖励。")
     with st.expander("📚 查看历史进化记忆库"):
         try:
-            memory = services.route_memory()
+            memory = live_services.route_memory()
             if memory.empty:
                 st.caption("记忆库为空。采纳推荐或探索路线后，将在这里形成持久化学习记录。")
             else:

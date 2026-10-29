@@ -1,0 +1,10 @@
+SIMULATED PLACEHOLDER ONLY — NOT A REAL INVOICE OR SENSOR RECORD
+Evidence_ID: EVD-SIM-010
+Invoice_No: INV-SIM-010
+Run_ID: RUN-SIM-010
+Ledger_Row_ID: LR-SIM-0010
+Trip_ID: TRIP-SIM-010
+Activity: 38.7 L 柴油消耗
+EF: 3.16 kgCO2e/L (proxy_pending_verification)
+Data_Status: simulated
+This file is used only to test identifier linkage. Replace with original source evidence before formal use.

@@ -284,15 +284,19 @@ def _render_evidence(evidence: pd.DataFrame) -> None:
     present = int(evidence["evidence_file_exists"].sum()) if "evidence_file_exists" in evidence else 0
     not_provided = int((evidence.get("status_bucket") == "not_provided").sum()) \
         if "status_bucket" in evidence else 0
-    blank = int((evidence.get("status_bucket") == "blank").sum()) \
-        if "status_bucket" in evidence else 0
+    placeholders = int(evidence["evidence_is_simulated_placeholder"].sum()) \
+        if "evidence_is_simulated_placeholder" in evidence else 0
+    source_docs = int(evidence["source_reference_file_available"].sum()) \
+        if "source_reference_file_available" in evidence else 0
+    original_activity = int(evidence["original_activity_evidence_available"].sum()) \
+        if "original_activity_evidence_available" in evidence else 0
     cells = [
         ("cl-blue", "EVIDENCE", _i(total), "条证据索引"),
         ("cl-mint", "ROW-LEVEL", _i(row_level), "条挂到主账行"),
-        ("", "FACTOR-SOURCE", _i(total - row_level), "条因子来源证据"),
-        ("cl-red", "FILE PRESENT", "%d / %d" % (present, total), "凭证文件实际存在"),
-        ("cl-amber", "NOT PROVIDED", _i(not_provided), "条原文明示未提供"),
-        ("", "BLANK", _i(blank), "条状态字段空白"),
+        ("", "ARTIFACT EXISTS", "%d / %d" % (present, total), "路径对应文件存在"),
+        ("cl-amber", "SIMULATED PLACEHOLDERS", _i(placeholders), "个模拟占位文件，不是原始凭证"),
+        ("cl-blue", "SOURCE DOCS", _i(source_docs), "个非占位来源文件"),
+        ("cl-red", "ORIGINAL ACTIVITY EVIDENCE", "%d / %d" % (original_activity, row_level), "条行级原始活动凭证已提供"),
     ]
     st.markdown("<div class='cl-grid'>%s</div>"
                 % "".join(_cell(*item) for item in cells),
@@ -300,6 +304,8 @@ def _render_evidence(evidence: pd.DataFrame) -> None:
     columns = [name for name in [
         "Evidence_ID", "Ledger_Row_ID", "Trip_ID", "Voucher_Type",
         "Evidence_File_Path", "evidence_file_resolved", "evidence_file_exists",
+        "evidence_is_simulated_placeholder", "source_reference_file_available",
+        "original_activity_evidence_available", "evidence_artifact_kind",
         "is_row_level", "Original_Document_Status", "Verification_Status",
     ] if name in evidence.columns]
     view = evidence[columns].copy()
@@ -308,21 +314,24 @@ def _render_evidence(evidence: pd.DataFrame) -> None:
         "Trip_ID": "物理趟次", "Voucher_Type": "凭证类型",
         "Evidence_File_Path": "凭证路径（交付方声明）",
         "evidence_file_resolved": "凭证路径（仓库内解析）",
-        "evidence_file_exists": "凭证文件存在",
+        "evidence_file_exists": "索引路径文件存在",
+        "evidence_is_simulated_placeholder": "模拟占位文件",
+        "source_reference_file_available": "非占位来源文件存在",
+        "original_activity_evidence_available": "行级原始活动凭证已提供",
+        "evidence_artifact_kind": "文件类型判定",
         "is_row_level": "凭证类型归属",
         "Original_Document_Status": "原始凭证状态（交付方声明）",
         "Verification_Status": "核验状态（交付方声明）",
     })
-    if "凭证文件存在" in view.columns:
-        view["凭证文件存在"] = view["凭证文件存在"].map(
-            {True: "是", False: "否（文件缺失）"})
+    for column in ("索引路径文件存在", "模拟占位文件", "非占位来源文件存在", "行级原始活动凭证已提供"):
+        if column in view.columns:
+            view[column] = view[column].map({True: "是", False: "否"})
     if "凭证类型归属" in view.columns:
         view["凭证类型归属"] = view["凭证类型归属"].map(
             {True: "行级凭证", False: "因子来源证据"})
     st.dataframe(view, width="stretch", hide_index=True)
-    st.caption("「凭证文件实际存在」由适配器在导出时按文件系统**实时判定**，"
-               "不是照抄工作簿里的状态字段 —— 两者不一致时以文件是否存在为准。"
-               "状态字段空白**不算**已提供。")
+    st.caption("“索引路径文件存在”只说明文件系统中有对应文件；simulated_evidence 占位文件不是真实发票或设备记录。"
+               "只有“行级原始活动凭证已提供”为是且通过人工核验，才能作为真实活动证据；状态字段空白**不算**已提供。")
 
 
 # ---------------------------------------------------------------------------
@@ -377,7 +386,13 @@ def _render_rules(rules: Dict[str, Any]) -> None:
         ("cl-mint", "PRESSURE", "%s / %s" % (_i(rules.get("pressure_passed")),
                                             _i(rules.get("pressure_case_count"))),
          "项压力场景通过"),
-        ("cl-red", "SELF-CHECK", "未随交付", "self_check.py 与模拟凭证缺失"),
+        ("cl-mint" if (rules.get("self_check") or {}).get("script_available") else "cl-red",
+         "SELF-CHECK",
+         ("%s / %s" % ((rules.get("self_check") or {}).get("passed", 0),
+                        (rules.get("self_check") or {}).get("failed", 0))
+          if (rules.get("self_check") or {}).get("result_available") else
+          ("脚本已提供" if (rules.get("self_check") or {}).get("script_available") else "未提供")),
+         "自检通过/失败；%s 个模拟占位文件" % _i(rules.get("simulated_placeholder_file_count"))),
     ]
     st.markdown("<div class='cl-grid'>%s</div>"
                 % "".join(_cell(*item) for item in cells),
@@ -433,6 +448,16 @@ def render_carbon_ledger_panel() -> None:
         return
 
     _status_strip(summary, gates)
+    integration_status = services.carbon_ledger_integration_status()
+    if integration_status.get("ready"):
+        st.caption("接入来源：%s · 导出时间：%s · 主账 SHA-256 前缀：%s · 正式批准行：%s" % (
+            integration_status.get("source_workbook") or "—",
+            integration_status.get("generated_at") or "—",
+            integration_status.get("source_sha256_16") or "—",
+            _i(integration_status.get("approved_rows")),
+        ))
+    else:
+        st.warning("碳账适配器元数据不可用：%s" % integration_status.get("reason", "未知原因"))
     if summary.get("is_simulated"):
         st.warning("模拟数据：当前主账 %d 行全部为 `simulated` 合成记录，"
                    "排放因子为代理值（proxy_pending_verification），"

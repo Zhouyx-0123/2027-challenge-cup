@@ -226,20 +226,68 @@ def _number(value: Any) -> Optional[float]:
     return number
 
 
+def _has_parquet_engine() -> bool:
+    try:
+        import pyarrow  # noqa: F401
+        return True
+    except Exception:  # noqa: BLE001
+        try:
+            import fastparquet  # noqa: F401
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+
+def _write_json_sidecar(frame: pd.DataFrame, path: Path) -> Path:
+    """写同名 JSON 侧车（人可读 + 无 Parquet 引擎时的只读回退）。"""
+    sidecar = path.with_suffix(".json")
+    rows = frame.astype(object).where(pd.notna(frame), None).to_dict(orient="records")
+    _save_json(rows, sidecar)
+    return sidecar
+
+
 def _save_parquet(frame: pd.DataFrame, path: Path, tries: int = 4) -> None:
-    """落 parquet（带重试：Windows 上文件被占用时偶发失败）。"""
+    """落 Parquet **并恒定附带同名 JSON 侧车**；缺少 Parquet 引擎时只落侧车。
+
+    为什么要"恒定附带"：
+        原实现是"有引擎写 Parquet 并**删掉**侧车，无引擎只写侧车"。
+        这让**同一份代码在两种机器上产出不同的文件集** —— 谁最后跑一次，
+        仓库里就留谁的形态，另一形态被删。结果表因此"不可由仓库自身复现"。
+
+    现在的约定：
+        · 有引擎 → 写 ``*.parquet``（契约格式）+ **同时**写 ``*.json`` 侧车；
+        · 无引擎 → 只写 ``*.json`` 侧车，并**清掉**可能存在的过期 Parquet
+          （否则读取端会优先读到上一次的旧 Parquet）。
+        两种环境下 **JSON 侧车恒定存在**，读取端因此永远有一条稳定通路；
+        Parquet 是否存在由 manifest 的 ``output_formats`` 如实记录。
+
+    不伪装成 Parquet，也不改变行、列、排放数值和 simulated 状态。
+    """
     import time
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    last: Optional[Exception] = None
-    for attempt in range(tries):
-        try:
-            frame.to_parquet(path, index=False)
-            return
-        except Exception as exc:  # noqa: BLE001
-            last = exc
-            time.sleep(0.4 * (attempt + 1))
-    raise RuntimeError("写 parquet 失败 %s：%s" % (path.name, last))
+    has_engine = _has_parquet_engine()
+    if has_engine:
+        last: Optional[Exception] = None
+        for attempt in range(tries):
+            try:
+                frame.to_parquet(path, index=False)
+                last = None
+                break
+            except Exception as exc:  # noqa: BLE001
+                last = exc
+                time.sleep(0.4 * (attempt + 1))
+        # Parquet engine exists but actual write failed: fail loudly rather than silently fallback.
+        if last is not None:
+            raise RuntimeError("写 parquet 失败 %s：%s" % (path.name, last))
+    else:
+        # 没有引擎：清掉可能残留的旧 Parquet，避免读取端读到过期数据
+        if path.exists():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+    _write_json_sidecar(frame, path)
 
 
 def _save_json(payload: Any, path: Path) -> None:
@@ -429,13 +477,19 @@ def build_evidence() -> pd.DataFrame:
     resolved: List[str] = []
     row_level: List[bool] = []
     status_bucket: List[str] = []
+    placeholder_flags: List[bool] = []
+    source_document_flags: List[bool] = []
+    original_activity_flags: List[bool] = []
+    artifact_kinds: List[str] = []
     for row in frame.to_dict(orient="records"):
         raw = _text(row.get("Evidence_File_Path"))
         relative, _base = _resolve_evidence_path(raw)
         resolved.append(relative)
-        exists.append(bool(_base))
+        artifact_exists = bool(_base)
+        exists.append(artifact_exists)
         ledger_row = _text(row.get("Ledger_Row_ID"))
-        row_level.append(bool(ledger_row) and ledger_row.upper() != "N/A")
+        is_row = bool(ledger_row) and ledger_row.upper() != "N/A"
+        row_level.append(is_row)
         status = _text(row.get("Original_Document_Status"))
         if not status:
             status_bucket.append("blank")
@@ -443,10 +497,44 @@ def build_evidence() -> pd.DataFrame:
             status_bucket.append("not_provided")
         else:
             status_bucket.append("provided")
+
+        artifact_path = (ROOT / relative) if relative else None
+        artifact_text = ""
+        if artifact_exists and artifact_path is not None:
+            try:
+                artifact_text = artifact_path.read_text(encoding="utf-8", errors="replace")[:4000]
+            except (OSError, UnicodeError):
+                artifact_text = ""
+        is_placeholder = bool(
+            "SIMULATED PLACEHOLDER ONLY" in artifact_text
+            or raw.replace("\\", "/").startswith("simulated_evidence/")
+            or (_text(row.get("Simulated")).lower() == "yes" and artifact_exists)
+        )
+        source_document_available = artifact_exists and not is_placeholder
+        original_activity_available = (
+            source_document_available and is_row
+            and _text(row.get("Simulated")).lower() != "yes"
+            and not status.upper().startswith("NOT PROVIDED")
+        )
+        placeholder_flags.append(is_placeholder)
+        source_document_flags.append(source_document_available)
+        original_activity_flags.append(original_activity_available)
+        if is_placeholder:
+            artifact_kinds.append("simulated_placeholder_not_original_evidence")
+        elif original_activity_available:
+            artifact_kinds.append("original_activity_evidence_file")
+        elif source_document_available:
+            artifact_kinds.append("non_placeholder_source_document")
+        else:
+            artifact_kinds.append("missing_file")
     frame["evidence_file_exists"] = exists
     frame["evidence_file_resolved"] = resolved
     frame["is_row_level"] = row_level
     frame["status_bucket"] = status_bucket
+    frame["evidence_is_simulated_placeholder"] = placeholder_flags
+    frame["source_reference_file_available"] = source_document_flags
+    frame["original_activity_evidence_available"] = original_activity_flags
+    frame["evidence_artifact_kind"] = artifact_kinds
     return frame
 
 
@@ -602,6 +690,15 @@ def build_rules() -> Dict[str, Any]:
         return passed, total
 
     pressure_passed, pressure_total = _passed(pressure)
+    self_check_path = LEDGER_DIR / "a6_verification" / "self_check.py"
+    self_check_result_path = LEDGER_DIR / "a6_verification" / "self_check_results.json"
+    self_check_result: Dict[str, Any] = {}
+    if self_check_result_path.exists():
+        try:
+            self_check_result = json.loads(self_check_result_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            self_check_result = {}
+    placeholder_files = sorted((LEDGER_DIR / "a5_evidence" / "simulated_evidence").glob("*.txt"))
     return {
         "validation_rules": validation,
         "validation_rule_count": len(validation),
@@ -615,9 +712,17 @@ def build_rules() -> Dict[str, Any]:
         "pending_items": pending,
         "rule_card_markdown": card,
         "rule_card_file": str(RULE_CARD_MD.relative_to(ROOT)).replace("\\", "/"),
-        "note": ("自检与压力测试结论取自交付方工作簿；"
-                 "交付方未随分支提供 self_check.py 与模拟凭证，"
-                 "「27 项自检通过」目前**无法在本仓库复现**。"),
+        "self_check": {
+            "script_available": self_check_path.exists(),
+            "result_available": bool(self_check_result),
+            "passed": int(self_check_result.get("passed") or 0),
+            "failed": int(self_check_result.get("failed") or 0),
+            "result_file": str(self_check_result_path.relative_to(ROOT)).replace("\\", "/"),
+        },
+        "simulated_placeholder_file_count": len(placeholder_files),
+        "note": ("适配器导出的是工作簿缓存结果，不重新计算排放。"
+                 "本仓库随交付提供的 simulated_evidence 是链接测试占位文件，不是真实发票或设备记录；"
+                 "必须区分原始活动凭证与占位文件，不能把文件存在等同于原始凭证已提供。"),
     }
 
 
@@ -806,19 +911,36 @@ def export(write: bool = True, out_dir: Optional[Path] = None) -> Dict[str, Any]
         base / schema.RESULT_FILES["carbon_ledger_activity_readiness"]: readiness,
         base / schema.RESULT_FILES["carbon_ledger_rules"]: rules,
     }
+    has_engine = _has_parquet_engine()
+    output_formats = {
+        path.name: ("parquet_with_json_sidecar" if isinstance(payload, pd.DataFrame)
+                    and has_engine else ("json_sidecar_no_parquet_engine"
+                    if isinstance(payload, pd.DataFrame) else "json"))
+        for path, payload in outputs.items()}
+    generated_at = _now()
     if write:
         for path, payload in outputs.items():
             if isinstance(payload, pd.DataFrame):
                 _save_parquet(payload, path)
             else:
                 _save_json(payload, path)
+        _save_json({
+            "generated_at": generated_at,
+            "output_formats": output_formats,
+            "format_notice": "JSON sidecars are explicit local compatibility outputs, not Parquet files; standard deployment with pyarrow/fastparquet emits Parquet.",
+            "simulated_rows": int(summary.get("simulated_rows") or 0),
+            "actual_rows": int(summary.get("actual_rows") or 0),
+            "approved_rows": int(gates.get("approved_rows") or 0),
+            "formal_gate_status": summary.get("formal", {}).get("gate_status", ""),
+        }, base / "carbon_ledger_export_manifest.json")
 
     return {
-        "generated_at": _now(),
+        "generated_at": generated_at,
         "written": write,
         "out_dir": str(base),
         "outputs": {path.name: (len(payload) if isinstance(payload, pd.DataFrame)
                                 else 1) for path, payload in outputs.items()},
+        "output_formats": output_formats,
         "trip_rows": int(len(trips)),
         "total_emissions_t": summary["total_emissions_t"],
         "approved_rows": gates["approved_rows"],

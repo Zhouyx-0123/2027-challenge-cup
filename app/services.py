@@ -578,6 +578,47 @@ def obd_is_demo() -> bool:
     return bool((obd_summary() or {}).get("is_demo"))
 
 
+# ---------------- VSP 模型 × OBD 实测 对照验证（docs/57） ----------------
+# 判据（老师原话）：「你测的和这些估的能不能对得上？对不上，那估的可能就不用了。」
+# 本层只读 ``src/obd_vsp_crosscheck.py`` 预计算的对拍结果表：
+# 实测轨 = 碳平衡法（守恒法）；模型轨 = VSP（速度剖面积分 / 平均速度法）。
+# 两者互不替代、也不相加 —— 这是**对照**，不是新口径。
+CARBON_LEDGER_CACHE_TTL = 30
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_obd_vsp_crosscheck() -> pd.DataFrame:
+    """逐趟 × 载重档的模型 vs 实测偏差表。"""
+    return _read_parquet(RESULT_FILES["obd_vsp_crosscheck"])
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_obd_vsp_crosscheck_points() -> pd.DataFrame:
+    """最佳载重档下的逐点排放率对照（实测 vs 模型）。"""
+    return _read_parquet(RESULT_FILES["obd_vsp_crosscheck_points"])
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_obd_vsp_crosscheck_summary() -> Dict[str, Any]:
+    """对拍汇总与判据结论。"""
+    return _read_json(RESULT_FILES["obd_vsp_crosscheck_summary"])
+
+
+def obd_vsp_crosscheck() -> pd.DataFrame:
+    """模型 vs 实测偏差表。缺失返回空表。"""
+    return _read_obd_vsp_crosscheck()
+
+
+def obd_vsp_crosscheck_points() -> pd.DataFrame:
+    """逐点排放率对照表。缺失返回空表。"""
+    return _read_obd_vsp_crosscheck_points()
+
+
+def obd_vsp_crosscheck_summary() -> Dict[str, Any]:
+    """对拍汇总与判据结论。缺失返回 {}。"""
+    return _read_obd_vsp_crosscheck_summary()
+
+
 # ---------------- 碳会计 A0–A6 交付轨（docs/54，审计轨） ----------------
 # 纪律：只读不算。本层只从 data/processed/ 读由 `python -m src.carbon_ledger_export`
 # 预计算的结果表；**不 import 适配器、不在页面里做判定、不写 Excel**。

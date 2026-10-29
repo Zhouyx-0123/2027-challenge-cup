@@ -82,6 +82,36 @@ def _f(value: Any, digits: int = 2, dash: str = "—") -> str:
     return ("%%.%df" % digits) % number
 
 
+def build_crosscheck_figure(points: pd.DataFrame, vehicle_id: str) -> go.Figure:
+    """逐点排放率对照：实测（碳平衡法）vs 模型（VSP）。
+
+    这是老师那句判据的可视化 —— 「你测的和这些估的能不能对得上」。
+    """
+    figure = go.Figure()
+    if points is None or points.empty:
+        return _base_layout(figure, 300, "g/s")
+    sub = points[points["vehicle_id"].astype(str) == str(vehicle_id)].copy()
+    if sub.empty:
+        return _base_layout(figure, 300, "g/s")
+    sub = sub.sort_values("ts")
+    stamps = pd.to_datetime(sub["ts"], errors="coerce")
+    elapsed = (stamps - stamps.min()).dt.total_seconds()
+    measured = pd.to_numeric(sub.get("er_gs_measured"), errors="coerce")
+    model = pd.to_numeric(sub.get("er_gs_model"), errors="coerce")
+    figure.add_trace(go.Scatter(
+        x=elapsed, y=measured, name="实测 ER（碳平衡法）", mode="markers",
+        marker=dict(size=3, color="#FF8A5B", opacity=0.5),
+        hovertemplate="%{y:.2f} g/s<extra></extra>"))
+    figure.add_trace(go.Scatter(
+        x=elapsed, y=model, name="模型 ER（VSP）", mode="lines",
+        line=dict(color="#7CCBFF", width=1.5),
+        hovertemplate="%{y:.2f} g/s<extra></extra>"))
+    figure.update_layout(
+        xaxis=dict(title="行程内经过时间 (s)"),
+        yaxis=dict(title="排放率 g/s"))
+    return _base_layout(figure, 300, "g/s")
+
+
 # ---------------------------------------------------------------------------
 # 状态条与指标卡
 # ---------------------------------------------------------------------------
@@ -109,6 +139,12 @@ def _status_strip(summary: Dict[str, Any]) -> None:
         unsafe_allow_html=True)
 
 
+def _cell(tone: str, key: str, value: str, unit: str) -> str:
+    """指标卡单格 HTML。"""
+    return ("<div class='ob-cell %s'><div class='k'>%s</div><div class='v'>%s</div>"
+            "<div class='u'>%s</div></div>" % (tone, _e(key), _e(value), _e(unit)))
+
+
 def _kpi_row(summary: Dict[str, Any], vehicles: pd.DataFrame) -> None:
     """车队级指标卡。数字全部来自结果表。"""
     cells = [
@@ -120,9 +156,7 @@ def _kpi_row(summary: Dict[str, Any], vehicles: pd.DataFrame) -> None:
     ]
     html_parts = ["<div class='ob-grid'>"]
     for tone, key, value, unit in cells:
-        html_parts.append(
-            "<div class='ob-cell %s'><div class='k'>%s</div><div class='v'>%s</div>"
-            "<div class='u'>%s</div></div>" % (tone, _e(key), _e(value), _e(unit)))
+        html_parts.append(_cell(tone, key, value, unit))
     html_parts.append("</div>")
     st.markdown("".join(html_parts), unsafe_allow_html=True)
 
@@ -400,6 +434,83 @@ def _engine_stats(points: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _render_vsp_crosscheck(vehicle_id: str) -> None:
+    """模型 vs 实测 对照验证 —— 回答老师那句判据。
+
+    实测轨 = 碳平衡法（守恒法）；模型轨 = VSP（速度剖面积分 / 平均速度法）。
+    两者互不替代、也不相加。
+    """
+    summary = services.obd_vsp_crosscheck_summary()
+    if not summary:
+        st.info("没有对拍结果（先执行 python -m src.obd_vsp_crosscheck）。")
+        return
+    totals = summary.get("totals") or {}
+    verdict = str(summary.get("verdict") or "—")
+    load_basis = str(summary.get("load_basis") or "—")
+
+    st.markdown(
+        "<div class='ob-note'>"
+        "<b>判据（老师原话）：</b>%s<br>"
+        "<b>实测轨</b>：碳平衡法（守恒法）—— OBD 只测油耗，碳由守恒系数推出；"
+        "<b>模型轨</b>：VSP（速度剖面积分）。两者<b>互不替代、也不相加</b>，这里只做对照。"
+        "</div>" % _e(summary.get("criterion") or ""),
+        unsafe_allow_html=True)
+
+    cells = [
+        ("ob-blue", "MEASURED", _f(totals.get("kg_measured"), 2), "kgCO₂ 实测（碳平衡法）"),
+        ("ob-blue", "VSP PROFILE", _f(totals.get("kg_vsp_profile"), 2), "kgCO₂ 模型（速度剖面）"),
+        ("ob-amber", "DELTA", "%+.2f%%" % float(totals.get("delta_pct_profile") or 0.0),
+         "模型 vs 实测 偏差"),
+        ("ob-coral", "AVG-SPEED", "%+.2f%%" % float(totals.get("delta_pct_avg") or 0.0),
+         "平均速度法 偏差（对照）"),
+    ]
+    st.markdown("<div class='ob-grid'>%s</div>"
+                % "".join(_cell(*item) for item in cells),
+                unsafe_allow_html=True)
+    if verdict == "可用于兜底":
+        st.success("**对得上**：速度剖面模型与实测偏差 %+.2f%%，在 ±%.0f%% 容差内 → "
+                   "VSP 可以用来给**没有装 OBD 的车**做全量估算。"
+                   % (float(totals.get("delta_pct_profile") or 0.0),
+                      float((summary.get("tolerance_pct") or {}).get("ok") or 15.0)))
+    elif verdict == "需修正":
+        st.warning("**偏差偏大**：%+.2f%%（超出 ±%.0f%% 容差，但在 ±%.0f%% 内）→ "
+                   "模型需要修正后再用于全量估算。"
+                   % (float(totals.get("delta_pct_profile") or 0.0),
+                      float((summary.get("tolerance_pct") or {}).get("ok") or 15.0),
+                      float((summary.get("tolerance_pct") or {}).get("warn") or 30.0)))
+    else:
+        st.error("**对不上**：%+.2f%% → 按判据，模型暂不能用于全量估算。"
+                 % float(totals.get("delta_pct_profile") or 0.0))
+
+    points = services.obd_vsp_crosscheck_points()
+    if not points.empty:
+        st.plotly_chart(build_crosscheck_figure(points, vehicle_id), width="stretch")
+        st.caption("逐点排放率对照：实测（碳平衡法，散点）vs 模型（VSP，线）。"
+                   "两条线的形状是否一致，就是「对不对得上」的直接答案。")
+
+    rows = summary.get("per_vehicle") or []
+    if rows:
+        frame = pd.DataFrame(rows)
+        view = frame[["vehicle_id", "load_basis", "load_t", "factor_gkm", "dist_km",
+                      "kg_measured", "kg_vsp_profile", "delta_pct_profile",
+                      "kg_vsp_avg", "delta_pct_avg", "verdict"]].rename(columns={
+            "vehicle_id": "车辆", "load_basis": "载重来源", "load_t": "载重 t",
+            "factor_gkm": "模型因子 g/km", "dist_km": "里程 km",
+            "kg_measured": "实测 kgCO₂", "kg_vsp_profile": "模型(剖面) kgCO₂",
+            "delta_pct_profile": "偏差(剖面)", "kg_vsp_avg": "模型(均速) kgCO₂",
+            "delta_pct_avg": "偏差(均速)", "verdict": "判定"})
+        st.dataframe(view, width="stretch", hide_index=True)
+
+    if load_basis == "scan":
+        st.warning("**载重是扫描假设**：%s" % (summary.get("load_basis_note") or ""))
+    st.caption("%s ｜ %s"
+               % (summary.get("profile_gain_note") or "",
+                  summary.get("boundary") or ""))
+    if summary.get("is_demo"):
+        st.warning("演示数据：当前对拍基于确定性演示序列，**不代表真实车队**，"
+                   "也不构成对外结论。")
+
+
 # ---------------------------------------------------------------------------
 # 主渲染
 # ---------------------------------------------------------------------------
@@ -486,6 +597,11 @@ def render_obd_panel() -> None:
     # ---- 车级聚合表 ----
     theme.section("每车碳排聚合", "守恒法实测 · 一台车（一个动力总成）一行")
     st.dataframe(build_vehicle_table(vehicles), width="stretch", hide_index=True)
+
+    # ---- 模型 vs 实测 对照验证（老师判据）----
+    theme.section("模型 vs 实测 对照验证",
+                  "碳平衡法（实测） × VSP（模型）· 回答「对不对得上」")
+    _render_vsp_crosscheck(vehicle_id)
 
     with st.expander("行程级明细", expanded=False):
         trips = services.obd_trips()

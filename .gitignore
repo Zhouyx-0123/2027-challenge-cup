@@ -85,6 +85,10 @@ data/processed/*
 !data/processed/obd_vehicle_carbon.parquet
 !data/processed/obd_trips.parquet
 !data/processed/obd_summary.json
+# VSP 模型 × OBD 碳平衡实测 对照验证轨（docs/57）：回答"测的和估的对不对得上"
+!data/processed/obd_vsp_crosscheck.parquet
+!data/processed/obd_vsp_crosscheck_points.parquet
+!data/processed/obd_vsp_crosscheck_summary.json
 data/processed/route_geo.parquet
 # 上海—北京 OSM 碳基线（docs/35 D2/D3）：非实时 · 固定因子 · 道路等级 proxy
 !data/processed/route_baseline_sh_bj_steps.parquet

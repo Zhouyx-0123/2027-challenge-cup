@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-10-29T21:14:01+08:00",
+  "criterion": "「你测的和这些估的能不能对得上？对不上，那估的可能就不用了。」—— 老师原话，2026-10-29",
+  "is_demo": true,
+  "factor_version": "JCB2023-BASE-v1",
+  "factor_source": "吴睿中等（2024）VSP 排放率；v=50 km/h；2023年基准碳排放计算结果.xlsx 因子表",
+  "vsp_version_note": "VSP 曲线 = factor_model.VSP_X/VSP_MULT（5 点代理，来源文献见 factor_source）",
+  "tolerance_pct": {
+    "ok": 15.0,
+    "warn": 30.0,
+    "note": "建议值，待负责人确认"
+  },
+  "load_basis": "scan",
+  "load_basis_note": "载重为**扫描假设**（模型因子表各载重锚点档中取偏差最小的一档）。真实设备上报 load_kg 后按实测载重取因子，本项自动变为 measured。**扫描得到的最佳档不构成「可用于兜底」的结论** —— 缺载重时模型与实测的关系，只能说明「对不上多半是因为载重对不上」。",
+  "totals": {
+    "kg_measured": 136.8389,
+    "kg_vsp_profile": 141.9651,
+    "kg_vsp_avg": 139.8086,
+    "delta_pct_profile": 3.7462,
+    "delta_pct_avg": 2.1702,
+    "profile_vs_avg_pct": 1.5425,
+    "dist_km": 131.28
+  },
+  "profile_gain_note": "速度剖面积分比平均速度法高出的比例 —— 这就是丢掉瞬态（怠速/加速/减速）的代价，即 docs/57 G1 的量化值。",
+  "verdict": "可用于兜底",
+  "per_vehicle": [
+    {
+      "vehicle_id": "TRK-BJ-002",
+      "load_basis": "scan",
+      "load_t": 12.0,
+      "factor_gkm": 544.752,
+      "dist_km": 50.243,
+      "kg_measured": 52.3712,
+      "kg_vsp_profile": 45.4468,
+      "delta_pct_profile": -13.2218,
+      "kg_vsp_avg": 45.2813,
+      "delta_pct_avg": -13.5378,
+      "verdict": "可用于兜底"
+    },
+    {
+      "vehicle_id": "TRK-GZ-001",
+      "load_basis": "scan",
+      "load_t": 30.0,
+      "factor_gkm": 1055.952,
+      "dist_km": 81.037,
+      "kg_measured": 84.4677,
+      "kg_vsp_profile": 96.5184,
+      "delta_pct_profile": 14.2666,
+      "kg_vsp_avg": 94.5273,
+      "delta_pct_avg": 11.9094,
+      "verdict": "可用于兜底"
+    }
+  ],
+  "boundary": "本轨是**对照验证**，不是新口径：实测轨 = 碳平衡法（守恒法），模型轨 = VSP。两者互不替代、也不相加。结果表独立于 data/processed/ 的其他表，不进 E₀ 主账、不参与 28 条闸门。",
+  "trips_rows": 12,
+  "points_rows": 6600
+}

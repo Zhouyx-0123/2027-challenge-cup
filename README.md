@@ -24,7 +24,7 @@
 | 守恒法 | `CO₂(kg) = 油耗(L) × ρ × w_C × (44.01/12.011)`；出账系数取自 `config/calc_factors.json`（唯一真源），守恒推导值作对拍校验（柴油偏差 0.628%） |
 | 契约 | `config/obd_gps_contract.json` —— 字段、别名、质控标记、接入方式，设备端与后端共用一份 |
 | 接收 | `POST /api/upload_obd_gps` —— 与传感器通道同一套令牌鉴权 / 限流 / 审计，默认 fail-closed |
-| 落地 | `src/obd_gps.py`（校验+算碳+分车聚合）、`src/obd_pipeline.py`（原始流→结果表） |
+| 落地 | `src/obd_gps.py`（校验+算碳+分车聚合）、`src/obd_pipeline.py`（原始流→结果表）、`src/obd_vsp_crosscheck.py`（**模型 vs 实测 对照验证**） |
 | 前端 | 云边端监控页第二个 tab：累计碳排、工况三联图、碳强度、GPS 轨迹、每车碳排聚合表 |
 
 > **边界**：本通道是独立轨道 —— **不写入 E₀ 主口径、不参与主闸门对拍**，
@@ -33,7 +33,13 @@
 ```bash
 python -m src.obd_pipeline --demo      # 生成演示结果表（确定性演示序列）
 python -m src.obd_pipeline              # 读 data/raw/obd_gps/ 的真实流
+python -m src.obd_vsp_crosscheck        # 模型(VSP) × 实测(碳平衡法) 对照验证
 ```
+
+**对照验证轨**回答老师那句判据：「你测的和这些估的能不能对得上？对不上，那估的可能就不用了。」
+实测轨 = 碳平衡法（守恒法，OBD 只测油耗）；模型轨 = VSP（速度剖面积分 / 平均速度法）。
+两者**互不替代、也不相加**。演示数据下模型 vs 实测偏差 **+3.75%**（±15% 容差内 → 对得上）；
+但**载重是扫描假设**，真实载重接入前不构成兜底结论。
 
 ## 碳账交付（碳会计线）
 

@@ -71,6 +71,10 @@ RESULT_FILES: Dict[str, str] = {
     "obd_vehicle_carbon": "obd_vehicle_carbon.parquet",
     "obd_trips": "obd_trips.parquet",
     "obd_summary": "obd_summary.json",
+    # VSP 模型 × OBD 碳平衡实测 对照验证轨（docs/57）：回答"测的和估的对不对得上"
+    "obd_vsp_crosscheck": "obd_vsp_crosscheck.parquet",
+    "obd_vsp_crosscheck_points": "obd_vsp_crosscheck_points.parquet",
+    "obd_vsp_crosscheck_summary": "obd_vsp_crosscheck_summary.json",
     # 碳会计 A0–A6 交付轨（docs/54）：**审计轨**，WTW 口径独立于工程侧 TTW 主口径；
     # 由 src/carbon_ledger_export.py 从 carbon_ledger/ 的 Excel 导出，前端只读
     "carbon_ledger_trips": "carbon_ledger_trips.parquet",

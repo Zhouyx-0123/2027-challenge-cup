@@ -49,8 +49,9 @@ function findBrowser() {
   const userDir = path.join(process.env.TEMP || 'C:\\Temp', 'cdp-obd-' + Date.now());
   const proc = spawn(browser, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars',
-    // 窗口要够高才能一次截全 OBD tab（区块容器实测约 2400 px）
-    '--window-size=1600,2600', `--remote-debugging-port=${PORT}`,
+    // 窗口要够高才能一次截全 OBD tab（区块容器实测约 3500 px：
+    // 累计碳排 / 工况三联 / 碳强度 / GPS 轨迹 / 车级聚合 / 模型 vs 实测 对照验证）
+    '--window-size=1600,4200', `--remote-debugging-port=${PORT}`,
     `--user-data-dir=${userDir}`, 'about:blank',
   ], { stdio: 'ignore' });
 

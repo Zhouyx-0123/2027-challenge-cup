@@ -961,7 +961,10 @@ def demo_stream(vehicles: Optional[Sequence[Dict[str, Any]]] = None,
         for i, (speed, rpm, fuel, load, throttle) in enumerate(cycle):
             ts = start + pd.Timedelta(seconds=2 * i)
             heading = 73.0 + 12.0 * math.sin(i / 90.0)
-            step_km = speed * 2.0 / 3600.0
+            # 里程必须跟**报表速度**同口径：报表速度是 speed*scale，里程也要乘 scale。
+            # 否则轻卡（scale<1）会按未缩放的速度累计里程 —— 里程虚高、碳强度被低估，
+            # 「模型 vs 实测」对拍会得出完全错误的结论。
+            step_km = speed * scale * 2.0 / 3600.0
             lat += (step_km / 111.0) * math.cos(math.radians(heading))
             lng += (step_km / (111.0 * math.cos(math.radians(lat)))) * math.sin(math.radians(heading))
             odo += step_km

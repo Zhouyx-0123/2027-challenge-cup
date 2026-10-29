@@ -8,9 +8,32 @@
 |---|---|
 | 首页概览 | 展示总排放、配额缺口、财务风险和实时碳脉动 |
 | 发票数据感知 | DeepSeek 多模态识别、缺失油量 50 L 容错、统一碳核算 |
-| 云边端硬件监控 | ESP32 → Flask → CSV → Streamlit，2 秒刷新与 CO2 超标预警；监测窗口滑条联动实时窗口预览图 |
+| 云边端硬件监控 | ESP32 → Flask → CSV → Streamlit，2 秒刷新与 CO2 超标预警；监测窗口滑条联动实时窗口预览图；**第二个 tab 是 OBD+GPS 实测碳排**（守恒法，每车碳排） |
 | 减碳路线沙盘 | 高德 JS API 2.0 精细地图、四维 NSGA-II、Q-learning 自适应变异与路线记忆；碳价滑条联动碳价敏感度图 |
 | 碳核算与台账 | 碳价和配额设置、动态配额缺口、披露附注与 CSV 下载 |
+
+## OBD + GPS 实测碳排（工科测量方向）
+
+项目新增**第三条证据链**：原有两条（发票油耗、VSP 估算）都是间接算碳，
+缺一个"测出来"的锚点。新通道测的是**实时油耗**，用燃料守恒法推出
+**每台车（每台发动机）的碳排放**。
+
+| 环节 | 做法 |
+|---|---|
+| 测量 | OBD（转速 / 负荷 / 车速 / 瞬时油耗 / 累计油耗）+ GPS（位置 / 速度 / 航向） |
+| 守恒法 | `CO₂(kg) = 油耗(L) × ρ × w_C × (44.01/12.011)`；出账系数取自 `config/calc_factors.json`（唯一真源），守恒推导值作对拍校验（柴油偏差 0.628%） |
+| 契约 | `config/obd_gps_contract.json` —— 字段、别名、质控标记、接入方式，设备端与后端共用一份 |
+| 接收 | `POST /api/upload_obd_gps` —— 与传感器通道同一套令牌鉴权 / 限流 / 审计，默认 fail-closed |
+| 落地 | `src/obd_gps.py`（校验+算碳+分车聚合）、`src/obd_pipeline.py`（原始流→结果表） |
+| 前端 | 云边端监控页第二个 tab：累计碳排、工况三联图、碳强度、GPS 轨迹、每车碳排聚合表 |
+
+> **边界**：本通道是独立轨道 —— **不写入 E₀ 主口径、不参与主闸门对拍**，
+> 主账口径与 28 条判据保持冻结。设计细节见 `docs/52_OBD_GPS_实测碳排方向.md`。
+
+```bash
+python -m src.obd_pipeline --demo      # 生成演示结果表（确定性演示序列）
+python -m src.obd_pipeline              # 读 data/raw/obd_gps/ 的真实流
+```
 
 ## 数据与前端边界
 
@@ -45,16 +68,19 @@ app/
     dashboard_home.py          # 暗色叙事首页 + 首页↔四页跳转联动
     route_sandbox.py           # 路线进化可视化
     slider_kit.py              # 高级滑条 + 联动可操作图（自绘，值由原生滑条承载）
+    obd_panel.py               # OBD+GPS 实测碳排面板（监控页第二个 tab）
     theme.py                   # 当前全局样式与紧凑页头（令牌唯一真源）
   static/                      # 极光底图 / 碳网络纹理 / 品牌标志
 src/
   invoice.py                   # DeepSeek 识别与统一 calc_carbon
   sensor.py                    # 传感器读取、超标判断与预警台账
   disclosure.py                # 智能披露附注
+  obd_gps.py                   # OBD+GPS 契约校验、守恒法算碳、分车聚合
+  obd_pipeline.py              # OBD 实测碳排流水线（独立轨道，不动主闸门）
   routing/                     # 高德、路线碳核算与四维进化
   ...                          # 数据复算与底层模型
-server.py                      # Flask 传感器接收服务
-config/                        # 因子表与本地密钥配置
+server.py                      # Flask 传感器接收服务 + OBD/GPS 接收端点
+config/                        # 因子表与本地密钥配置（含 OBD 契约与守恒物理量）
 data/                          # 业务数据、结果表与路线记忆
 tests/                         # 当前功能及底层契约测试
 tools/                         # 启动、复算和命令行工具
@@ -130,7 +156,7 @@ python -m pytest tests/ -q
 python -m tools.verify_p0           # 企业级 P0 一键验收（10 条判据）
 ```
 
-测试覆盖五页主入口、共享状态、顶部导航、DeepSeek 请求契约、高德响应解析、路线四维进化、探索与采纳、发票碳核算以及底层数据契约。
+测试覆盖五页主入口、共享状态、顶部导航、DeepSeek 请求契约、高德响应解析、路线四维进化、探索与采纳、发票碳核算、OBD+GPS 实测碳排通道（契约/守恒/聚合/边界/接收端）以及底层数据契约。
 
 视觉与联动验收（需要 Node 与本机 Edge/Chrome，服务先起在 8501）：
 
@@ -139,6 +165,7 @@ node tools/verify_pages.js http://localhost:8501 _shots   # 逐页截图 + 空�
 node tools/verify_nav.js   http://localhost:8501            # 顶栏与首页卡片跳转联动
 node tools/verify_sliders.js http://localhost:8501 _shots   # 滑条：真拖一次 + 值回传校验
 node tools/verify_dashboard_layout.js http://localhost:8501 _shots  # 首页方块重叠与间距
+node tools/verify_obd_tab.js http://localhost:8501 _shots   # OBD+GPS tab：切页 + 文案 + 图表数
 ```
 
 需要复算底层结果表时，先把原始附件放入 `data/raw/`，再运行：

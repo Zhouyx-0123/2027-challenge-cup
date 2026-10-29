@@ -500,6 +500,84 @@ def is_mock() -> bool:
     return (PROCESSED / "_mock.flag").exists() and source_name() != "real"
 
 
+# ---------------- OBD + GPS 实测碳排（docs/52，独立轨道） ----------------
+# 纪律：只读不算。本层只从 data/processed/ 读由 `python -m src.obd_pipeline`
+# 预计算的结果表；**不 import src.obd_gps 的算法**，不在页面里做守恒法。
+# 该轨道**不进 E₀ 主口径、不参与主闸门对拍**（口径冻结，见 docs/52 §2）。
+#
+# 缓存策略：这一层带 **30 s TTL**，不像主表那样永久缓存 —— 实测通道是活的，
+# 设备持续上报 → 重跑流水线 → 页面应当自己跟上，不该要求重启应用。
+# 主表的永久缓存保持原样（口径冻结，不动既有行为）。
+
+OBD_CACHE_TTL = 30
+
+
+@st.cache_data(show_spinner=False, ttl=OBD_CACHE_TTL)
+def _read_obd_points() -> pd.DataFrame:
+    """逐点工况 + 碳排表 obd_points.parquet（一次读入，页面按车切片）。"""
+    return _read_parquet(RESULT_FILES["obd_points"])
+
+
+@st.cache_data(show_spinner=False, ttl=OBD_CACHE_TTL)
+def _read_obd_vehicles() -> pd.DataFrame:
+    """车级碳排聚合表。"""
+    return _read_parquet(RESULT_FILES["obd_vehicle_carbon"])
+
+
+@st.cache_data(show_spinner=False, ttl=OBD_CACHE_TTL)
+def _read_obd_trips() -> pd.DataFrame:
+    """行程级聚合表。"""
+    return _read_parquet(RESULT_FILES["obd_trips"])
+
+
+@st.cache_data(show_spinner=False, ttl=OBD_CACHE_TTL)
+def _read_obd_summary() -> Dict[str, Any]:
+    """实测碳排汇总（来源、条数、因子、数据质量）。"""
+    return _read_json(RESULT_FILES["obd_summary"])
+
+
+def obd_summary() -> Dict[str, Any]:
+    """实测碳排汇总 obd_summary.json（来源、条数、因子、数据质量）。缺失返回 {}。"""
+    return _read_obd_summary()
+
+
+def obd_vehicles() -> pd.DataFrame:
+    """车级碳排聚合表 obd_vehicle_carbon.parquet。**每台车（每台发动机）的碳排放**。"""
+    return _read_obd_vehicles()
+
+
+def obd_trips() -> pd.DataFrame:
+    """行程级聚合表 obd_trips.parquet。缺失返回空表。"""
+    return _read_obd_trips()
+
+
+def obd_points(vehicle_id: str = "", limit: int = 4000) -> pd.DataFrame:
+    """逐点表（可选按车过滤、按时间倒序截断）。
+
+    只做筛选与截断，不做任何换算与计算。
+    """
+    frame = _read_obd_points()
+    if frame.empty:
+        return frame
+    if vehicle_id:
+        frame = frame[frame["vehicle_id"].astype(str) == str(vehicle_id)]
+    if "ts" in frame.columns:
+        frame = frame.sort_values("ts")
+    if limit and len(frame) > limit:
+        frame = frame.tail(limit)
+    return frame.reset_index(drop=True)
+
+
+def obd_available() -> bool:
+    """实测碳排通道是否就绪（车级表非空即可）。"""
+    return not obd_vehicles().empty
+
+
+def obd_is_demo() -> bool:
+    """当前结果表是不是演示数据（前端据此显式标注，不冒充真实读数）。"""
+    return bool((obd_summary() or {}).get("is_demo"))
+
+
 # ---------------- 汇总指标 ----------------
 
 @st.cache_data(show_spinner=False)

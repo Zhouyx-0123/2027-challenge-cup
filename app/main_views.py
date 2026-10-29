@@ -9,7 +9,7 @@ import streamlit as st
 
 import live_services
 import services
-from components import dashboard_home, flags, route_sandbox, slider_kit, theme
+from components import dashboard_home, flags, obd_panel, route_sandbox, slider_kit, theme
 from demo_state import carbon_snapshot, fallback_disclosure
 
 
@@ -144,6 +144,16 @@ def render_sensor() -> None:
         "云边端硬件监控",
         "ESP32 → Flask → sensor_data.csv → Streamlit；超标事件同步财务状态。",
         kicker="02 / EDGE MONITOR", badges=["2 秒刷新", "CO2 > 1000 ppm", "黄框预警"])
+    # 两条数据通道：① CO₂ 环境浓度（原有 ESP32 链路）② OBD+GPS 实测油耗（工科测量方向）。
+    # 两者口径完全不同，所以分 tab 呈现，绝不混在一张图里。
+    tab_co2, tab_obd = st.tabs(["🌫️ CO₂ 环境浓度", "🚘 OBD+GPS 实测碳排"])
+    with tab_co2:
+        _render_sensor_co2()
+    with tab_obd:
+        obd_panel.render_obd_panel()
+
+
+def _render_sensor_co2() -> None:
     st.caption("实时演示通道：传感器读数与预警成本只驱动当前会话，不回写 E₀ 或结果表。")
     lab_col, side_col = st.columns([2.1, 1], gap="large")
     with lab_col:

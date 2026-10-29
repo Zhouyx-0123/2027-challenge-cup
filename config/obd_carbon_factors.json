@@ -1,0 +1,48 @@
+{
+  "version": "obd-carbon-factors-v1",
+  "updated": "2026-10-29",
+  "owner": "周嬴鑫（PM 统一维护）；修改需在群里说明并 bump version",
+  "notes": "OBD 实测油耗轨的**守恒法基础物理量**。与 config/calc_factors.json 分工明确：calc_factors.json 是权威 CO₂/L 因子（出账口径，唯一真源）；本文件只放推导守恒所需的元素组成与密度，以及由它们推出的**校验值**。两处不重复维护同一个 CO₂/L 数值。",
+  "method": {
+    "name": "燃料守恒法（碳平衡）",
+    "formula": "CO₂(kg) = V(L) × ρ(kg/L) × w_C(质量含碳率) × (M_CO₂ / M_C)",
+    "molar_ratio": "44.01 / 12.011 ≈ 3.6640",
+    "why": "老师口径：柴油/汽油每升燃料的碳含量很稳定，消耗一升油排多少 CO₂ 有确定系数，波动很小。所以「测油耗 → 乘系数 → 得碳」成立，且不需要测尾气流量。",
+    "authority": "**出账用 config/calc_factors.json 的 co2_factors（如 diesel_ttw_kg_per_l）**；本文件的 derived_kg_co2_per_l 只用于对拍校验（factor_consistency_pct）。"
+  },
+  "fuels": {
+    "diesel": {
+      "label": "柴油",
+      "density_kg_per_l": 0.835,
+      "carbon_mass_fraction": 0.865,
+      "derived_kg_co2_per_l": 2.6465,
+      "derived_source": "由本文件的 density × carbon_mass_fraction × molar_ratio 推出",
+      "note": "密度取轻柴油常温值；含碳率 86.5% 为柴油典型元素组成。与权威因子 2.63 kgCO₂/L 的差值来自参考条件不同（推导用元素组成，权威因子用 GB/T 2589 标准燃料），在 3% 容差内视为一致。"
+    },
+    "gasoline": {
+      "label": "汽油",
+      "density_kg_per_l": 0.74,
+      "carbon_mass_fraction": 0.852,
+      "derived_kg_co2_per_l": 2.3097,
+      "derived_source": "由本文件的 density × carbon_mass_fraction × molar_ratio 推出",
+      "note": "含碳率 85.2% 为汽油典型元素组成，与权威因子 2.31 kgCO₂/L 基本吻合。"
+    },
+    "lpg": {
+      "label": "液化石油气",
+      "density_kg_per_l": 0.53,
+      "carbon_mass_fraction": 0.825,
+      "derived_kg_co2_per_l": 1.6023,
+      "derived_source": "由本文件的 density × carbon_mass_fraction × molar_ratio 推出",
+      "note": "LPG 口径需按质量换算成等效柴油/汽油当量后再比较，暂不走本通道出账。"
+    }
+  },
+  "fallback": {
+    "fuel_type_default": "diesel",
+    "_label": "设备未上报 fuel_type 时按柴油默认，并置 qc 标记 fuel_type_default。",
+    "factor_tolerance_pct": 3.0,
+    "_tolerance_label": "守恒推导值与权威因子的允许偏差（%）。超过则判 factor_mismatch，该车碳账需人工复核。"
+  },
+  "electric": {
+    "note": "**纯电车不走本通道**。电车没有燃料消耗，碳排来自电网因子（calc_factors.json 的 grid_wtw_kg_per_kwh），需要电表/电池 SOC 数据，是另一条通道。设备上报 fuel_type=electric 时本通道不做碳排，只保留轨迹与里程。"
+  }
+}

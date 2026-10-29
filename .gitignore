@@ -73,6 +73,12 @@ data/processed/*
 !data/processed/composition.json
 # O6 方案 × 线路约束表（第 3 页逐线结论的取数来源）
 !data/processed/scenario_route_constraint.parquet
+# OBD+GPS 实测碳排轨（docs/52）：独立轨道，结果表可复现故入库；
+# 原始流留在 data/raw/ 下（已由上面的规则挡住，不入库）
+!data/processed/obd_points.parquet
+!data/processed/obd_vehicle_carbon.parquet
+!data/processed/obd_trips.parquet
+!data/processed/obd_summary.json
 data/processed/route_geo.parquet
 # 上海—北京 OSM 碳基线（docs/35 D2/D3）：非实时 · 固定因子 · 道路等级 proxy
 !data/processed/route_baseline_sh_bj_steps.parquet

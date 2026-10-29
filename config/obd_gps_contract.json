@@ -1,0 +1,230 @@
+{
+  "version": "obd-gps-contract-v1",
+  "updated": "2026-10-29",
+  "owner": "周嬴鑫（PM 统一维护）；设备侧由工科同学（OBD 采集盒 + GPS 模块）实现上报端",
+  "notes": "车载 OBD（发动机/动力总成）+ GPS 的数据接口契约。设备端与后端共用这一份，避免两边各写一套。与 config/telemetry_contract.json 同构：契约在前，内核在后。",
+  "scope": {
+    "what_this_is": "车载终端上报的**连续工况流**（OBD 发动机数据 + GPS 位置数据）的字段契约与落盘位置。",
+    "what_this_is_not": "不是 CO₂ 浓度测量。本通道**不测尾气、不测流量**，只测**燃烧了多少油**；碳排由守恒法从油耗推出来。",
+    "why_it_matters": "项目原有两条线都是**间接算碳**（发票油量是财务凭证、VSP 是模型拟合），缺一个可信的实测锚点。本通道提供**实时实测油耗**，是老师所说「先算碳，每台车（每台发动机）的碳排放」的落点，也是把 VSP 估算从「信」变成「可校验」的前提。",
+    "hard_requirement": "**必须有油耗字段**。本通道的碳排完全由油耗守恒推出，没有油耗就没有碳。瞬时油耗（instant_fuel_lph）与累计油耗（total_fuel_l）至少要有一个；两者都有时优先用累计油耗差分。",
+    "measurement_principle": "老师口径：柴油/汽油每升燃料的碳含量很稳定，**消耗一升油排多少 CO₂ 有确定系数**，波动很小。所以「测油耗 → 乘系数 → 得碳」是成立的工程路径；不需要去测尾气流量。"
+  },
+  "field_contract": {
+    "required": "缺任意一条**必填**字段即判定该条读数不可用（进 rejects 表并记 qc 标记），不是丢弃也不是默默填 0。",
+    "units": "字段名后缀即单位，不可省略、不可换算后混用。",
+    "time": "ts 必须是带时区偏移的 ISO8601（例 2026-10-29T10:12:33+08:00）。裸时间戳（无偏移）视为无效。",
+    "float_format": "小数点分隔，不带千分位逗号；空值写 null，不写 0、不写 NaN。",
+    "null_handling": "读不到的字段写 null 并置对应 qc 标记；**禁止用 0 冒充缺失**（0 是有物理含义的值：怠速油耗、停止、液位空）。",
+    "alias_policy": "设备侧字段名不统一时，用本契约的 aliases 列表映射到规范名；后端优先按规范名取，认不出就走别名表，再认不出就当缺字段。"
+  },
+  "fields": {
+    "ts": {
+      "type": "string(ISO8601+tz)", "required": true,
+      "desc": "采样时刻（带时区偏移）。设备须做 NTP 对时；对时失败置 qc 标志 clock_drift。",
+      "example": "2026-10-29T10:12:33+08:00"
+    },
+    "vehicle_id": {
+      "type": "string", "required": true,
+      "desc": "车辆唯一标识，全局唯一。建议「车牌脱敏码-设备序号」这种稳定 ID，如 TRK-GZ-001。",
+      "example": "TRK-GZ-001"
+    },
+    "plate": {
+      "type": "string", "required": false,
+      "desc": "车牌。**可选**。属可识别业务信息，台账与报告里须脱敏（docs/42 §8）。",
+      "example": "苏US3126"
+    },
+    "instant_fuel_lph": {
+      "type": "number >= 0", "required": false,
+      "desc": "瞬时油耗，单位 L/h。守恒法的**主输入**：区间油耗 = 本值 × Δt。与 total_fuel_l 二选一必填其一；两者都有时优先用 total_fuel_l 差分（仪表累计更稳）。",
+      "example": 18.4
+    },
+    "total_fuel_l": {
+      "type": "number >= 0", "required": false,
+      "desc": "累计油耗，单位 L（仪表/ECU 累计示数，只增不减）。与 instant_fuel_lph 二选一必填其一；两者都有时优先用本字段差分。",
+      "example": 18422.6
+    },
+    "fuel_type": {
+      "type": "string", "required": false,
+      "desc": "燃料类型：diesel / gasoline / lpg / cng / electric / hybrid。**决定用哪个 CO₂/L 因子**，缺省按 diesel 处理并在 qc 标记 fuel_type_default。",
+      "example": "diesel"
+    },
+    "engine_rpm": {
+      "type": "number >= 0", "required": false,
+      "desc": "发动机转速（rpm）。工况判别（怠速/巡航/加速）与排放率分档的辅助量。",
+      "example": 1450
+    },
+    "vehicle_speed_kmh": {
+      "type": "number >= 0", "required": false,
+      "desc": "车速（km/h）。与 gps_speed_kmh 互为旁证：两者偏差大时置 qc 标志 speed_mismatch。",
+      "example": 62.5
+    },
+    "throttle_pos_pct": {
+      "type": "number 0..100", "required": false,
+      "desc": "节气门开度（%）。工况识别辅助量。",
+      "example": 32.0
+    },
+    "engine_load_pct": {
+      "type": "number 0..100", "required": false,
+      "desc": "发动机负荷（%）。工况识别与油耗合理性校验辅助量。",
+      "example": 48.0
+    },
+    "fuel_level_pct": {
+      "type": "number 0..100", "required": false,
+      "desc": "燃油液位（%）。仅作数据合理性旁证，**不用于算碳**（液位受油箱形状与温度影响大）。",
+      "example": 78.0
+    },
+    "engine_temp_c": {
+      "type": "number -60..250", "required": false,
+      "desc": "发动机冷却液温度（°C）。暖机前油耗偏高，冷态读数建议单独标记。",
+      "example": 88.5
+    },
+    "intake_press_kpa": {
+      "type": "number 0..300", "required": false,
+      "desc": "进气歧管压力（kPa，CAN 绝对压力）。工况识别辅助量。",
+      "example": 42.0
+    },
+    "atm_press_kpa": {
+      "type": "number 0..200", "required": false,
+      "desc": "大气压力（kPa）。与海拔相关，可与 GPS 高程互校。",
+      "example": 101.3
+    },
+    "odo_km": {
+      "type": "number >= 0", "required": false,
+      "desc": "总里程（km）。**里程的最优来源**：有它就不用 GPS 积分算里程，精度高得多。",
+      "example": 128430.5
+    },
+    "lat": {
+      "type": "number -90..90", "required": false,
+      "desc": "纬度（WGS-84 十进制度）。GPS 位置与轨迹的基础。缺失时轨迹区块不渲染。",
+      "example": 31.230416
+    },
+    "lng": {
+      "type": "number -180..180", "required": false,
+      "desc": "经度（WGS-84 十进制度）。",
+      "example": 121.473701
+    },
+    "gps_speed_kmh": {
+      "type": "number >= 0", "required": false,
+      "desc": "GPS 速度（km/h）。与 OBD 车速互为旁证。",
+      "example": 61.8
+    },
+    "heading_deg": {
+      "type": "number 0..360", "required": false,
+      "desc": "航向角（度，正北为 0，顺时针）。",
+      "example": 73.0
+    },
+    "altitude_m": {
+      "type": "number", "required": false,
+      "desc": "海拔（m）。",
+      "example": 18.0
+    },
+    "satellites": {
+      "type": "integer >= 0", "required": false,
+      "desc": "定位卫星数。<4 时定位质量差，置 qc 标志 gps_weak。",
+      "example": 11
+    },
+    "fix_quality": {
+      "type": "integer 0..2", "required": false,
+      "desc": "GPS 定位质量：0=无定位，1=单点，2=差分/RTK。0 时该点的位置不可用。",
+      "example": 1
+    },
+    "load_kg": {
+      "type": "number >= 0", "required": false,
+      "desc": "该时刻载重（kg）。**有它才能算 gCO₂/t·km**（老师口径：视角要放到货物上）。车载 OBD 一般给不了，可由运单/地磅数据按时间段回填。",
+      "example": 18000
+    },
+    "ignition": {
+      "type": "boolean", "required": false,
+      "desc": "点火开关状态。false 的时段不计入油耗累计（避免熄火驻车被算成燃烧）。",
+      "example": true
+    },
+    "fault_codes": {
+      "type": "string", "required": false,
+      "desc": "ECU 故障码（多个用逗号分隔）。非空时该车数据标记 needs_review。",
+      "example": ""
+    },
+    "qc_flags": {
+      "type": "array<string>", "required": false,
+      "desc": "质控标记位，见 qc_flags 定义。空数组表示本条数据有效。",
+      "example": ["clock_drift"]
+    }
+  },
+  "aliases": {
+    "_note": "设备侧常见字段名 → 规范名。比对时统一转小写、去空格与下划线后匹配。",
+    "vehicle_id": ["vehicleid", "carid", "car_id", "veh_id", "device_id", "vin", "车辆编号", "车辆id"],
+    "ts": ["timestamp", "time", "datetime", "gps_time", "采集时间", "时间戳"],
+    "plate": ["plate_no", "license_plate", "车牌", "车牌号"],
+    "instant_fuel_lph": ["instant_fuel", "fuel_rate", "fuel_flow", "lph", "instantfuelrate", "瞬时油耗", "瞬时油耗率"],
+    "total_fuel_l": ["total_fuel", "fuel_total", "cumulative_fuel", "fuel_used", "odo_fuel", "累计油耗", "总油耗"],
+    "fuel_type": ["fueltype", "fuel", "燃料类型", "燃油类型"],
+    "engine_rpm": ["rpm", "engine_speed", "enginespeed", "engine_rpm", "转速", "发动机转速"],
+    "vehicle_speed_kmh": ["speed", "speed_kmh", "veh_speed", "vehiclespeed", "spd", "车速", "行驶速度"],
+    "throttle_pos_pct": ["throttle", "throttle_pos", "throttleposition", "节气门开度", "节气门位置"],
+    "engine_load_pct": ["engine_load", "load_pct", "calculated_engine_load", "发动机负荷"],
+    "fuel_level_pct": ["fuel_level", "fuellevel", "fuel_frac", "燃油液位", "油量"],
+    "engine_temp_c": ["coolant_temp", "ect", "engine_temp", "temp_c", "水温", "发动机温度"],
+    "intake_press_kpa": ["map", "intake_press", "manifold_pressure", "进气压力"],
+    "atm_press_kpa": ["baro", "barometer", "atm_pressure", "大气压力"],
+    "odo_km": ["odo", "odometer", "total_mileage", "mileage", "总里程", "里程表"],
+    "lat": ["latitude", "gps_lat", "纬度"],
+    "lng": ["lon", "longitude", "gps_lng", "gps_lon", "经度"],
+    "gps_speed_kmh": ["gps_speed", "gpgspeed", "speed_over_ground", "gps车速"],
+    "heading_deg": ["heading", "course", "bearing", "azimuth", "航向", "航向角"],
+    "altitude_m": ["alt", "altitude", "elevation", "海拔", "海拔高度"],
+    "satellites": ["sat", "sats", "num_satellites", "nsats", "卫星数"],
+    "fix_quality": ["fix", "gps_fix", "quality", "定位质量"],
+    "load_kg": ["payload", "payload_kg", "cargo_weight", "载重", "货物重量"],
+    "ignition": ["ignition_on", "engine_on", "点火", "点火状态"],
+    "fault_codes": ["dtc", "dtc_codes", "fault", "故障码"]
+  },
+  "qc_flags": {
+    "clock_drift": "设备时钟未对时或漂移",
+    "gps_weak": "卫星数不足或定位质量为 0，位置不可用",
+    "speed_mismatch": "OBD 车速与 GPS 速度偏差超阈值",
+    "fuel_type_default": "未上报燃料类型，按柴油默认处理",
+    "fuel_source_switch": "油耗来源在瞬时/累计之间切换，该点做了来源切换标记",
+    "fuel_negative": "累计油耗出现回退（仪表复位或换表）",
+    "odometer_reset": "总里程出现回退（换表或数据错位）",
+    "ecu_fault": "ECU 上报了故障码",
+    "engine_cold": "发动机冷却液温度低于暖机阈值，读数受冷态影响",
+    "impossible_fuel": "瞬时油耗超出该燃料的物理上限",
+    "duplicate": "与上一条读数重复",
+    "gap_fill": "前序时间戳缺失，本条按缺样补位",
+    "speed_reset": "车速在相邻两点间跳变超物理阈值"
+  },
+  "delivery": {
+    "primary": {
+      "mode": "http_post",
+      "desc": "**首选**。车载终端有稳定网络时直传。接收端只做「鉴权 → 校验 → 落盘」，**不做业务计算**。",
+      "endpoint": "POST /api/upload_obd_gps",
+      "content_type": "application/json; charset=utf-8",
+      "body": "单条记录对象，或 {\"records\": [ ... ]} 批量",
+      "auth": "X-Device-Token 头 + 设备注册表（沿用 server.py 的 device_auth，默认 fail-closed）"
+    },
+    "secondary": {
+      "mode": "file_drop",
+      "desc": "无网络时回传。终端把当批读数写成 CSV，落到共享目录（网盘 / 局域网共享 / SD 卡回传）。",
+      "path_pattern": "data/raw/obd_gps/obd_stream.csv",
+      "encoding": "UTF-8（带 BOM 亦可）",
+      "header": "必须含表头行，列名用本契约的字段名或 aliases 里的任一别名；多批追加时表头只写一次"
+    },
+    "reserved": {
+      "mode": "mqtt",
+      "desc": "预留。topic 建议 obd/{vehicle_id}/telemetry，payload 与 HTTP body 同构。设备端选型确定后再启用。",
+      "topic_pattern": "obd/{vehicle_id}/telemetry",
+      "qos": 1,
+      "retain": false
+    }
+  },
+  "backend_landing": {
+    "read_point": "src/obd_gps.py（契约校验、归一、守恒法算碳、分车聚合，纯函数，可单测）",
+    "pipeline": "src/obd_pipeline.py（原始流 → 车级碳排结果表，独立于主 pipeline，不动闸门）",
+    "cli": "python -m src.obd_pipeline",
+    "raw_dir": "data/raw/obd_gps/",
+    "processed_hook": "结果表写入 data/processed/；**不改 src/pipeline.py 的闸门口径**，主链路的 28 条判据保持不变。",
+    "gate": "本通道**不参与**主闸门对拍。实测碳轨与 VSP 估算轨的交叉验证是下一阶段（见 docs/52 §7），本轮只算实测碳。",
+    "privacy": "plate 在结果表与报告中须脱敏（docs/42 §8）；data/raw/ 与 outputs/ 已在 .gitignore 内。",
+    "no_fake_factors": "**CO₂/L 因子只从 config/calc_factors.json 读取**（唯一真源），本契约不含任何自造因子；守恒推导值仅用于对拍校验，不作为出账口径。"
+  }
+}

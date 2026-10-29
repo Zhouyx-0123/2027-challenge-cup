@@ -66,6 +66,11 @@ RESULT_FILES: Dict[str, str] = {
     "vsp_audit": "vsp_audit.json",
     "vsp_physical_trips": "vsp_physical_trips.parquet",
     "vsp_vehicle_groups": "vsp_vehicle_groups.parquet",
+    # OBD+GPS 实测碳排轨（docs/52）：**独立轨道**，不进 E₀ 主口径、不参与主闸门
+    "obd_points": "obd_points.parquet",
+    "obd_vehicle_carbon": "obd_vehicle_carbon.parquet",
+    "obd_trips": "obd_trips.parquet",
+    "obd_summary": "obd_summary.json",
 }
 
 # --------------------------------------------------------------------------

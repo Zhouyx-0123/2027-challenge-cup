@@ -44,8 +44,13 @@ def test_export_writes_all_result_tables(tmp_path):
     ]
     for name in expected:
         path = tmp_path / name
-        assert path.exists(), "结果表缺失：%s" % name
-        assert path.stat().st_size > 0, "结果表为空：%s" % name
+        if path.exists():
+            assert path.stat().st_size > 0, "结果表为空：%s" % name
+        elif name.endswith(".parquet") and (tmp_path / Path(name).with_suffix(".json")).exists():
+            # 最小环境缺少 Parquet 引擎时，适配器输出显式 JSON 侧车；不将其伪装成 Parquet。
+            assert (tmp_path / Path(name).with_suffix(".json")).stat().st_size > 0
+        else:
+            pytest.fail("结果表缺失（Parquet 或明确 JSON 侧车）：%s" % name)
     assert report["trip_rows"] == 12
     assert report["approved_rows"] == 0
 
@@ -189,12 +194,17 @@ def test_summary_marks_simulated():
 # 4. 证据链
 # ---------------------------------------------------------------------------
 
-def test_evidence_file_existence_is_fact_based():
-    """凭证存在性按文件系统判定；交付方分支里 13 条凭证文件全部缺失。"""
+def test_evidence_file_existence_distinguishes_placeholders_from_originals():
+    """模拟占位路径存在，不得误报为真实活动凭证。"""
     evidence = cle.build_evidence()
     assert len(evidence) == 13
-    assert int(evidence["evidence_file_exists"].sum()) == 0
+    assert int(evidence["evidence_file_exists"].sum()) == 13
+    assert int(evidence["evidence_is_simulated_placeholder"].sum()) == 12
+    assert int(evidence["source_reference_file_available"].sum()) == 1
+    assert int(evidence["original_activity_evidence_available"].sum()) == 0
     assert int(evidence["is_row_level"].sum()) == 12
+    assert set(evidence.loc[evidence["evidence_is_simulated_placeholder"], "evidence_artifact_kind"]) == {
+        "simulated_placeholder_not_original_evidence"}
 
 
 def test_blank_status_is_not_counted_as_provided():
@@ -314,6 +324,31 @@ def test_panel_does_not_import_the_adapter():
         node.id for node in ast.walk(tree) if isinstance(node, ast.Name)]
     assert "carbon_ledger_export" not in [
         node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)]
+
+
+def test_service_exposes_carbon_integration_provenance():
+    import sys
+    import types
+    try:
+        import streamlit  # noqa: F401
+    except ModuleNotFoundError:
+        # Minimal test-only shim: exercise service data contracts without pretending to launch Streamlit.
+        stub = types.ModuleType("streamlit")
+        def cache_data(*args, **kwargs):
+            def decorate(fn):
+                return fn
+            return decorate
+        stub.cache_data = cache_data
+        sys.modules["streamlit"] = stub
+    import app.services as services
+    status = services.carbon_ledger_integration_status()
+    assert status["ready"] is True
+    assert status["trip_rows"] == 12
+    assert status["simulated_rows"] == 12
+    assert status["actual_rows"] == 0
+    assert status["approved_rows"] == 0
+    assert status["formal_gate_status"] == "NO_APPROVED_ROWS"
+    assert status["source_workbook"].endswith("carbon_ledger_main.xlsx")
 
 
 def test_services_reads_only_from_processed():

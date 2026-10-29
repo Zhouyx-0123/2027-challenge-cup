@@ -1,0 +1,156 @@
+{
+  "package_root": "/mnt/data/carbon_integration_workspace/carbon_integration_delivery/project/2027-challenge-cup-main/carbon_ledger",
+  "test_suite": "improved_multi_scenario_v4_pressure_test",
+  "tests": [
+    {
+      "test": "R1-01 expanded synthetic dataset completeness",
+      "status": "PASS",
+      "detail": "rows=12; missing=[]"
+    },
+    {
+      "test": "R1-02 unique ledger/activity/trip keys",
+      "status": "PASS",
+      "detail": "ledger=12, unique=12; activities=12; trips=12"
+    },
+    {
+      "test": "R1-03 unit checks and proxy-only labels",
+      "status": "PASS",
+      "detail": "errors=[]"
+    },
+    {
+      "test": "R1-04 independent emission arithmetic",
+      "status": "PASS",
+      "detail": "synthetic_total_tCO2e=2.439298000000; errors=[]"
+    },
+    {
+      "test": "R1-05 ledger/CVS unique-sum reconciliation",
+      "status": "PASS",
+      "detail": "ledger_rows=12; CSV_total=2.439298000000; ledger_total=2.439298000000"
+    },
+    {
+      "test": "R1-06 month/year summary reconciliation",
+      "status": "PASS",
+      "detail": "months_checked=['2026-10', '2026-11', '2026-12']; month_errors=[]; annual_total=2.4392980000000004"
+    },
+    {
+      "test": "R1-07 evidence chain and placeholder file links",
+      "status": "PASS",
+      "detail": "records=12; errors=[]"
+    },
+    {
+      "test": "R1-08 multi-waybill allocation control",
+      "status": "PASS",
+      "detail": "waybill_mapping_rows=13; grouped_trip_checks=12; errors=[]"
+    },
+    {
+      "test": "R1-09 excluded four-vehicle sample guard",
+      "status": "PASS",
+      "detail": "历史四车偏差未复制、未计算、未进入主账或汇总"
+    },
+    {
+      "test": "R1-10 15-case feasibility suite",
+      "status": "PASS",
+      "detail": "cases=15; pass_cases=11; blocked_cases=4; errors=[]"
+    },
+    {
+      "test": "R1-11 main-ledger exception controls and formal gate",
+      "status": "PASS",
+      "detail": "12 simulated rows pass structural checks only; all blocked from formal use; errors=[]"
+    },
+    {
+      "test": "R1-12 quota-ledger formula reconciliation",
+      "status": "PASS",
+      "detail": "used=2.439298; available=1.2; closing=0; shortfall=1.239298; simulated/not-approved only"
+    },
+    {
+      "test": "R2-01 repeated calculation deterministic",
+      "status": "PASS",
+      "detail": "run1=2.439298000000; run2=2.439298000000"
+    },
+    {
+      "test": "R2-02 source-data/control total reproducible",
+      "status": "PASS",
+      "detail": "csv=2.439298000000; ledger=2.439298000000"
+    },
+    {
+      "test": "R3-01 Excel workbook package integrity",
+      "status": "PASS",
+      "detail": "xlsx_count=10; corrupt=[]"
+    },
+    {
+      "test": "R3-02 required workbooks and sheets",
+      "status": "PASS",
+      "detail": "errors=[]"
+    },
+    {
+      "test": "R3-03 formula presence",
+      "status": "PASS",
+      "detail": "errors=[]"
+    },
+    {
+      "test": "R3-04 formula error token scan",
+      "status": "PASS",
+      "detail": "errors=[]"
+    },
+    {
+      "test": "R3-05 factor source register link",
+      "status": "PASS",
+      "detail": "all 12 factors refer to SRC-004 row 5 as proxy; not confirmed formal factor"
+    },
+    {
+      "test": "R4-01 19-case pressure-test formulas versus expected",
+      "status": "PASS",
+      "detail": "cases=19; failed=[]"
+    },
+    {
+      "test": "R4-02 unsupported-unit whitelist blocks m³",
+      "status": "PASS",
+      "detail": "validation=BLOCK_UNSUPPORTED_UNIT; gate=EXCLUDED_NOT_FORMALLY_APPROVED"
+    },
+    {
+      "test": "R4-03 physical duplicate trip/source/fingerprint controls",
+      "status": "PASS",
+      "detail": "pressure duplicate cases=['BLOCK_POSSIBLE_PHYSICAL_DUPLICATE', 'BLOCK_POSSIBLE_PHYSICAL_DUPLICATE', 'BLOCK_POSSIBLE_PHYSICAL_DUPLICATE']; main controls={'PASS_UNIQUE_PHYSICAL_TRIP'}"
+    },
+    {
+      "test": "R4-04 formal summaries exclude simulated/unapproved main rows",
+      "status": "PASS",
+      "detail": "monthly=[('2026-10', '0', 'NO_APPROVED_ROWS'), ('2026-11', '0', 'NO_APPROVED_ROWS'), ('2026-12', '0', 'NO_APPROVED_ROWS')]; annual=[('2026', '0', 'NO_APPROVED_ROWS')]"
+    },
+    {
+      "test": "R4-05 test totals labeled non-formal",
+      "status": "PASS",
+      "detail": "existing month/year totals explicitly identify themselves as simulated test summaries"
+    },
+    {
+      "test": "R4-06 control register documents new rules",
+      "status": "PASS",
+      "detail": "new rule IDs present: ['CTRL-11', 'CTRL-12', 'CTRL-13', 'CTRL-14']"
+    },
+    {
+      "test": "R4-07 formula logic includes whitelist, physical fingerprint and approval gate",
+      "status": "PASS",
+      "detail": "AJ checks supported units; AN checks physical-trip candidates; AP requires human approval status"
+    },
+    {
+      "test": "R4-08 missing physical identity blocks the record",
+      "status": "PASS",
+      "detail": "vehicle field missing; validation=BLOCK_MISSING_REQUIRED; gate=EXCLUDED_NOT_FORMALLY_APPROVED"
+    }
+  ],
+  "passed": 27,
+  "failed": 0,
+  "simulated_main_ledger_rows": 12,
+  "simulated_total_tCO2e": 2.439298,
+  "scenario_cases": 15,
+  "scenario_pass_cases": 11,
+  "scenario_blocked_cases": 4,
+  "pressure_test_cases": 19,
+  "pressure_test_pass_cases": 19,
+  "formal_emission_or_posting_claim": false,
+  "excluded_four_vehicle_deviation_examples": {
+    "calculated": false,
+    "included_in_ledger": false,
+    "average_computed": false
+  }
+}

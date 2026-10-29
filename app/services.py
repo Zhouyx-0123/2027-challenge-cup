@@ -65,19 +65,49 @@ def column_ok(df: pd.DataFrame, cols: List[str]) -> List[str]:
 
 @st.cache_data(show_spinner=False)
 def available() -> Dict[str, bool]:
-    return {k: (PROCESSED / f).exists() for k, f in RESULT_FILES.items()}
+    out: Dict[str, bool] = {}
+    for key, filename in RESULT_FILES.items():
+        path = PROCESSED / filename
+        sidecar = path.with_suffix(".json") if filename.endswith(".parquet") else None
+        out[key] = path.exists() or bool(sidecar and sidecar.exists() and key.startswith("carbon_ledger_"))
+    return out
 
 
 @st.cache_data(show_spinner=False)
 def _read_parquet(filename: str) -> pd.DataFrame:
     p = PROCESSED / filename
-    if not p.exists():
-        return pd.DataFrame()
-    try:
-        return pd.read_parquet(p)
-    except Exception:
-        # 没装 pyarrow 或文件损坏，都退化成空表；页面显示空状态而不是红屏
-        return pd.DataFrame()
+    sidecar = p.with_suffix(".json") if filename.startswith("carbon_ledger_") and filename.endswith(".parquet") else None
+    # 使用适配器显式写出的 manifest 决定结果格式，避免旧 Parquet 文件遮蔽新 JSON 侧车。
+    manifest_path = PROCESSED / "carbon_ledger_export_manifest.json"
+    manifest = {}
+    if sidecar and manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception:
+            manifest = {}
+    use_json_sidecar = bool(sidecar and sidecar.exists() and
+        manifest.get("output_formats", {}).get(filename) == "json_sidecar_no_parquet_engine")
+    if use_json_sidecar:
+        try:
+            payload = json.loads(sidecar.read_text(encoding="utf-8"))
+            if isinstance(payload, list):
+                return pd.DataFrame(payload)
+        except Exception:
+            return pd.DataFrame()
+    if p.exists():
+        try:
+            return pd.read_parquet(p)
+        except Exception:
+            pass
+    if sidecar and sidecar.exists():
+        try:
+            payload = json.loads(sidecar.read_text(encoding="utf-8"))
+            if isinstance(payload, list):
+                return pd.DataFrame(payload)
+        except Exception:
+            return pd.DataFrame()
+    # 其他表没有通用格式回退，缺失/损坏时返回空表。
+    return pd.DataFrame()
 
 
 @st.cache_data(show_spinner=False)
@@ -712,6 +742,26 @@ def carbon_ledger_rules() -> Dict[str, Any]:
 def carbon_ledger_available() -> bool:
     """碳账轨是否就绪（主账明细非空即可）。"""
     return not carbon_ledger_trips().empty
+
+
+def carbon_ledger_integration_status() -> Dict[str, Any]:
+    """面向前端的接入元数据：只读适配器产物，不执行核算或审批。"""
+    summary = carbon_ledger_summary()
+    if not summary:
+        return {"ready": False, "reason": "carbon_ledger_summary.json 缺失或不可读"}
+    formal = summary.get("formal") or {}
+    return {
+        "ready": bool(summary.get("trip_rows")),
+        "source_workbook": summary.get("ledger_file", ""),
+        "source_sha256_16": summary.get("ledger_sha256_16", ""),
+        "generated_at": summary.get("generated_at", ""),
+        "trip_rows": int(summary.get("trip_rows") or 0),
+        "simulated_rows": int(summary.get("simulated_rows") or 0),
+        "actual_rows": int(summary.get("actual_rows") or 0),
+        "approved_rows": int(formal.get("approved_row_count") or 0),
+        "formal_gate_status": formal.get("gate_status", ""),
+        "reason": "metadata from read-only adapter output",
+    }
 
 
 # ---------------- 汇总指标 ----------------

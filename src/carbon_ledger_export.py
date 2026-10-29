@@ -780,8 +780,12 @@ def _ledger_diesel_ef(trips: pd.DataFrame) -> Optional[float]:
 # 导出
 # ---------------------------------------------------------------------------
 
-def export(write: bool = True) -> Dict[str, Any]:
-    """跑一遍适配器，返回摘要 dict。"""
+def export(write: bool = True, out_dir: Optional[Path] = None) -> Dict[str, Any]:
+    """跑一遍适配器，返回摘要 dict。
+
+    ``out_dir`` 给了就写到别处（测试用临时目录），**避免测试把
+    ``data/processed/`` 里已入库的结果表改成脏工作树**。
+    """
     trips = build_trips()
     if trips.empty:
         raise RuntimeError("主账 Trip_Detail 读不到数据行：%s" % MAIN_LEDGER)
@@ -792,14 +796,15 @@ def export(write: bool = True) -> Dict[str, Any]:
     rules = build_rules()
     summary = build_summary(trips, gates)
 
+    base = Path(out_dir) if out_dir else PROCESSED
     outputs = {
-        TRIPS_PATH: trips,
-        EVIDENCE_PATH: evidence,
-        SUMMARY_PATH: summary,
-        GATES_PATH: gates,
-        QUOTA_PATH: quota,
-        READINESS_PATH: readiness,
-        RULES_PATH: rules,
+        base / schema.RESULT_FILES["carbon_ledger_trips"]: trips,
+        base / schema.RESULT_FILES["carbon_ledger_evidence"]: evidence,
+        base / schema.RESULT_FILES["carbon_ledger_summary"]: summary,
+        base / schema.RESULT_FILES["carbon_ledger_gates"]: gates,
+        base / schema.RESULT_FILES["carbon_ledger_quota"]: quota,
+        base / schema.RESULT_FILES["carbon_ledger_activity_readiness"]: readiness,
+        base / schema.RESULT_FILES["carbon_ledger_rules"]: rules,
     }
     if write:
         for path, payload in outputs.items():
@@ -811,6 +816,7 @@ def export(write: bool = True) -> Dict[str, Any]:
     return {
         "generated_at": _now(),
         "written": write,
+        "out_dir": str(base),
         "outputs": {path.name: (len(payload) if isinstance(payload, pd.DataFrame)
                                 else 1) for path, payload in outputs.items()},
         "trip_rows": int(len(trips)),

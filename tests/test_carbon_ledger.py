@@ -33,27 +33,43 @@ FIELD_MAP_PATH = ROOT / "config" / "carbon_ledger_field_map.json"
 # 1. 适配器
 # ---------------------------------------------------------------------------
 
-def test_export_writes_all_result_tables():
-    report = cle.export(write=True)
+def test_export_writes_all_result_tables(tmp_path):
+    """写到临时目录 —— 不去弄脏已入库的 data/processed/。"""
+    report = cle.export(write=True, out_dir=tmp_path)
     expected = [
-        cle.TRIPS_PATH, cle.EVIDENCE_PATH, cle.SUMMARY_PATH, cle.GATES_PATH,
-        cle.QUOTA_PATH, cle.READINESS_PATH, cle.RULES_PATH,
+        "carbon_ledger_trips.parquet", "carbon_ledger_evidence.parquet",
+        "carbon_ledger_summary.json", "carbon_ledger_gates.json",
+        "carbon_ledger_quota.json", "carbon_ledger_activity_readiness.json",
+        "carbon_ledger_rules.json",
     ]
-    for path in expected:
-        assert path.exists(), "结果表缺失：%s" % path.name
-        assert path.stat().st_size > 0, "结果表为空：%s" % path.name
+    for name in expected:
+        path = tmp_path / name
+        assert path.exists(), "结果表缺失：%s" % name
+        assert path.stat().st_size > 0, "结果表为空：%s" % name
     assert report["trip_rows"] == 12
     assert report["approved_rows"] == 0
 
 
-def test_export_does_not_touch_delivery_files():
+def test_export_does_not_touch_delivery_files(tmp_path):
     """适配器只读交付物，绝不写回 carbon_ledger/。"""
     before = {path: path.stat().st_mtime for path in cle.LEDGER_DIR.rglob("*")
               if path.is_file()}
-    cle.export(write=True)
+    cle.export(write=True, out_dir=tmp_path)
     after = {path: path.stat().st_mtime for path in cle.LEDGER_DIR.rglob("*")
              if path.is_file()}
     assert before == after, "适配器改动了交付方文件"
+
+
+def test_export_does_not_dirty_committed_result_tables(tmp_path):
+    """跑测试不该让 data/processed/ 里已入库的结果表变成脏工作树。"""
+    tracked = [cle.PROCESSED / name for name in
+               ("carbon_ledger_summary.json", "carbon_ledger_gates.json",
+                "carbon_ledger_quota.json", "carbon_ledger_rules.json",
+                "carbon_ledger_activity_readiness.json")]
+    before = {path: path.stat().st_mtime for path in tracked if path.exists()}
+    cle.export(write=True, out_dir=tmp_path)
+    after = {path: path.stat().st_mtime for path in tracked if path.exists()}
+    assert before == after, "适配器写到了 data/processed/，测试会弄脏工作树"
 
 
 def test_adapter_does_not_recompute_emissions():

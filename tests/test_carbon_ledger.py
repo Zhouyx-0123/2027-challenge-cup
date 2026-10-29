@@ -195,16 +195,27 @@ def test_summary_marks_simulated():
 # ---------------------------------------------------------------------------
 
 def test_evidence_file_existence_distinguishes_placeholders_from_originals():
-    """模拟占位路径存在，不得误报为真实活动凭证。"""
+    """模拟占位路径存在，不得误报为真实活动凭证。
+
+    2026-10-29 更新：12 个占位凭证已随交付补入 ``carbon_ledger/a5_evidence/simulated_evidence/``；
+    第 13 条 ``SRC-EVD-SRC004`` 指向的 ``碳慧智算汇报.pptx`` 已随方向调整**作废删除**，
+    因此它必须被判为 ``missing_file`` —— 断言按**分类**写，不写死计数，
+    免得下次补件或再删件时又红。
+    """
     evidence = cle.build_evidence()
     assert len(evidence) == 13
-    assert int(evidence["evidence_file_exists"].sum()) == 13
-    assert int(evidence["evidence_is_simulated_placeholder"].sum()) == 12
-    assert int(evidence["source_reference_file_available"].sum()) == 1
+    placeholder = evidence[evidence["evidence_is_simulated_placeholder"]]
+    assert len(placeholder) == 12, "12 条行级凭证应为占位文件"
+    assert set(placeholder["evidence_artifact_kind"]) == {
+        "simulated_placeholder_not_original_evidence"}
+    # 已作废的 PPT 不再是可用来源文件
+    retired = evidence[evidence["Evidence_ID"] == "SRC-EVD-SRC004"]
+    assert not retired.empty
+    assert int(retired["evidence_file_exists"].sum()) == 0
+    assert set(retired["evidence_artifact_kind"]) == {"missing_file"}
+    # 占位文件**不得**被算成原始活动凭证
     assert int(evidence["original_activity_evidence_available"].sum()) == 0
     assert int(evidence["is_row_level"].sum()) == 12
-    assert set(evidence.loc[evidence["evidence_is_simulated_placeholder"], "evidence_artifact_kind"]) == {
-        "simulated_placeholder_not_original_evidence"}
 
 
 def test_blank_status_is_not_counted_as_provided():
@@ -340,7 +351,13 @@ def test_service_exposes_carbon_integration_provenance():
             return decorate
         stub.cache_data = cache_data
         sys.modules["streamlit"] = stub
-    import app.services as services
+    # `app/` 不是 Python 包（前端是 app/app.py 单入口，模块靠 sys.path 注入导入）。
+    # 用 `import app.services` 会在别的测试把 app.py 载入 sys.modules['app'] 之后炸掉
+    # （"'app' is not a package"），因此这里跟项目里其他前端测试用同一种导入方式。
+    app_dir = str(ROOT / "app")
+    if app_dir not in sys.path:
+        sys.path.insert(0, app_dir)
+    import services
     status = services.carbon_ledger_integration_status()
     assert status["ready"] is True
     assert status["trip_rows"] == 12

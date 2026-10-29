@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-29T15:31:28+00:00",
+  "generated_at": "2026-10-30T00:08:04+08:00",
   "output_formats": {
-    "carbon_ledger_trips.parquet": "json_sidecar_no_parquet_engine",
-    "carbon_ledger_evidence.parquet": "json_sidecar_no_parquet_engine",
+    "carbon_ledger_trips.parquet": "parquet_with_json_sidecar",
+    "carbon_ledger_evidence.parquet": "parquet_with_json_sidecar",
     "carbon_ledger_summary.json": "json",
     "carbon_ledger_gates.json": "json",
     "carbon_ledger_quota.json": "json",

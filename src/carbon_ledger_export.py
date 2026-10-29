@@ -238,42 +238,56 @@ def _has_parquet_engine() -> bool:
             return False
 
 
-def _save_parquet(frame: pd.DataFrame, path: Path, tries: int = 4) -> None:
-    """优先落 Parquet；缺少 pyarrow/fastparquet 时写同名 JSON 记录侧车。
+def _write_json_sidecar(frame: pd.DataFrame, path: Path) -> Path:
+    """写同名 JSON 侧车（人可读 + 无 Parquet 引擎时的只读回退）。"""
+    sidecar = path.with_suffix(".json")
+    rows = frame.astype(object).where(pd.notna(frame), None).to_dict(orient="records")
+    _save_json(rows, sidecar)
+    return sidecar
 
-    部署环境安装了项目 requirements 时仍输出契约指定的 Parquet 文件。
-    最小环境没有 Parquet 引擎时，JSON 侧车允许本地服务链路做只读验证；
+
+def _save_parquet(frame: pd.DataFrame, path: Path, tries: int = 4) -> None:
+    """落 Parquet **并恒定附带同名 JSON 侧车**；缺少 Parquet 引擎时只落侧车。
+
+    为什么要"恒定附带"：
+        原实现是"有引擎写 Parquet 并**删掉**侧车，无引擎只写侧车"。
+        这让**同一份代码在两种机器上产出不同的文件集** —— 谁最后跑一次，
+        仓库里就留谁的形态，另一形态被删。结果表因此"不可由仓库自身复现"。
+
+    现在的约定：
+        · 有引擎 → 写 ``*.parquet``（契约格式）+ **同时**写 ``*.json`` 侧车；
+        · 无引擎 → 只写 ``*.json`` 侧车，并**清掉**可能存在的过期 Parquet
+          （否则读取端会优先读到上一次的旧 Parquet）。
+        两种环境下 **JSON 侧车恒定存在**，读取端因此永远有一条稳定通路；
+        Parquet 是否存在由 manifest 的 ``output_formats`` 如实记录。
+
     不伪装成 Parquet，也不改变行、列、排放数值和 simulated 状态。
     """
     import time
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        import pyarrow  # noqa: F401
-        has_engine = True
-    except Exception:  # noqa: BLE001
-        try:
-            import fastparquet  # noqa: F401
-            has_engine = True
-        except Exception:  # noqa: BLE001
-            has_engine = False
-    if not has_engine:
-        fallback = path.with_suffix(".json")
-        rows = frame.astype(object).where(pd.notna(frame), None).to_dict(orient="records")
-        _save_json(rows, fallback)
-        return
-    last: Optional[Exception] = None
-    for attempt in range(tries):
-        try:
-            frame.to_parquet(path, index=False)
-            sidecar = path.with_suffix(".json")
-            if sidecar.exists():
-                sidecar.unlink()
-            return
-        except Exception as exc:  # noqa: BLE001
-            last = exc
-            time.sleep(0.4 * (attempt + 1))
-    # Parquet engine exists but actual write failed: fail loudly rather than silently fallback.
-    raise RuntimeError("写 parquet 失败 %s：%s" % (path.name, last))
+    has_engine = _has_parquet_engine()
+    if has_engine:
+        last: Optional[Exception] = None
+        for attempt in range(tries):
+            try:
+                frame.to_parquet(path, index=False)
+                last = None
+                break
+            except Exception as exc:  # noqa: BLE001
+                last = exc
+                time.sleep(0.4 * (attempt + 1))
+        # Parquet engine exists but actual write failed: fail loudly rather than silently fallback.
+        if last is not None:
+            raise RuntimeError("写 parquet 失败 %s：%s" % (path.name, last))
+    else:
+        # 没有引擎：清掉可能残留的旧 Parquet，避免读取端读到过期数据
+        if path.exists():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+    _write_json_sidecar(frame, path)
 
 
 def _save_json(payload: Any, path: Path) -> None:
@@ -897,10 +911,12 @@ def export(write: bool = True, out_dir: Optional[Path] = None) -> Dict[str, Any]
         base / schema.RESULT_FILES["carbon_ledger_activity_readiness"]: readiness,
         base / schema.RESULT_FILES["carbon_ledger_rules"]: rules,
     }
+    has_engine = _has_parquet_engine()
     output_formats = {
-        path.name: ("json_sidecar_no_parquet_engine" if isinstance(payload, pd.DataFrame)
-                    and not _has_parquet_engine() else ("parquet" if isinstance(payload, pd.DataFrame)
-                    else "json")) for path, payload in outputs.items()}
+        path.name: ("parquet_with_json_sidecar" if isinstance(payload, pd.DataFrame)
+                    and has_engine else ("json_sidecar_no_parquet_engine"
+                    if isinstance(payload, pd.DataFrame) else "json"))
+        for path, payload in outputs.items()}
     generated_at = _now()
     if write:
         for path, payload in outputs.items():

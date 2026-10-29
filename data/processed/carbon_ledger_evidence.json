@@ -315,13 +315,13 @@
     "Simulated": null,
     "Original_Document_Status": null,
     "Notes": null,
-    "evidence_file_exists": true,
+    "evidence_file_exists": false,
     "evidence_file_resolved": "碳慧智算汇报.pptx",
     "is_row_level": false,
     "status_bucket": "blank",
     "evidence_is_simulated_placeholder": false,
-    "source_reference_file_available": true,
+    "source_reference_file_available": false,
     "original_activity_evidence_available": false,
-    "evidence_artifact_kind": "non_placeholder_source_document"
+    "evidence_artifact_kind": "missing_file"
   }
 ]

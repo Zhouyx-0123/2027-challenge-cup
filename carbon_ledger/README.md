@@ -143,6 +143,15 @@ python -m tools.verify_carbon_ledger_delivery     # 改完自查，全绿退出�
 
 ---
 
+
+
+### 本次集成工作副本补充（2026-10-29）
+
+- **本次集成工作副本已补入** `carbon_ledger/a6_verification/self_check.py` 与
+  `self_check_results.json`，自检命令为 `python carbon_ledger/a6_verification/self_check.py`。
+  该补充属于本次工作副本集成内容；请在合并前由仓库负责人审核，不代表原始项目归档版本原本包含这些文件。
+  自检结果会记录在 `carbon_ledger/a6_verification/`，正式凭证、正式因子与正式入账仍需实际资料及人工确认。
+
 ## 注意
 
 - 本目录里的文档内部用**裸文件名**互相引用（如 `source_register.xlsx`）。

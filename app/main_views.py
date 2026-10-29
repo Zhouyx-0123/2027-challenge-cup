@@ -156,6 +156,12 @@ def render_sensor() -> None:
 
 def _render_sensor_co2() -> None:
     st.caption("实时演示通道：传感器读数与预警成本只驱动当前会话，不回写 E₀ 或结果表。")
+    st.info(
+        "**定位说明（避免误读）**：本页是**仓储 / 办公场所的环境 CO₂ 监测与碳资产管理**"
+        "（浓度超标 → 超标碳排量 → 额外碳配额成本，阈值 1000 ppm，"
+        "按输入的『监测空间体积 (m³)』折算）。"
+        "**它不是运输排放测量**——项目已明确放弃车载 CO₂ 浓度传感器路线，"
+        "运输排放由 **OBD+GPS 实测轨**与 **VSP 模型轨**承担（见 docs/57）。")
     lab_col, side_col = st.columns([2.1, 1], gap="large")
     with lab_col:
         n = slider_kit.render_lab(

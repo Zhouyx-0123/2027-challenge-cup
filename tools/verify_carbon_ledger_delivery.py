@@ -32,6 +32,13 @@ DICTIONARY = LEDGER / "a2_activity_data" / "activity_data_field_dictionary.xlsx"
 ACTIVITY_TEMPLATE = LEDGER / "a2_activity_data" / "activity_data_template.xlsx"
 LEDGER_README = LEDGER / "README.md"
 VALIDATION_DIR = LEDGER / "validation"
+SOURCE_REGISTER = LEDGER / "a0_input" / "source_register.xlsx"
+SIMULATED_CSV = LEDGER / "a4_ledger" / "simulated_test_data.csv"
+
+#: 已作废删除的来源（2026-10-29 项目方向调整：放弃 CO₂ 浓度传感器路线，
+#: 改为 OBD 直测油耗 + GPS + VSP 模型）。该 PPT 不得再作为因子来源或凭证路径。
+RETIRED_SRC_ID = "SRC-004"
+RETIRED_SRC_FILE = "碳慧智算汇报.pptx"
 
 OLD_VALIDATION_NAME = "碳账可行性多组数据验证改进版.xlsx"
 STALE_TOTAL = "0.5433"
@@ -304,6 +311,62 @@ def check_legacy_validation() -> Tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# 修订 7 · 已作废的 PPT 不得再被引用
+# ---------------------------------------------------------------------------
+
+def check_retired_ppt() -> Tuple[str, str]:
+    """PPT 已作废删除：交付物里不得再把它当因子来源或凭证路径。
+
+    2026-10-29 项目方向调整（放弃 CO₂ 浓度传感器路线，改 OBD 直测油耗 + GPS
+    + VSP 模型），原项目 PPT 已删除。它此前是代理因子 3.16 / 0.5568 的
+    **唯一出处**，所以必须同步清理引用 —— 否则主账的因子来源行会指向一个
+    不存在的文件。
+    """
+    problems: List[str] = []
+    # 1) 主账因子的来源登记行不得再指向已作废的 SRC-004
+    if MAIN.exists():
+        trips = _read_records(MAIN, "Trip_Detail")
+        stale = [str(row.get("Ledger_Row_ID"))
+                 for row in trips
+                 if RETIRED_SRC_ID in str(row.get("Factor_Source_Register_Row") or "")]
+        if stale:
+            problems.append("主账 %d 行仍把 %s 当因子来源（%s…）"
+                            % (len(stale), RETIRED_SRC_ID, stale[0]))
+    # 2) 模拟测试底稿同步
+    if SIMULATED_CSV.exists():
+        text = SIMULATED_CSV.read_text(encoding="utf-8")
+        if RETIRED_SRC_ID in text:
+            problems.append("simulated_test_data.csv 仍引用 %s" % RETIRED_SRC_ID)
+    # 3) 来源登记表里 SRC-004 必须标作废
+    if SOURCE_REGISTER.exists():
+        rows = _read_records(SOURCE_REGISTER, "Source_Register")
+        found = False
+        for row in rows:
+            if RETIRED_SRC_ID not in str(row.get("来源ID") or ""):
+                continue
+            found = True
+            joined = " ".join(str(value) for value in row.values())
+            if "作废" not in joined and "已删除" not in joined:
+                problems.append("source_register 的 %s 行未标注「已作废/已删除」"
+                                % RETIRED_SRC_ID)
+        if not found:
+            problems.append("source_register 里找不到 %s 行（该作废来源应保留"
+                            "作废记录，不能直接删行）" % RETIRED_SRC_ID)
+    # 4) 证据索引不得再把它当凭证路径
+    if EVIDENCE.exists():
+        for row in _read_records(EVIDENCE, "Evidence_Index"):
+            path = str(row.get("Evidence_File_Path") or "")
+            if RETIRED_SRC_FILE in path:
+                status = str(row.get("Original_Document_Status") or "")
+                if "NOT PROVIDED" not in status.upper():
+                    problems.append("证据 %s 仍指向已作废的 %s（状态未标 NOT PROVIDED）"
+                                    % (row.get("Evidence_ID"), RETIRED_SRC_FILE))
+    if problems:
+        return "FAIL", "；".join(problems)
+    return "OK", "已作废 PPT 的引用已清理完毕"
+
+
+# ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
 
@@ -314,6 +377,7 @@ CHECKS = [
     ("修订 3 · 证据索引状态口径", check_evidence_status),
     ("修订 4 · 字段字典表头错位", check_dictionary_header),
     ("修订 6 · 旧版验证工作簿版本警示", check_legacy_validation),
+    ("修订 7 · 已作废 PPT 的引用已清理", check_retired_ppt),
 ]
 
 

@@ -10,7 +10,7 @@
 | 发票数据感知 | DeepSeek 多模态识别、缺失油量 50 L 容错、统一碳核算 |
 | 云边端硬件监控 | ESP32 → Flask → CSV → Streamlit，2 秒刷新与 CO2 超标预警；监测窗口滑条联动实时窗口预览图；**第二个 tab 是 OBD+GPS 实测碳排**（守恒法，每车碳排） |
 | 减碳路线沙盘 | 高德 JS API 2.0 精细地图、四维 NSGA-II、Q-learning 自适应变异与路线记忆；碳价滑条联动碳价敏感度图 |
-| 碳核算与台账 | 碳价和配额设置、动态配额缺口、披露附注与 CSV 下载 |
+| 碳核算与台账 | 碳价和配额设置、动态配额缺口、披露附注与 CSV 下载；**第二个 tab 是碳会计 A0–A6 审计轨**（只读判定链） |
 
 ## OBD + GPS 实测碳排（工科测量方向）
 
@@ -56,6 +56,18 @@ python -m src.obd_pipeline              # 读 data/raw/obd_gps/ 的真实流
 > （2.63）。两者相差 20% 是**核算边界差异，不是数据错误**，对账前必须显式标注。
 > 详见 `docs/53_碳账交付接入与口径对齐.md`。
 
+**碳账已进前端**：「碳核算与台账」页的第二个 tab「📋 碳会计口径 A0–A6（审计轨）」，**只读**。
+前端不读 Excel，由适配器导出预计算结果表供页面读取：
+
+```bash
+python -m src.carbon_ledger_export      # → data/processed/carbon_ledger_*
+```
+
+页面呈现的是**判定**而不是另一套数字：9 项正式汇总资格逐条摊开（为什么正式汇总是 0 行）、
+配额缺口、证据链索引（凭证文件是否存在按文件系统事实判定）、51 字段活动量就绪度、规则与自证。
+**不提供任何写入或审批控件**（审批载体仍是 `carbon_ledger/` 里的 Excel），
+两套口径不合并、不相减、不并排比大小。落地设计与已知问题登记见 `docs/54_碳数据输出格式与前端落地方案.md`。
+
 ## 数据与前端边界
 
 数据准备只发生一次：
@@ -90,6 +102,7 @@ app/
     route_sandbox.py           # 路线进化可视化
     slider_kit.py              # 高级滑条 + 联动可操作图（自绘，值由原生滑条承载）
     obd_panel.py               # OBD+GPS 实测碳排面板（监控页第二个 tab）
+    carbon_ledger_panel.py     # 碳会计 A0–A6 审计轨面板（台账页第二个 tab）
     theme.py                   # 当前全局样式与紧凑页头（令牌唯一真源）
   static/                      # 极光底图 / 碳网络纹理 / 品牌标志
 src/
@@ -98,6 +111,7 @@ src/
   disclosure.py                # 智能披露附注
   obd_gps.py                   # OBD+GPS 契约校验、守恒法算碳、分车聚合
   obd_pipeline.py              # OBD 实测碳排流水线（独立轨道，不动主闸门）
+  carbon_ledger_export.py      # 碳账交付 → 前端只读结果表（适配器，不重算、不改交付物）
   routing/                     # 高德、路线碳核算与四维进化
   ...                          # 数据复算与底层模型
 server.py                      # Flask 传感器接收服务 + OBD/GPS 接收端点
@@ -178,7 +192,7 @@ python -m pytest tests/ -q
 python -m tools.verify_p0           # 企业级 P0 一键验收（10 条判据）
 ```
 
-测试覆盖五页主入口、共享状态、顶部导航、DeepSeek 请求契约、高德响应解析、路线四维进化、探索与采纳、发票碳核算、OBD+GPS 实测碳排通道（契约/守恒/聚合/边界/接收端）以及底层数据契约。
+测试覆盖五页主入口、共享状态、顶部导航、DeepSeek 请求契约、高德响应解析、路线四维进化、探索与采纳、发票碳核算、OBD+GPS 实测碳排通道（契约/守恒/聚合/边界/接收端）、碳会计 A0–A6 审计轨（适配器/判定链/口径边界/只读守卫/证据存在性）以及底层数据契约。
 
 视觉与联动验收（需要 Node 与本机 Edge/Chrome，服务先起在 8501）：
 
@@ -188,6 +202,7 @@ node tools/verify_nav.js   http://localhost:8501            # 顶栏与首页卡
 node tools/verify_sliders.js http://localhost:8501 _shots   # 滑条：真拖一次 + 值回传校验
 node tools/verify_dashboard_layout.js http://localhost:8501 _shots  # 首页方块重叠与间距
 node tools/verify_obd_tab.js http://localhost:8501 _shots   # OBD+GPS tab：切页 + 文案 + 图表数
+node tools/verify_carbon_ledger_tab.js http://localhost:8501 _shots   # 碳账审计轨 tab：切页 + 判定链 + 文案
 ```
 
 需要复算底层结果表时，先把原始附件放入 `data/raw/`，再运行：

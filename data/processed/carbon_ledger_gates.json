@@ -1,0 +1,136 @@
+{
+  "formula_source": "carbon_ledger_main.xlsx!Trip_Detail!AP2",
+  "predicate_count": 9,
+  "total_rows": 12,
+  "approved_rows": 0,
+  "conditions": [
+    {
+      "key": "data_status_actual",
+      "label": "Data_Status = actual",
+      "column": "Data_Status",
+      "why": "只有实测行才可能正式入账",
+      "passed": 0,
+      "blocked": 12,
+      "status": "fail",
+      "block_reasons": [
+        {
+          "value": "simulated",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "key": "simulated_not_yes",
+      "label": "Simulated ≠ yes",
+      "column": "Simulated",
+      "why": "模拟行不得进入正式汇总",
+      "passed": 0,
+      "blocked": 12,
+      "status": "fail",
+      "block_reasons": [
+        {
+          "value": "yes",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "key": "factor_verified",
+      "label": "Factor_Status = factor_verified",
+      "column": "Factor_Status",
+      "why": "排放因子须完成核验",
+      "passed": 0,
+      "blocked": 12,
+      "status": "fail",
+      "block_reasons": [
+        {
+          "value": "proxy_pending_verification",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "key": "formal_precheck",
+      "label": "Validation_Status = PASS_FORMAL_PRECHECK",
+      "column": "Validation_Status",
+      "why": "结构预检须通过",
+      "passed": 0,
+      "blocked": 12,
+      "status": "fail",
+      "block_reasons": [
+        {
+          "value": "PASS_SIMULATED_ONLY",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "key": "unique_physical_trip",
+      "label": "Physical_Trip_Control = PASS_UNIQUE_PHYSICAL_TRIP",
+      "column": "Physical_Trip_Control",
+      "why": "物理趟次去重指纹须唯一",
+      "passed": 12,
+      "blocked": 0,
+      "status": "pass",
+      "block_reasons": []
+    },
+    {
+      "key": "owner_approval",
+      "label": "Owner_Approval_Status = approved",
+      "column": "Owner_Approval_Status (manual)",
+      "why": "公式不能替负责人批准",
+      "passed": 0,
+      "blocked": 12,
+      "status": "fail",
+      "block_reasons": [
+        {
+          "value": "not approved",
+          "count": 12
+        }
+      ]
+    },
+    {
+      "key": "evidence_id",
+      "label": "Evidence_ID 非空",
+      "column": "Evidence_ID",
+      "why": "每行须挂证据编号",
+      "passed": 12,
+      "blocked": 0,
+      "status": "pass",
+      "block_reasons": []
+    },
+    {
+      "key": "run_id",
+      "label": "Run_ID 非空",
+      "column": "Run_ID",
+      "why": "每行须挂 run 版本",
+      "passed": 12,
+      "blocked": 0,
+      "status": "pass",
+      "block_reasons": []
+    },
+    {
+      "key": "source_ledger_row_no",
+      "label": "Source_Ledger_Row_No 非空",
+      "column": "Source_Ledger_Row_No",
+      "why": "来源行号须可追溯",
+      "passed": 12,
+      "blocked": 0,
+      "status": "pass",
+      "block_reasons": []
+    }
+  ],
+  "first_block": [
+    {
+      "key": "data_status_actual",
+      "count": 12
+    }
+  ],
+  "eligibility_distribution": [
+    {
+      "value": "EXCLUDED_NOT_FORMALLY_APPROVED",
+      "count": 12
+    }
+  ],
+  "boundary": "碳会计轨为 WTW 全生命周期口径（柴油 = 尾管 + 上游）；工程侧 E₀ 为 TTW 尾管燃烧口径。两套口径不合并、不相减、不做趋势对比，也不并排比大小 —— 两边的核算范围本身也不同（碳账当前仅 12 条合成趟次，工程侧为全网趟次）。"
+}

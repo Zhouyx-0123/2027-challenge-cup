@@ -1,0 +1,91 @@
+{
+  "version": "v1",
+  "updated": "2026-10-29",
+  "owner": "项目负责人",
+  "notes": [
+    "碳账活动数据底稿 51 字段的**数据就绪度**映射表。",
+    "本文件只描述'这个字段今天能不能填、谁来填'，**不写任何口径数值**；",
+    "排放因子数值仍以 config/calc_factors.json 为唯一真源。",
+    "由 src/carbon_ledger_export.py 读入并预计算成结果表，前端只读结果表（前端只读不算）。"
+  ],
+  "categories": [
+    {
+      "id": "engineering",
+      "label": "工程侧已具备",
+      "desc": "主链路结果表已有对应字段，可直接映射"
+    },
+    {
+      "id": "obd",
+      "label": "OBD+GPS 实测可填",
+      "desc": "实测通道产出；按 docs/53 决策 3，实测优先于发票"
+    },
+    {
+      "id": "invoice",
+      "label": "发票感知可填",
+      "desc": "发票识别通道产出（会话级演示通道）"
+    },
+    {
+      "id": "finance",
+      "label": "待财务线补",
+      "desc": "财务账/凭证侧提供，当前未到位"
+    },
+    {
+      "id": "external",
+      "label": "待外部资料",
+      "desc": "标准全文、正式因子、车辆参数、报告边界等外部输入"
+    }
+  ],
+  "fields": {
+    "source_row_id": {"category": "engineering", "note": "主链路结果行号可映射"},
+    "activity_id": {"category": "engineering", "note": "适配器按规则生成"},
+    "trip_id": {"category": "engineering", "note": "主链路物理趟次 ID"},
+    "segment_id": {"category": "engineering", "note": "主链路 segment_id"},
+    "waybill_id": {"category": "engineering", "note": "主链路运单 ID"},
+    "vehicle_id": {"category": "engineering", "note": "车辆主数据；台账内按 docs/42 §8 脱敏"},
+    "reporting_entity": {"category": "external", "note": "报告主体未确认（外包承运/自有边界待定）"},
+    "vehicle_control_type": {"category": "external", "note": "运营控制 vs 外包承运边界待确认"},
+    "trip_date": {"category": "engineering", "note": "主链路行程日期"},
+    "activity_month": {"category": "engineering", "note": "由 trip_date 派生"},
+    "activity_year": {"category": "engineering", "note": "由 trip_date 派生"},
+    "activity_type": {"category": "engineering", "note": "燃料/电力活动类型枚举"},
+    "fuel_type": {"category": "engineering", "note": "油品/能源类型枚举"},
+    "activity_value": {"category": "obd", "note": "OBD 实测油耗优先，发票次之（docs/53 决策 3）"},
+    "activity_unit": {"category": "engineering", "note": "L / kWh / km / t 白名单"},
+    "distance_km": {"category": "obd", "note": "GPS 里程；主链路亦有 route 级里程"},
+    "cargo_t": {"category": "engineering", "note": "主链路货重（运单/装载）"},
+    "vehicle_tare_t": {"category": "external", "note": "车辆技术参数/行驶证未提供"},
+    "speed_kmh": {"category": "obd", "note": "GPS/车载装置速度"},
+    "ambient_temp_c": {"category": "obd", "note": "OBD 冷却液温度可作环境温度近似"},
+    "altitude_m": {"category": "obd", "note": "GPS 高度"},
+    "factor_value": {"category": "engineering", "note": "config/calc_factors.json；碳账侧 WTW 值需登记进来源表"},
+    "factor_unit": {"category": "engineering", "note": "kgCO2e/L、kgCO2e/kWh"},
+    "factor_source_row": {"category": "engineering", "note": "source_register.xlsx 行号"},
+    "factor_status": {"category": "external", "note": "正式因子文件未到位，当前 proxy_pending_verification"},
+    "scope_candidate": {"category": "external", "note": "Scope 1/2 归属待国标全文"},
+    "emission_kgco2e": {"category": "engineering", "note": "主账公式列（活动量×因子）"},
+    "emission_tco2e": {"category": "engineering", "note": "主账公式列（kg/1000）"},
+    "data_status": {"category": "engineering", "note": "actual / simulated 由核验流程写入"},
+    "simulated": {"category": "engineering", "note": "测试脚本/人工标记"},
+    "evidence_id": {"category": "engineering", "note": "证据索引可生成（凭证文件仍缺）"},
+    "invoice_no": {"category": "invoice", "note": "发票识别通道"},
+    "invoice_date": {"category": "invoice", "note": "发票识别通道"},
+    "invoice_qty": {"category": "invoice", "note": "发票识别通道"},
+    "invoice_unit": {"category": "invoice", "note": "发票识别通道"},
+    "invoice_unit_price_cny": {"category": "invoice", "note": "发票识别通道"},
+    "invoice_amount_cny": {"category": "invoice", "note": "发票识别通道"},
+    "expense_type": {"category": "finance", "note": "成本科目表"},
+    "finance_account_code": {"category": "finance", "note": "财务科目表"},
+    "cost_center": {"category": "finance", "note": "财务主数据"},
+    "finance_ledger_row_id": {"category": "finance", "note": "财务账主表"},
+    "allocation_key": {"category": "finance", "note": "财务分摊规则"},
+    "carbon_price_cny_per_t": {"category": "engineering", "note": "前端全局碳价参数"},
+    "compliance_cost_cny": {"category": "finance", "note": "履约/超额凭证"},
+    "run_id": {"category": "engineering", "note": "主链路 run 版本号"},
+    "source_system": {"category": "engineering", "note": "原始系统/文件标识"},
+    "source_ledger_row_no": {"category": "engineering", "note": "运单/油票/财务台账行号"},
+    "duplicate_group_id": {"category": "engineering", "note": "物理趟次去重指纹"},
+    "include_in_summary": {"category": "engineering", "note": "经核验的纳入口径"},
+    "exception_flag": {"category": "engineering", "note": "校验流程标记"},
+    "note": {"category": "engineering", "note": "人工复核记录"}
+  }
+}

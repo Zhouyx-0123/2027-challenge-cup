@@ -1,0 +1,94 @@
+{
+  "generated_at": "2026-10-29T19:48:31+08:00",
+  "ledger_file": "carbon_ledger/a4_ledger/carbon_ledger_main.xlsx",
+  "ledger_sha256_16": "bb372f82a83ca63f",
+  "workbook_sheet_count": 13,
+  "trip_rows": 12,
+  "total_emissions_t": 2.439298,
+  "simulated_rows": 12,
+  "actual_rows": 0,
+  "include_in_summary_rows": 12,
+  "include_in_summary_t": 2.439298,
+  "is_simulated": true,
+  "ledger_status": "未获正式批准",
+  "monthly": [
+    {
+      "month": "2026-10",
+      "rows": 5,
+      "total_t": 0.8441320000000001,
+      "data_state": "simulated only",
+      "report_status": "SIMULATED_TEST_SUMMARY_NOT_FORMAL"
+    },
+    {
+      "month": "2026-11",
+      "rows": 4,
+      "total_t": 1.14178,
+      "data_state": "simulated only",
+      "report_status": "SIMULATED_TEST_SUMMARY_NOT_FORMAL"
+    },
+    {
+      "month": "2026-12",
+      "rows": 3,
+      "total_t": 0.45338599999999996,
+      "data_state": "simulated only",
+      "report_status": "SIMULATED_TEST_SUMMARY_NOT_FORMAL"
+    }
+  ],
+  "annual": [
+    {
+      "year": "2026",
+      "rows": 12,
+      "total_t": 2.4392980000000004,
+      "data_state": "simulated only",
+      "report_status": "SIMULATED_TEST_SUMMARY_NOT_FORMAL"
+    }
+  ],
+  "formal": {
+    "annual_rows": 1,
+    "monthly_rows": 3,
+    "approved_row_count": 0,
+    "approved_total_t": 0.0,
+    "gate_status": "NO_APPROVED_ROWS",
+    "note": "Formal totals include only rows passing all controls and with documented owner approval; none in current simulated data.",
+    "meaning": "0 行 = 没有合格正式行，**不等于实际排放为零**"
+  },
+  "factor": {
+    "ledger_ef_values": [
+      {
+        "value": "3.16 kgCO2e/kgCO2e/L",
+        "rows": 8
+      },
+      {
+        "value": "0.5568 kgCO2e/kgCO2e/kWh",
+        "rows": 4
+      }
+    ],
+    "factor_status": [
+      {
+        "value": "proxy_pending_verification",
+        "rows": 12
+      }
+    ],
+    "basis": "WTW",
+    "basis_label": "WTW 全生命周期（尾管燃烧 + 上游）",
+    "engineering_basis": "TTW",
+    "engineering_basis_label": "TTW 尾管燃烧（工程侧 E₀ 口径）",
+    "mix_allowed": false,
+    "decomposition": {
+      "diesel_ttw_kg_per_l": 2.63,
+      "diesel_wtt_kg_per_l": 0.53,
+      "diesel_wtw_kg_per_l": 3.16,
+      "grid_kg_per_kwh": 0.5568,
+      "source": "config/calc_factors.json"
+    },
+    "ledger_ef_matches_calc_factors": true
+  },
+  "boundary": "碳会计轨为 WTW 全生命周期口径（柴油 = 尾管 + 上游）；工程侧 E₀ 为 TTW 尾管燃烧口径。两套口径不合并、不相减、不做趋势对比，也不并排比大小 —— 两边的核算范围本身也不同（碳账当前仅 12 条合成趟次，工程侧为全网趟次）。",
+  "source_files": [
+    "carbon_ledger/a4_ledger/carbon_ledger_main.xlsx",
+    "carbon_ledger/a4_ledger/quota_ledger.xlsx",
+    "carbon_ledger/a5_evidence/evidence_index.xlsx",
+    "carbon_ledger/a2_activity_data/activity_data_field_dictionary.xlsx",
+    "carbon_ledger/a2_activity_data/activity_data_template.xlsx"
+  ]
+}

@@ -89,6 +89,15 @@ data/processed/route_geo.parquet
 # 上海—北京 OSM 碳基线（docs/35 D2/D3）：非实时 · 固定因子 · 道路等级 proxy
 !data/processed/route_baseline_sh_bj_steps.parquet
 !data/processed/route_baseline_sh_bj_summary.json
+# 碳会计 A0–A6 审计轨（docs/54）：WTW 口径独立于工程 TTW 主口径；
+# 结果表由 carbon_ledger/ 的工作簿确定性导出，可复现故入库
+!data/processed/carbon_ledger_trips.parquet
+!data/processed/carbon_ledger_evidence.parquet
+!data/processed/carbon_ledger_summary.json
+!data/processed/carbon_ledger_gates.json
+!data/processed/carbon_ledger_quota.json
+!data/processed/carbon_ledger_activity_readiness.json
+!data/processed/carbon_ledger_rules.json
 
 # ===== 离线包与产物 =====
 wheels/

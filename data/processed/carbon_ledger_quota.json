@@ -1,0 +1,50 @@
+{
+  "quota_record_id": "QUOTA-SIM-001",
+  "period": "2026",
+  "opening_quota_t": 1.0,
+  "compliance_used_t": 2.439298,
+  "purchased_quota_t": 0.2,
+  "available_quota_t": 1.2,
+  "closing_balance_t": 0.0,
+  "shortfall_t": 1.239298,
+  "data_status": "simulated",
+  "approval_status": "not approved",
+  "source_document": "simulated scenario: used amount matches 12-row synthetic ledger total 2.439298 t for formula testing only; not a real quota record",
+  "notes": "All quota amounts are synthetic placeholders for formula testing only; not a legal allowance or approved ledger balance. 0.5433t is the synthetic Trip_Detail result using proxy factors.",
+  "instructions": [
+    {
+      "项目": "用途",
+      "说明": "配额台账列结构模板，模拟值仅测试公式，不是实际配额或履约结论。"
+    },
+    {
+      "项目": "公式",
+      "说明": "Available=Opening+Purchased；Closing=Available-Compliance_Used；Shortfall=MAX(0,Compliance_Used-Available)。"
+    },
+    {
+      "项目": "计量边界",
+      "说明": "物理排放量与配额交易/履约成本分开记录，避免重复计入排放。"
+    },
+    {
+      "项目": "正式使用",
+      "说明": "必须补配额制度适用依据、账户/期间证明、真实购买/履约凭证及经确认会计处理。"
+    },
+    {
+      "项目": "批准状态",
+      "说明": "not approved；待负责人/财务账负责人确认。"
+    }
+  ],
+  "raw_fields": {
+    "Quota_Record_ID": "QUOTA-SIM-001",
+    "Period": "2026",
+    "Opening_Quota_tCO2e": 1,
+    "Compliance_Used_tCO2e": 2.439298,
+    "Purchased_Quota_tCO2e": 0.2,
+    "Available_Quota_tCO2e": 1.2,
+    "Closing_Balance_tCO2e": 0,
+    "Shortfall_tCO2e": 1.239298,
+    "Source_Document": "simulated scenario: used amount matches 12-row synthetic ledger total 2.439298 t for formula testing only; not a real quota record",
+    "Data_Status": "simulated",
+    "Approval_Status": "not approved",
+    "Notes": "All quota amounts are synthetic placeholders for formula testing only; not a legal allowance or approved ledger balance. 0.5433t is the synthetic Trip_Detail result using proxy factors."
+  }
+}

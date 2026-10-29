@@ -578,6 +578,101 @@ def obd_is_demo() -> bool:
     return bool((obd_summary() or {}).get("is_demo"))
 
 
+# ---------------- 碳会计 A0–A6 交付轨（docs/54，审计轨） ----------------
+# 纪律：只读不算。本层只从 data/processed/ 读由 `python -m src.carbon_ledger_export`
+# 预计算的结果表；**不 import 适配器、不在页面里做判定、不写 Excel**。
+#
+# 这条轨道与工程侧 E₀ 主口径**不是同一口径**：
+#   碳会计轨 = WTW 全生命周期（柴油 3.16 kgCO₂e/L）
+#   工程 E₀  = TTW 尾管燃烧（柴油 2.63 kgCO₂/L）
+# 因此这里**只读碳账自己的数**，绝不把两边的总量放在一起比大小。
+#
+# 缓存策略与 OBD 轨一致：带 **30 s TTL**，交付方更新工作簿后重跑适配器即可刷新。
+CARBON_LEDGER_CACHE_TTL = 30
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_carbon_ledger_trips() -> pd.DataFrame:
+    """主账 Trip_Detail 全列 + 门禁谓词拆解。"""
+    return _read_parquet(RESULT_FILES["carbon_ledger_trips"])
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_carbon_ledger_evidence() -> pd.DataFrame:
+    """证据索引 + 凭证文件存在性（适配器实时判定的事实）。"""
+    return _read_parquet(RESULT_FILES["carbon_ledger_evidence"])
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_carbon_ledger_summary() -> Dict[str, Any]:
+    """账本状态条 / 月年汇总 / 正式汇总 / 口径声明。"""
+    return _read_json(RESULT_FILES["carbon_ledger_summary"])
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_carbon_ledger_gates() -> Dict[str, Any]:
+    """正式汇总资格判定链（9 项谓词）。"""
+    return _read_json(RESULT_FILES["carbon_ledger_gates"])
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_carbon_ledger_quota() -> Dict[str, Any]:
+    """配额台账。"""
+    return _read_json(RESULT_FILES["carbon_ledger_quota"])
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_carbon_ledger_readiness() -> Dict[str, Any]:
+    """活动数据 51 字段就绪度。"""
+    return _read_json(RESULT_FILES["carbon_ledger_activity_readiness"])
+
+
+@st.cache_data(show_spinner=False, ttl=CARBON_LEDGER_CACHE_TTL)
+def _read_carbon_ledger_rules() -> Dict[str, Any]:
+    """控制规则 / 用例 / 压力场景 / 规则卡。"""
+    return _read_json(RESULT_FILES["carbon_ledger_rules"])
+
+
+def carbon_ledger_trips() -> pd.DataFrame:
+    """碳账主账明细。缺失返回空表。"""
+    return _read_carbon_ledger_trips()
+
+
+def carbon_ledger_evidence() -> pd.DataFrame:
+    """碳账证据索引。缺失返回空表。"""
+    return _read_carbon_ledger_evidence()
+
+
+def carbon_ledger_summary() -> Dict[str, Any]:
+    """碳账汇总（状态条数据）。缺失返回 {}。"""
+    return _read_carbon_ledger_summary()
+
+
+def carbon_ledger_gates() -> Dict[str, Any]:
+    """正式汇总资格判定链。缺失返回 {}。"""
+    return _read_carbon_ledger_gates()
+
+
+def carbon_ledger_quota() -> Dict[str, Any]:
+    """配额台账。缺失返回 {}。"""
+    return _read_carbon_ledger_quota()
+
+
+def carbon_ledger_readiness() -> Dict[str, Any]:
+    """活动数据就绪度。缺失返回 {}。"""
+    return _read_carbon_ledger_readiness()
+
+
+def carbon_ledger_rules() -> Dict[str, Any]:
+    """控制规则与自证数据。缺失返回 {}。"""
+    return _read_carbon_ledger_rules()
+
+
+def carbon_ledger_available() -> bool:
+    """碳账轨是否就绪（主账明细非空即可）。"""
+    return not carbon_ledger_trips().empty
+
+
 # ---------------- 汇总指标 ----------------
 
 @st.cache_data(show_spinner=False)

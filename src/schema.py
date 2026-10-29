@@ -71,6 +71,15 @@ RESULT_FILES: Dict[str, str] = {
     "obd_vehicle_carbon": "obd_vehicle_carbon.parquet",
     "obd_trips": "obd_trips.parquet",
     "obd_summary": "obd_summary.json",
+    # 碳会计 A0–A6 交付轨（docs/54）：**审计轨**，WTW 口径独立于工程侧 TTW 主口径；
+    # 由 src/carbon_ledger_export.py 从 carbon_ledger/ 的 Excel 导出，前端只读
+    "carbon_ledger_trips": "carbon_ledger_trips.parquet",
+    "carbon_ledger_evidence": "carbon_ledger_evidence.parquet",
+    "carbon_ledger_summary": "carbon_ledger_summary.json",
+    "carbon_ledger_gates": "carbon_ledger_gates.json",
+    "carbon_ledger_quota": "carbon_ledger_quota.json",
+    "carbon_ledger_activity_readiness": "carbon_ledger_activity_readiness.json",
+    "carbon_ledger_rules": "carbon_ledger_rules.json",
 }
 
 # --------------------------------------------------------------------------

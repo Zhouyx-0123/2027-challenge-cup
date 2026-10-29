@@ -9,7 +9,8 @@ import streamlit as st
 
 import live_services
 import services
-from components import dashboard_home, flags, obd_panel, route_sandbox, slider_kit, theme
+from components import (carbon_ledger_panel, dashboard_home, flags, obd_panel,
+                        route_sandbox, slider_kit, theme)
 from demo_state import carbon_snapshot, fallback_disclosure
 
 
@@ -240,6 +241,29 @@ def _sync_ledger_carbon_params() -> None:
 
 
 def render_ledger() -> None:
+    """碳台账页：两条并行的口径轨道。
+
+    · Tab 1「工程口径 E₀」—— 主链路的实时成账（原有内容，一行未改）；
+    · Tab 2「碳会计 A0–A6 审计轨」—— 碳会计交付物的**只读**判定视图。
+
+    两者口径不同（E₀ = TTW 尾管燃烧；碳账 = WTW 全生命周期），**不合并、不相减**。
+    """
+    theme.hero_compact(
+        "碳核算与台账",
+        "工程口径 E₀ 实时成账，与碳会计 A0–A6 审计轨并列呈现；两套口径互不换算。",
+        kicker="04 / CARBON LEDGER",
+        badges=["统一快照", "配额缺口", "碳会计审计轨", "只读判定链"])
+    tab_e0, tab_audit = st.tabs([
+        "⚙️ 工程口径 E₀（主账）",
+        "📋 碳会计口径 A0–A6（审计轨）",
+    ])
+    with tab_e0:
+        _render_ledger_e0()
+    with tab_audit:
+        carbon_ledger_panel.render_carbon_ledger_panel()
+
+
+def _render_ledger_e0() -> None:
     with st.expander("碳账参数设置", expanded=True):
         param_a, param_b = st.columns(2)
         with param_a:
@@ -253,10 +277,6 @@ def render_ledger() -> None:
                 value=float(st.session_state["carbon_quota_t"]), step=10.0,
                 key="ledger_carbon_quota_input", on_change=_sync_ledger_carbon_params)
     snap = carbon_snapshot()
-    theme.hero_compact(
-        "碳核算与台账",
-        "基准碳账 + 当前发票 + 硬件超标事件，实时形成配额缺口、财务风险与披露附注。",
-        kicker="04 / CARBON LEDGER", badges=["统一快照", "配额缺口", "DeepSeek 附注"])
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("当期总碳排", f"{snap['total_t']:.4f} t")
     c2.metric("碳配额缺口", f"{snap['gap_t']:.4f} t")

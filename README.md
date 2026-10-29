@@ -205,6 +205,12 @@ node tools/verify_obd_tab.js http://localhost:8501 _shots   # OBD+GPS tab：切�
 node tools/verify_carbon_ledger_tab.js http://localhost:8501 _shots   # 碳账审计轨 tab：切页 + 判定链 + 文案
 ```
 
+交付方改完碳账交付物后自查（**只读，不改文件**）：
+
+```bash
+python -m tools.verify_carbon_ledger_delivery     # 逐条检查 docs/55 的修订项，全绿退出码 0
+```
+
 需要复算底层结果表时，先把原始附件放入 `data/raw/`，再运行：
 
 ```bash

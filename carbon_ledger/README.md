@@ -108,6 +108,29 @@ python -m src.carbon_ledger_export      # → data/processed/carbon_ledger_*
 口径纪律、落地设计与**已知问题登记**（含配额台账 Notes 的陈旧数值、README 行数口径、
 凭证文件缺失等 6 条）见 `docs/54_碳数据输出格式与前端落地方案.md` §5 / §6。
 
+### 交付方修订指南（docs/55）
+
+交付物里有 **6 处自相矛盾**（文档与表格打架、口径错位）。其中 **5 处不需要任何真实数据**，
+已整理成修订单交给交付方：
+
+| 编号 | 文件 | 改什么 |
+|---|---|---|
+| 1 | `a4_ledger/quota_ledger.xlsx` | `Quota_Ledger` 行 2 `Notes`：`0.5433t` → `2.439298 t` |
+| 2 | `README.md` | `Trip_Detail … 101 行` → `12 条有效记录` |
+| 3 | `a5_evidence/evidence_index.xlsx` | 9 行空白状态填 `NOT PROVIDED`；去掉「source file readable」 |
+| 4 | `a2_activity_data/activity_data_field_dictionary.xlsx` | 只改第 1 行表头（数据行不动） |
+| 5 | `README.md` | `Validation_Rules … 15 条` → `14 条` |
+| 6 | `validation/…改进版.xlsx` | 改名带版本警示 + 工作簿内加说明（或负责人确认后删除） |
+
+逐条改法、验收口径与自助检查脚本见 `docs/55_碳账交付修订指南.md`：
+
+~~~bash
+python -m tools.verify_carbon_ledger_delivery     # 改完自查，全绿退出码 0
+~~~
+
+第 6 条之外的**凭证文件本体、正式排放因子、车辆参数与报告边界**需要真实资料，
+不在本轮修订范围（见 `docs/55` §3）。
+
 ---
 
 ## 注意

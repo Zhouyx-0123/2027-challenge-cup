@@ -17,6 +17,12 @@ data/reference/
 *.csv
 !config/*.csv
 
+# ===== 碳账交付工作区（carbon_ledger/，碳会计 A0–A6 交付物）=====
+# 工作簿与模板是可复现的交付物，必须入库 —— 全局的 *.xlsx / *.csv 规则对它们不适用。
+# 注意：真实台账数据（碳排放因子源表、正式凭证）不在这里入库，见 docs/53。
+!carbon_ledger/**/*.xlsx
+!carbon_ledger/**/*.csv
+
 # ===== 备份包：含不可再生的原始证据与代码快照，永不入库 =====
 backups/
 

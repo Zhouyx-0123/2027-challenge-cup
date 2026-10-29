@@ -102,6 +102,11 @@ data/processed/route_geo.parquet
 !data/processed/carbon_ledger_quota.json
 !data/processed/carbon_ledger_activity_readiness.json
 !data/processed/carbon_ledger_rules.json
+# 恒定并存的 JSON 侧车（无 Parquet 引擎时的只读回退 + 人可读）：
+# 适配器在两种环境下都会写侧车，manifest 记录实际主格式
+!data/processed/carbon_ledger_trips.json
+!data/processed/carbon_ledger_evidence.json
+!data/processed/carbon_ledger_export_manifest.json
 
 # ===== 离线包与产物 =====
 wheels/

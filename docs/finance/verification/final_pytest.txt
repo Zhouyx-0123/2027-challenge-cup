@@ -1,0 +1,13 @@
+........................................................................ [ 23%]
+........................................................................ [ 47%]
+........................................................................ [ 70%]
+........................................................................ [ 94%]
+..................                                                       [100%]
+=============================== warnings summary ===============================
+tests/test_main_app.py::test_sensor_warning_writes_penalty_state
+  /tmp/finance-integration-venv/lib/python3.12/site-packages/streamlit/elements/lib/built_in_chart_utils.py:620: Pandas4Warning: The inplace keyword in DataFrame.reset_index is deprecated and will be removed in a future version (PDEP-8).
+  See https://pandas.pydata.org/docs/dev/whatsnew/v3.1.0.html#deprecation-inplace for more details.
+    df.reset_index(inplace=True)  # noqa: PD002
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+306 passed, 1 deselected, 1 warning in 33.95s

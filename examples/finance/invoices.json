@@ -1,0 +1,49 @@
+[
+  {
+    "invoice_code": "",
+    "invoice_no": "DEMO-INVOICE-0001",
+    "seller_name": "DEMO-SELLER",
+    "invoice_amount": 476.84,
+    "amount_excluding_tax": 421.98,
+    "tax_amount": 54.86,
+    "item_name": "0#柴油",
+    "quantity": 65.5,
+    "unit": "L",
+    "unit_price": 7.28,
+    "fuel_liters": 65.5,
+    "plate": "DEMO-PLATE-01",
+    "invoice_date": "2026-10-25",
+    "mock": true,
+    "source_mode": "simulated",
+    "source_image": "src/invoice.py:MOCK_RESULT",
+    "note": "项目内置模拟值，非真实发票；单价口径待复核。"
+  },
+  {
+    "invoice_code": "0110",
+    "invoice_no": "DEMO-ELEC",
+    "seller_name": "DEMO-POWER",
+    "invoice_amount": 1130,
+    "amount_excluding_tax": 1000,
+    "tax_amount": 130,
+    "item_name": "电费",
+    "quantity": 1000,
+    "unit": "kWh",
+    "invoice_date": "2026-10-25",
+    "mock": true,
+    "source_image": "tests/test_invoice_carbon.py:test_parse_invoice_keeps_generic_financial_fields"
+  },
+  {
+    "invoice_code": "",
+    "invoice_no": "DEMO-ELEC-SECRET",
+    "seller_name": "DEMO-POWER",
+    "invoice_amount": 800,
+    "amount_excluding_tax": 800,
+    "tax_amount": 0,
+    "item_name": "电费",
+    "quantity": 1000,
+    "unit": "kWh",
+    "invoice_date": "2026-10-25",
+    "mock": true,
+    "source_image": "tests/test_invoice_carbon.py:test_cli_writes_carbon_detail_and_privacy_safe_summary"
+  }
+]

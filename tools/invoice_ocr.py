@@ -71,6 +71,7 @@ LEDGER_COLUMNS: List[str] = [
     "confidence", "status", "note", "carbon_status", "carbon_method",
     "emission_category", "activity_quantity", "activity_unit", "co2e_kg",
     "carbon_scope", "included_in_total", "carbon_note",
+    "invoice_type", "tax_rate", "mock",
 ]
 
 
@@ -185,7 +186,7 @@ def run(input_dir: Path, ledger_path: Path, report_path: Path,
             image.read_bytes(), api_key, filename=image.name)
 
         for field in ("invoice_code", "invoice_no", "seller_name", "item_name",
-                      "unit", "plate", "invoice_date"):
+                      "unit", "plate", "invoice_date", "invoice_type", "tax_rate", "mock"):
             base[field] = parsed.get(field, "")
         amount = parsed.get("invoice_amount")
         liters = parsed.get("fuel_liters")

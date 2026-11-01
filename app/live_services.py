@@ -56,6 +56,16 @@ def extract_invoice(image_bytes: bytes, filename: str = "invoice.jpg") -> Dict[s
     return invoice.extract_invoice_fields(image_bytes, invoice_api_key(), filename)
 
 
+def register_finance_invoice(record, image_bytes, filename):
+    from src.finance_workflow import register_invoice
+    return register_invoice(record, image_bytes, filename)
+
+
+def finance_download(mode):
+    from src.finance_workflow import finance_download as read_file
+    return read_file(mode)
+
+
 def invoice_summary(fuel_liters: Optional[float], distance_km: Optional[float],
                     **kwargs: Any) -> Dict[str, Any]:
     from src import invoice

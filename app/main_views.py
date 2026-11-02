@@ -68,39 +68,8 @@ def _run_invoice(uploaded) -> None:
 
 
 def _render_finance_register():
-    raw = st.session_state.get('finance_invoice_raw')
-    image = st.session_state.get('finance_invoice_image')
-    if not raw or not image:
-        return
-    st.subheader('发票费用登记')
-    if raw.get('mock'):
-        st.warning('模拟识别数据，仅写入模拟主表。')
-    st.write({'商品或服务': raw.get('item_name'), '不含税金额': raw.get('amount_excluding_tax'),
-              '发票税额': raw.get('tax_amount'), '税率/征收率': raw.get('tax_rate'),
-              '价税合计': raw.get('invoice_amount')})
-    st.caption('按票面信息登记；税额、税率直接保存，抵扣资格另行判断。')
-    if st.button('记录到财务主表', key='finance_register_save'):
-        try:
-            report = live_services.register_finance_invoice(raw, image[0], image[1])
-            if report['rejected']:
-                st.error(report['rejected'][0]['reason'])
-            elif report['duplicates']:
-                st.info('这张发票已登记，本次未重复新增。')
-            else:
-                st.success('已记录到财务主表。')
-            if not report['rejected']:
-                st.session_state['finance_download_mode'] = report['source_mode']
-        except (ValueError, OSError) as exc:
-            st.error('登记未完成：%s' % exc)
-    mode = st.session_state.get('finance_download_mode')
-    if mode:
-        try:
-            st.download_button('下载财务主表', live_services.finance_download(mode),
-                               file_name='finance_master_'+mode+'.xlsx',
-                               mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                               key='finance_register_download')
-        except (ValueError,OSError):
-            pass
+    from finance_panel import render
+    render()
 
 
 def render_invoice() -> None:

@@ -1,0 +1,170 @@
+{
+  "schema_version": "finance_master_v2",
+  "fields": [
+    {
+      "field": "record_id",
+      "column_number": 1,
+      "header": "记录ID"
+    },
+    {
+      "field": "activity_id",
+      "column_number": 2,
+      "header": "活动记录ID"
+    },
+    {
+      "field": "source_mode",
+      "column_number": 3,
+      "header": "数据性质"
+    },
+    {
+      "field": "invoice_month",
+      "column_number": 4,
+      "header": "开票月份"
+    },
+    {
+      "field": "invoice_date",
+      "column_number": 5,
+      "header": "开票日期"
+    },
+    {
+      "field": "invoice_code",
+      "column_number": 6,
+      "header": "发票代码"
+    },
+    {
+      "field": "invoice_no",
+      "column_number": 7,
+      "header": "发票号码"
+    },
+    {
+      "field": "seller_name",
+      "column_number": 8,
+      "header": "销售方名称"
+    },
+    {
+      "field": "item_name",
+      "column_number": 9,
+      "header": "商品或服务名称"
+    },
+    {
+      "field": "expense_category",
+      "column_number": 10,
+      "header": "费用类别"
+    },
+    {
+      "field": "quantity",
+      "column_number": 11,
+      "header": "数量"
+    },
+    {
+      "field": "unit",
+      "column_number": 12,
+      "header": "单位"
+    },
+    {
+      "field": "unit_price",
+      "column_number": 13,
+      "header": "单价（元/单位）"
+    },
+    {
+      "field": "fuel_liters",
+      "column_number": 14,
+      "header": "柴油量（L）"
+    },
+    {
+      "field": "amount_excluding_tax",
+      "column_number": 15,
+      "header": "不含税金额（元）"
+    },
+    {
+      "field": "tax_amount",
+      "column_number": 16,
+      "header": "发票税额（元）"
+    },
+    {
+      "field": "invoice_amount",
+      "column_number": 17,
+      "header": "价税合计（元）"
+    },
+    {
+      "field": "confirmed_cost",
+      "column_number": 18,
+      "header": "确认成本（元）"
+    },
+    {
+      "field": "plate",
+      "column_number": 19,
+      "header": "车牌号"
+    },
+    {
+      "field": "waybill_no",
+      "column_number": 20,
+      "header": "运单号"
+    },
+    {
+      "field": "trip_id",
+      "column_number": 21,
+      "header": "趟或段ID"
+    },
+    {
+      "field": "run_id",
+      "column_number": 22,
+      "header": "核算批次ID"
+    },
+    {
+      "field": "verification_status",
+      "column_number": 23,
+      "header": "双验判定"
+    },
+    {
+      "field": "posting_allowed",
+      "column_number": 24,
+      "header": "是否允许入账"
+    },
+    {
+      "field": "reviewer",
+      "column_number": 25,
+      "header": "审核人"
+    },
+    {
+      "field": "reviewed_at",
+      "column_number": 26,
+      "header": "审核时间"
+    },
+    {
+      "field": "evidence_ref",
+      "column_number": 27,
+      "header": "证据索引"
+    },
+    {
+      "field": "note",
+      "column_number": 28,
+      "header": "备注"
+    },
+    {
+      "field": "invoice_type",
+      "column_number": 29,
+      "header": "发票类型"
+    },
+    {
+      "field": "tax_rate",
+      "column_number": 30,
+      "header": "税率/征收率"
+    },
+    {
+      "field": "deduction_status",
+      "column_number": 31,
+      "header": "抵扣状态"
+    },
+    {
+      "field": "deductible_input_tax",
+      "column_number": 32,
+      "header": "可抵扣进项税额（元）"
+    },
+    {
+      "field": "deduction_basis",
+      "column_number": 33,
+      "header": "抵扣判断依据"
+    }
+  ]
+}

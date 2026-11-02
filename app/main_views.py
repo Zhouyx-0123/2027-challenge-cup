@@ -19,12 +19,29 @@ def render_dashboard() -> None:
 
 
 def _run_invoice(uploaded) -> None:
+    st.session_state['finance_invoice_raw'] = None
+    st.session_state['finance_invoice_image'] = None
+    st.session_state['finance_invoice_notice'] = ''
     try:
         result = live_services.extract_invoice(uploaded.getvalue(), uploaded.name)
         if result.get("status") == "failed":
             st.session_state["invoice_error"] = result.get("note") or "发票识别失败，请换一张清晰图片"
             st.session_state["current_invoice_result"] = None
             st.session_state["disclosure_note"] = ""
+            return
+        # Keep the original OCR record before any carbon/fuel estimation.
+        st.session_state['finance_invoice_raw'] = dict(result)
+        st.session_state['finance_invoice_image'] = (uploaded.getvalue(), uploaded.name)
+        # Non-diesel invoices must not inherit the legacy 50 L diesel fallback.
+        name = str(result.get('item_name') or '')
+        if name and '柴油' not in name:
+            st.session_state['current_invoice_result'] = None
+            st.session_state['current_invoice_carbon'] = 0.0
+            st.session_state['current_invoice_fuel'] = None
+            st.session_state['current_invoice_estimated'] = False
+            st.session_state['invoice_error'] = ''
+            st.session_state['disclosure_note'] = ''
+            st.session_state['finance_invoice_notice'] = '票面信息已识别，可登记到财务主表。本票未使用柴油估算；碳排需按对应类别核算。'
             return
         fuel, estimated = live_services.invoice_fuel_with_estimation(result.get("fuel_liters"))
         summary = live_services.invoice_summary(
@@ -33,6 +50,7 @@ def _run_invoice(uploaded) -> None:
         carbon_kg = live_services.calc_carbon(18.0, float(summary["distance_km"]), "重型")
         summary["calc_carbon_kg"] = carbon_kg
         summary["is_estimated"] = estimated
+        summary['mock'] = bool(result.get('mock'))
         st.session_state["current_invoice_carbon"] = float(carbon_kg)
         st.session_state["current_invoice_fuel"] = float(fuel)
         st.session_state["current_invoice_estimated"] = bool(estimated)
@@ -49,10 +67,46 @@ def _run_invoice(uploaded) -> None:
         st.session_state["invoice_error"] = "识别或碳核算失败：%s" % exc
 
 
+def _render_finance_register():
+    raw = st.session_state.get('finance_invoice_raw')
+    image = st.session_state.get('finance_invoice_image')
+    if not raw or not image:
+        return
+    st.subheader('发票费用登记')
+    if raw.get('mock'):
+        st.warning('模拟识别数据，仅写入模拟主表。')
+    st.write({'商品或服务': raw.get('item_name'), '不含税金额': raw.get('amount_excluding_tax'),
+              '发票税额': raw.get('tax_amount'), '税率/征收率': raw.get('tax_rate'),
+              '价税合计': raw.get('invoice_amount')})
+    st.caption('按票面信息登记；税额、税率直接保存，抵扣资格另行判断。')
+    if st.button('记录到财务主表', key='finance_register_save'):
+        try:
+            report = live_services.register_finance_invoice(raw, image[0], image[1])
+            if report['rejected']:
+                st.error(report['rejected'][0]['reason'])
+            elif report['duplicates']:
+                st.info('这张发票已登记，本次未重复新增。')
+            else:
+                st.success('已记录到财务主表。')
+            if not report['rejected']:
+                st.session_state['finance_download_mode'] = report['source_mode']
+        except (ValueError, OSError) as exc:
+            st.error('登记未完成：%s' % exc)
+    mode = st.session_state.get('finance_download_mode')
+    if mode:
+        try:
+            st.download_button('下载财务主表', live_services.finance_download(mode),
+                               file_name='finance_master_'+mode+'.xlsx',
+                               mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                               key='finance_register_download')
+        except (ValueError,OSError):
+            pass
+
+
 def render_invoice() -> None:
     theme.hero_compact(
         "发票数据感知",
-        "DeepSeek 多模态识别 → 50L 缺失容错 → calc_carbon → 全局碳账。",
+        "发票识别、费用登记与柴油碳排演算。",
         kicker="01 / INVOICE PERCEPTION", badges=["多模态 OCR", "估算留痕", "状态共享"])
     uploaded = st.file_uploader(
         "上传发票图片", type=["jpg", "jpeg", "png", "webp", "gif"],
@@ -69,6 +123,9 @@ def render_invoice() -> None:
             _run_invoice(uploaded)
     if st.session_state.get("invoice_error"):
         st.error(st.session_state["invoice_error"])
+    if st.session_state.get('finance_invoice_notice'):
+        st.info(st.session_state['finance_invoice_notice'])
+    _render_finance_register()
     result = st.session_state.get("current_invoice_result")
     if result:
         if result.get("is_estimated"):

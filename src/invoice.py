@@ -80,6 +80,8 @@ EXTRACT_PROMPT = (
     "  fuel_liters    柴油加注数量 / 加油升数（单位：升 L；非柴油发票填 null）\n"
     "  plate          车牌号（若票面有则填，否则空字符串）\n"
     "  invoice_date   开票日期（YYYY-MM-DD）\n"
+    "  invoice_type   发票标题类型，照票面原文；没有则空字符串\n"
+    "  tax_rate       税率/征收率，保留百分号或免税、不征税文字；没有则空字符串，多税率填空\n"
     "规则：\n"
     "1. 只认图片中真实印刷的文字和数字，不要推算、不要用常识补全、不要自行分类；\n"
     "2. 只输出一个 JSON 对象，不要任何解释文字、不要 Markdown 代码块；\n"
@@ -87,7 +89,7 @@ EXTRACT_PROMPT = (
     "\"seller_name\":\"\",\"invoice_amount\":null,\"amount_excluding_tax\":null,"
     "\"tax_amount\":null,\"item_name\":\"\",\"quantity\":null,\"unit\":\"\","
     "\"unit_price\":null,\"fuel_liters\":null,\"plate\":\"\","
-    "\"invoice_date\":\"\"}；\n"
+    "\"invoice_date\":\"\",\"invoice_type\":\"\",\"tax_rate\":\"\"}；\n"
     "4. 某个字段确实读不出时：数字字段填 null，文本字段填空字符串；\n"
     "5. 多行明细不得合并数量或自行选择一行，quantity 填 null；\n"
     "6. 若整张图都不是发票，输出 {\"error\":\"not_an_invoice\"}。"
@@ -388,6 +390,8 @@ def parse_invoice(obj: Dict[str, Any]) -> Dict[str, Any]:
         "invoice_amount": amount,
         "amount_excluding_tax": net_amount,
         "tax_amount": tax_amount,
+        "invoice_type": _to_text(obj.get("invoice_type")),
+        "tax_rate": _to_text(obj.get("tax_rate")),
         "item_name": _to_text(obj.get("item_name")),
         "quantity": quantity,
         "unit": _to_text(obj.get("unit")),

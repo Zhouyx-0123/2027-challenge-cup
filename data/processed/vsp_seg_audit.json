@@ -103,5 +103,65 @@
     ],
     "verdict": "审计证据：数据自然边界 vs 论文档位；最终档标签以论文为准"
   },
-  "known_limit": "输入为趟级门到门平均速度，非逐秒剖面；OBD+GPS 上线后框架不变、输入升级"
+  "known_limit": "输入为趟级门到门平均速度，非逐秒剖面；OBD+GPS 上线后框架不变、输入升级",
+  "carbon": {
+    "rule_version": "SEG-RULE-v1",
+    "rule_statement": "排放率由速度档决定（档均速→档VSP→档乘数），时间按本趟实际；因子基准沿用趟次法定因子(g/km)",
+    "downstream_contract": "Q-learning/运筹侧以 vsp_seg_rule_table.parquet 的 ef_gkm(档,载重) × 里程 为路段成本系数；本模块不做优化",
+    "totals": {
+      "km": 2111819.46,
+      "kg_vsp_own_speed": 2387925.101,
+      "kg_binned": 2378000.852,
+      "delta_t": -9924.25,
+      "delta_pct": -0.416,
+      "excluded_trips": 131
+    },
+    "per_bin": [
+      {
+        "speed_bin": "低速档 <20",
+        "trips": 2793,
+        "km": 105777.89,
+        "kg_vsp": 344059.394,
+        "kg_binned": 342713.086,
+        "avg_delta_pct": -1.307,
+        "ef_binned_gkm": 3239.93
+      },
+      {
+        "speed_bin": "中低速档 20-40",
+        "trips": 3867,
+        "km": 257837.23,
+        "kg_vsp": 322539.362,
+        "kg_binned": 321485.61,
+        "avg_delta_pct": 0.333,
+        "ef_binned_gkm": 1246.85
+      },
+      {
+        "speed_bin": "中速档 40-60",
+        "trips": 3027,
+        "km": 500094.19,
+        "kg_vsp": 507533.464,
+        "kg_binned": 499145.503,
+        "avg_delta_pct": -0.455,
+        "ef_binned_gkm": 998.1
+      },
+      {
+        "speed_bin": "中高速档 60-80",
+        "trips": 2144,
+        "km": 1134003.54,
+        "kg_vsp": 1161609.695,
+        "kg_binned": 1162098.553,
+        "avg_delta_pct": 0.103,
+        "ef_binned_gkm": 1024.78
+      },
+      {
+        "speed_bin": "高速档 ≥80",
+        "trips": 205,
+        "km": 114106.61,
+        "kg_vsp": 52183.186,
+        "kg_binned": 52558.1,
+        "avg_delta_pct": 1.238,
+        "ef_binned_gkm": 460.61
+      }
+    ]
+  }
 }

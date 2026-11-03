@@ -12,13 +12,20 @@ from src import schema
 from src.vsp_segment import (
     PAPER_BIN_EDGES,
     RESULT_AUDIT,
+    RESULT_CARBON,
+    RESULT_RULES,
     RESULT_TRIPS,
     SPEED_MAX_KMH,
+    bin_carbon,
+    bin_multiplier,
     boundary_alignment,
+    build_rule_table,
     build_segments,
+    clean_speed_for_time,
     elbow_k,
     kmeans_1d,
     paper_bin_label,
+    rule_ef,
     speed_gates,
 )
 
@@ -118,6 +125,7 @@ def sample_trips() -> pd.DataFrame:
         "month": ["2023-11"] * 8,
         "distance_km": [10.0, 30.0, 50.0, 70.0, 5.0, 20.0, 40.0, 60.0],
         "speed_kmh": [10.0, 30.0, 50.0, 70.0, -1.0, 200.0, 45.0, 65.0],
+        "ef_g_km": [394.56] * 8,
         "vehicle_group": ["g"] * 8,
     })
 
@@ -159,11 +167,92 @@ def test_seg_verdict_paper_wins(sample_trips):
 
 
 # --------------------------------------------------------------------------
+# 计碳规则卡 + 分档计碳
+# --------------------------------------------------------------------------
+def test_rule_table_shape_and_version():
+    rules = build_rule_table()
+    assert len(rules) == 30                     # 5 档 × 6 载重锚点
+    assert (rules["rule_version"] == "SEG-RULE-v1").all()
+    assert set(rules["load_t"]) == {4.5, 12.0, 18.0, 30.0, 40.0, 45.0}
+
+
+def test_rule_table_ef_increases_with_load():
+    rules = build_rule_table()
+    mid = rules[rules["speed_bin"] == "中速档 40-60"].sort_values("load_t")
+    assert mid["ef_gkm"].is_monotonic_increasing
+
+
+def test_rule_table_ef_lowest_at_high_speed():
+    """同一载重下，速度越高 EF 越低（VSP 乘数 ≤ 中速档锚点 1.0 的档更省）。"""
+    rules = build_rule_table()
+    lo = rules[(rules["speed_bin"] == "低速档 <20") & (rules["load_t"] == 18.0)]["ef_gkm"].iloc[0]
+    mid = rules[(rules["speed_bin"] == "中速档 40-60") & (rules["load_t"] == 18.0)]["ef_gkm"].iloc[0]
+    hi = rules[(rules["speed_bin"] == "高速档 ≥80") & (rules["load_t"] == 18.0)]["ef_gkm"].iloc[0]
+    assert lo > mid > hi
+
+
+def test_mid_bin_multiplier_is_unity():
+    """中速档档中值 50 km/h → VSP=2.0（锚点）→ 乘数恰为 1.0（口径自洽）。"""
+    assert abs(bin_multiplier(50.0) - 1.0) < 1e-9
+
+
+def test_rule_ef_interpolates_load():
+    rules = build_rule_table()
+    ef = rule_ef(rules, "中速档 40-60", 15.0)   # 介于 12 与 18 之间
+    lo = rule_ef(rules, "中速档 40-60", 12.0)
+    hi = rule_ef(rules, "中速档 40-60", 18.0)
+    assert lo < ef < hi
+
+
+def test_bin_carbon_math_hand_checked():
+    trips = pd.DataFrame({
+        "trip_id": [1],
+        "month": ["2023-11"],
+        "distance_km": [50.0],
+        "speed_kmh": [50.0],
+        "ef_g_km": [544.752],
+        "passed": [True],
+        "speed_bin": ["中速档 40-60"],
+    })
+    audit = {"paper_bins": [{"speed_bin": "中速档 40-60", "bin_mean_speed": 50.0}]}
+    seg, summary = bin_carbon(trips, audit)
+    # ER = 544.752/72×1.0 = 7.566 g/s；秒 = 50/50×3600 = 3600；kg = 7.566×3600/1000
+    assert abs(seg["kg_co2_binned"].iloc[0] - 7.566 * 3.6) < 1e-6
+    # 本趟速度 = 档均速 → 两条轨相等
+    assert abs(seg["kg_co2_vsp_own"].iloc[0] - seg["kg_co2_binned"].iloc[0]) < 1e-6
+    assert abs(seg["binned_delta_pct"].iloc[0]) < 0.01
+
+
+def test_bin_carbon_excludes_invalid(sample_trips):
+    seg_trips, audit = build_segments(sample_trips)
+    carbon, summary = bin_carbon(seg_trips, audit)
+    assert carbon["kg_co2_binned"].isna().sum() == 2          # 2 趟门禁未过
+    assert summary["totals"]["excluded_trips"] == 2
+
+
+def test_bin_carbon_summary_contract(sample_trips):
+    seg_trips, audit = build_segments(sample_trips)
+    _, summary = bin_carbon(seg_trips, audit)
+    assert summary["rule_version"] == "SEG-RULE-v1"
+    assert "不做优化" in summary["downstream_contract"]
+    assert len(summary["per_bin"]) == 5
+
+
+def test_rule_table_no_optimizer_keywords():
+    """规则卡里不允许出现优化/决策字段——规则与运筹分界。"""
+    rules = build_rule_table()
+    forbidden = {"cost", "optimal", "action", "reward", "q_value", "decision"}
+    assert not (set(rules.columns) & forbidden)
+
+
+# --------------------------------------------------------------------------
 # 并列轨纪律：不碰主结果表
 # --------------------------------------------------------------------------
 def test_result_tables_registered_in_schema():
     assert schema.RESULT_FILES["vsp_seg_trips"] == RESULT_TRIPS
     assert schema.RESULT_FILES["vsp_seg_audit"] == RESULT_AUDIT
+    assert schema.RESULT_FILES["vsp_seg_carbon"] == RESULT_CARBON
+    assert schema.RESULT_FILES["vsp_seg_rule_table"] == RESULT_RULES
 
 
 def test_module_writes_only_its_own_tables(tmp_path, sample_trips, monkeypatch):

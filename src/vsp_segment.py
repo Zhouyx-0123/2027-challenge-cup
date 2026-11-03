@@ -43,10 +43,20 @@ import numpy as np
 import pandas as pd
 
 from src import schema
-from src.factor_model import vsp_from_speed
+from src.factor_model import (
+    INDUSTRY_SPEED_KMH,
+    LOAD_ANCHORS,
+    SECONDS_PER_HOUR,
+    VSP_X,
+    VSP_MULT,
+    factor_lookup,
+    vsp_from_speed,
+)
 
 #: 版本：档位边界或门禁规则变更必须 bump
 SEG_VERSION = "PAPER-BIN-v1"
+#: 计碳规则版本：规则卡（档位×载重→g/km）口径变更必须 bump
+RULE_VERSION = "SEG-RULE-v1"
 
 #: 论文锚定速度档（km/h）：左闭右开。依据见模块 docstring。
 PAPER_BIN_EDGES = np.array([0.0, 20.0, 40.0, 60.0, 80.0, np.inf])
@@ -70,6 +80,8 @@ KMEANS_SEED = 20261103  # 固定种子：结果可复现
 
 RESULT_TRIPS = "vsp_seg_trips.parquet"
 RESULT_AUDIT = "vsp_seg_audit.json"
+RESULT_CARBON = "vsp_seg_carbon.parquet"
+RESULT_RULES = "vsp_seg_rule_table.parquet"
 
 
 # --------------------------------------------------------------------------
@@ -274,10 +286,141 @@ def build_segments(trips: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         "known_limit": "输入为趟级门到门平均速度，非逐秒剖面；OBD+GPS 上线后框架不变、输入升级",
     }
 
-    out_cols = ["trip_id", "month", "speed_kmh", "distance_km",
+    out_cols = ["trip_id", "month", "speed_kmh", "distance_km", "ef_g_km",
                 "vehicle_group", "speed_bin", "speed_flag_seg", "passed"]
     cols = [c for c in out_cols if c in df.columns]
     return df[cols], audit
+
+
+# --------------------------------------------------------------------------
+# 计碳规则卡 + 分档计碳（只定规则，不做优化）
+# --------------------------------------------------------------------------
+def clean_speed_for_time(speed_kmh: pd.Series) -> np.ndarray:
+    """时间口径的速度清洗：与 carbon_model.VSP 轨同一策略（≤1 → 行业均速，
+    截断 1~130）——保证分档轨与现行 VSP 轨**只差 VSP 来源**，可干净对拍。"""
+    s = pd.to_numeric(speed_kmh, errors="coerce")
+    s = s.where(s > 1.0, INDUSTRY_SPEED_KMH)
+    return s.clip(lower=1.0, upper=130.0).to_numpy(dtype=float)
+
+
+def bin_multiplier(bin_mean_speed: float) -> float:
+    """档均速 → VSP 代理 → 排放率乘数（唯一真源：factor_model 曲线）。"""
+    vsp = float(vsp_from_speed([bin_mean_speed])[0])
+    return float(np.interp(vsp, VSP_X, VSP_MULT))
+
+
+def build_rule_table() -> pd.DataFrame:
+    """**分段计碳规则卡**：档位 × 载重锚点 → ER(g/s) 与 EF(g/km)。
+
+    这是交给下游（Q-learning 路径成本）的**唯一接口**：
+        路段成本(kg) = EF(档, 载重) × 路段里程 / 1000
+    规则卡不含任何优化逻辑——优化是下一棒的事。
+    """
+    rows: List[Dict[str, Any]] = []
+    for label, mid in zip(PAPER_BIN_LABELS, [10.0, 30.0, 50.0, 70.0, 90.0]):
+        mult = bin_multiplier(mid)
+        vsp = float(vsp_from_speed([mid])[0])
+        for load in LOAD_ANCHORS:
+            factor = float(factor_lookup(np.asarray([load]))[0])   # g/km @50km/h 基准
+            er = factor / 72.0 * mult                              # g/s（72 = 3600/50）
+            ef = er * SECONDS_PER_HOUR / mid                       # g/km：ER 按档均速摊到公里
+            rows.append({
+                "speed_bin": label,
+                "bin_mid_kmh": mid,
+                "bin_vsp_proxy": round(vsp, 3),
+                "vsf_multiplier": round(mult, 4),
+                "load_t": float(load),
+                "factor_base_gkm": round(factor, 2),
+                "er_gs": round(er, 4),
+                "ef_gkm": round(ef, 2),
+                "rule_version": RULE_VERSION,
+            })
+    return pd.DataFrame(rows)
+
+
+def rule_ef(rule_table: pd.DataFrame, speed_bin: str, load_t: float) -> float:
+    """从规则卡查 EF(g/km)：档位精确匹配 + 载重线性插值（越界取端点）。"""
+    sub = rule_table[rule_table["speed_bin"] == speed_bin]
+    if sub.empty:
+        raise KeyError(f"规则卡无此档位: {speed_bin}")
+    sub = sub.sort_values("load_t")
+    return float(np.interp(load_t, sub["load_t"].to_numpy(),
+                           sub["ef_gkm"].to_numpy()))
+
+
+def bin_carbon(seg: pd.DataFrame, audit: Dict[str, Any]) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    """分档计碳（规则=档位 VSP 决定排放率，时间按本趟实际）：
+
+        kg_binned_i = EF 基准_i(g/km) × mult(档) / 72 × 秒_i / 1000
+        秒_i = 里程_i / 清洗速度_i × 3600
+
+    同表并排现行 VSP 轨（本趟速度→VSP），两者**只差 VSP 来源**，
+    差值即"分档规则"本身带来的口径变化，全程可对拍。
+    """
+    if "ef_g_km" not in seg.columns:
+        raise ValueError("趟次表缺少 ef_g_km（法定因子 g/km）列")
+    df = seg.copy()
+    df["speed_clean"] = clean_speed_for_time(df["speed_kmh"])
+    df["seconds"] = df["distance_km"] / df["speed_clean"] * SECONDS_PER_HOUR
+
+    bin_mid = {r["speed_bin"]: r["bin_mean_speed"] for r in audit["paper_bins"]}
+    bin_mid = {k: (v if v > 0 else 10.0) for k, v in bin_mid.items()}  # 空档兜底
+
+    mult_bin = df["speed_bin"].map(lambda b: bin_multiplier(bin_mid.get(b, 10.0)))
+    mult_bin = pd.to_numeric(mult_bin, errors="coerce")
+    valid = df["passed"].to_numpy() & mult_bin.notna().to_numpy()
+
+    mult_bin = mult_bin.fillna(1.0).to_numpy(dtype=float)
+    factor = pd.to_numeric(df["ef_g_km"], errors="coerce").fillna(544.752).to_numpy(dtype=float)
+    seconds = df["seconds"].fillna(0.0).to_numpy(dtype=float)
+
+    er_bin = factor / 72.0 * mult_bin
+    kg_binned = er_bin * seconds / 1000.0
+    kg_binned[~valid] = np.nan
+
+    vsp_own = vsp_from_speed(df["speed_clean"])
+    er_own = factor / 72.0 * np.interp(vsp_own, VSP_X, VSP_MULT)
+    kg_vsp = er_own * seconds / 1000.0
+    kg_vsp[~valid] = np.nan
+
+    df["kg_co2_vsp_own"] = np.round(kg_vsp, 6)
+    df["kg_co2_binned"] = np.round(kg_binned, 6)
+    df["binned_delta_pct"] = np.round(
+        np.where(kg_vsp > 0, (kg_binned - kg_vsp) / kg_vsp * 100.0, 0.0), 3)
+
+    ok = df[df["passed"]].copy()
+    per_bin = (ok.groupby("speed_bin")
+                 .agg(trips=("trip_id", "size"),
+                      km=("distance_km", "sum"),
+                      kg_vsp=("kg_co2_vsp_own", "sum"),
+                      kg_binned=("kg_co2_binned", "sum"),
+                      avg_delta_pct=("binned_delta_pct", "mean"))
+                 .reindex(PAPER_BIN_LABELS).fillna(0.0).reset_index())
+    per_bin["ef_binned_gkm"] = np.where(
+        per_bin["km"] > 0, per_bin["kg_binned"] * 1000.0 / per_bin["km"], 0.0)
+    for c in ("km", "kg_vsp", "kg_binned"):
+        per_bin[c] = per_bin[c].round(3)
+    per_bin["ef_binned_gkm"] = per_bin["ef_binned_gkm"].round(2)
+    per_bin["avg_delta_pct"] = per_bin["avg_delta_pct"].round(3)
+
+    summary = {
+        "rule_version": RULE_VERSION,
+        "rule_statement": "排放率由速度档决定（档均速→档VSP→档乘数），时间按本趟实际；因子基准沿用趟次法定因子(g/km)",
+        "downstream_contract": "Q-learning/运筹侧以 vsp_seg_rule_table.parquet 的 ef_gkm(档,载重) × 里程 为路段成本系数；本模块不做优化",
+        "totals": {
+            "km": round(float(ok["distance_km"].sum()), 3),
+            "kg_vsp_own_speed": round(float(ok["kg_co2_vsp_own"].sum()), 3),
+            "kg_binned": round(float(ok["kg_co2_binned"].sum()), 3),
+            "delta_t": round(float(ok["kg_co2_binned"].sum() - ok["kg_co2_vsp_own"].sum()), 3),
+            "delta_pct": round(float(
+                (ok["kg_co2_binned"].sum() / ok["kg_co2_vsp_own"].sum() - 1.0) * 100.0), 3),
+            "excluded_trips": int((~df["passed"]).sum()),
+        },
+        "per_bin": per_bin.to_dict("records"),
+    }
+    cols = ["trip_id", "month", "speed_kmh", "speed_bin", "distance_km",
+            "kg_co2_vsp_own", "kg_co2_binned", "binned_delta_pct", "passed"]
+    return df[[c for c in cols if c in df.columns]], summary
 
 
 def main() -> None:
@@ -299,14 +442,30 @@ def main() -> None:
     audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2),
                           encoding="utf-8")
 
+    # ---- 计碳规则卡 + 分档计碳（只定规则，优化在下游 Q-learning）----
+    rules = build_rule_table()
+    carbon, carbon_summary = bin_carbon(seg, audit)
+    rules_path = out_dir / RESULT_RULES
+    carbon_path = out_dir / RESULT_CARBON
+    rules.to_parquet(rules_path, index=False)
+    carbon.to_parquet(carbon_path, index=False)
+    audit["carbon"] = carbon_summary
+    audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+
     # 自检输出契约
-    assert RESULT_TRIPS in schema.RESULT_FILES.values(), \
-        "vsp_seg_trips 未在 schema.RESULT_FILES 注册"
+    for key in (RESULT_TRIPS, RESULT_CARBON, RESULT_RULES):
+        assert key in schema.RESULT_FILES.values(), f"{key} 未在 schema.RESULT_FILES 注册"
     print(f"[vsp_segment] trips -> {seg_path} ({len(seg)} rows)")
     print(f"[vsp_segment] audit -> {audit_path}")
+    print(f"[vsp_segment] rules -> {rules_path} ({len(rules)} rows)")
+    print(f"[vsp_segment] carbon -> {carbon_path} ({len(carbon)} rows)")
     print(f"[vsp_segment] gates: {audit['gates']['passed']}/{audit['gates']['total']} passed; "
           f"K*={audit['kmeans']['k_selected']}; "
           f"centers={audit['kmeans']['centers_kmh']}")
+    t = audit["carbon"]["totals"]
+    print(f"[vsp_segment] carbon: vsp_own={t['kg_vsp_own_speed']} kg | "
+          f"binned={t['kg_binned']} kg | delta={t['delta_pct']}%")
 
 
 if __name__ == "__main__":

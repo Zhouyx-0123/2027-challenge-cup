@@ -65,12 +65,36 @@ K-means：肘部法选 **K\*=3**，簇心 **15.16 / 38.16 / 64.42 km/h**，与�
 | 文件 | 注册名 | 内容 |
 |---|---|---|
 | `data/processed/vsp_seg_trips.parquet` | `vsp_seg_trips` | 每趟：trip_id / speed_kmh / speed_bin / speed_flag_seg / passed |
-| `data/processed/vsp_seg_audit.json` | `vsp_seg_audit` | 门禁计数、档位统计、K 扫描、簇心-论文对齐、已知局限 |
+| `data/processed/vsp_seg_audit.json` | `vsp_seg_audit` | 门禁计数、档位统计、K 扫描、簇心-论文对齐、计碳汇总、已知局限 |
+| `data/processed/vsp_seg_rule_table.parquet` | `vsp_seg_rule_table` | **计碳规则卡**：档位×载重锚点 → VSP 代理 / 乘数 / ER(g/s) / EF(g/km)，30 行 |
+| `data/processed/vsp_seg_carbon.parquet` | `vsp_seg_carbon` | 每趟：kg_co2_vsp_own（现行逐趟速度轨）/ kg_co2_binned（分档规则轨）/ delta% |
 
 ```bash
 python -m src.vsp_segment --out data/processed
-pytest -q tests/test_vsp_segment.py        # 26 项
+pytest -q tests/test_vsp_segment.py        # 35 项
 ```
+
+## 3.5 计碳规则（本模块只定规则，优化在下游 Q-learning）
+
+**规则语句**：排放率由速度档决定——档均速 → 档 VSP → 档乘数；时间按本趟实际；因子基准沿用趟次法定因子 (g/km)。
+
+```
+kg_binned(趟) = 法定因子(g/km) / 72 × mult(档VSP) × 秒(本趟) / 1000
+路段成本(kg)  = ef_gkm(档, 载重) × 路段里程 / 1000     ← Q-learning 的唯一接口
+```
+
+**对拍结果（2026-11-03，12,036 有效趟 / 211.2 万 km）**：
+
+| 轨 | 总量 |
+|---|---|
+| 现行逐趟速度 VSP 轨 | 2,387.925 t |
+| **分档规则轨** | **2,378.001 t** |
+| 差异 | **−0.416%** |
+
+分档碳汇总：低速档 EF 3,239.9 g/km（2,793 趟）→ 中低速 1,246.9 → 中速 998.1 → 中高速 1,024.8 → 高速 460.6 g/km。
+低速档 EF 显著最高，与吴睿中"<20 km/h 载重效应显著"结论方向一致。
+
+**分界声明**：本模块输出的规则卡（`vsp_seg_rule_table.parquet`）是运筹侧的**成本系数表**——Q-learning 同学以 `ef_gkm(档, 载重) × 里程` 作为路径/方案碳成本，本模块不包含任何优化、决策或搜索逻辑（有测试守这条线：规则卡禁止出现优化类字段）。
 
 ## 4. 诚实边界（答辩主动说）
 

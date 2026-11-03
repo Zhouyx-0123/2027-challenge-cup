@@ -88,6 +88,8 @@ RESULT_FILES: Dict[str, str] = {
     # 不参与主闸门对拍；由 src/vsp_segment.py 从趟次表确定性导出
     "vsp_seg_trips": "vsp_seg_trips.parquet",
     "vsp_seg_audit": "vsp_seg_audit.json",
+    "vsp_seg_carbon": "vsp_seg_carbon.parquet",
+    "vsp_seg_rule_table": "vsp_seg_rule_table.parquet",
 }
 
 # --------------------------------------------------------------------------

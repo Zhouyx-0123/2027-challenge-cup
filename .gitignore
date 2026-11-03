@@ -89,6 +89,10 @@ data/processed/*
 !data/processed/obd_vsp_crosscheck.parquet
 !data/processed/obd_vsp_crosscheck_points.parquet
 !data/processed/obd_vsp_crosscheck_summary.json
+# 论文锚定速度分段 + K-means 归档轨（docs/58）：**并列轨**，不改 E₀ 主账；
+# 结果表由 src/vsp_segment.py 从趟次表确定性导出，可复现故入库
+!data/processed/vsp_seg_trips.parquet
+!data/processed/vsp_seg_audit.json
 data/processed/route_geo.parquet
 # 上海—北京 OSM 碳基线（docs/35 D2/D3）：非实时 · 固定因子 · 道路等级 proxy
 !data/processed/route_baseline_sh_bj_steps.parquet

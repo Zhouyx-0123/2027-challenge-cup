@@ -1,0 +1,107 @@
+{
+  "seg_version": "PAPER-BIN-v1",
+  "method": "论文锚定分箱(主口径) + 1D K-means(归档验证)",
+  "paper_basis": [
+    "吴睿中等(2024) LC-VSP：10~80 km/h 为主区间、<20 km/h 载重效应显著、>110 判异常",
+    "白孝轩等(2026) 多元动态因子：EF 为速度非线性多项式(式2)，分段降低 Jensen 偏差",
+    "吴老师 2026-11-02 指导：分段标准锚定工科论文实测档位，K-means 负责归档"
+  ],
+  "gates": {
+    "speed_min_kmh": 0.0,
+    "speed_max_kmh": 110.0,
+    "total": 12167,
+    "passed": 12036,
+    "flagged": 131
+  },
+  "paper_bins": [
+    {
+      "speed_bin": "低速档 <20",
+      "trips": 2793,
+      "trip_share_pct": 23.21,
+      "bin_mean_speed": 11.34,
+      "bin_vsp_proxy": 0.067
+    },
+    {
+      "speed_bin": "中低速档 20-40",
+      "trips": 3867,
+      "trip_share_pct": 32.13,
+      "bin_mean_speed": 29.82,
+      "bin_vsp_proxy": 0.991
+    },
+    {
+      "speed_bin": "中速档 40-60",
+      "trips": 3027,
+      "trip_share_pct": 25.15,
+      "bin_mean_speed": 49.62,
+      "bin_vsp_proxy": 1.981
+    },
+    {
+      "speed_bin": "中高速档 60-80",
+      "trips": 2144,
+      "trip_share_pct": 17.81,
+      "bin_mean_speed": 66.9,
+      "bin_vsp_proxy": 2.845
+    },
+    {
+      "speed_bin": "高速档 ≥80",
+      "trips": 205,
+      "trip_share_pct": 1.7,
+      "bin_mean_speed": 92.35,
+      "bin_vsp_proxy": 4.0
+    }
+  ],
+  "kmeans": {
+    "k_selected": 3,
+    "selection": "肘部法(惯性二阶差分)，K 扫描 2~6",
+    "k_scan": [
+      {
+        "k": 2.0,
+        "inertia": 1543964.4282931932
+      },
+      {
+        "k": 3.0,
+        "inertia": 766214.6358173946
+      },
+      {
+        "k": 4.0,
+        "inertia": 480467.3937835863
+      },
+      {
+        "k": 5.0,
+        "inertia": 339486.9284591038
+      },
+      {
+        "k": 6.0,
+        "inertia": 229302.16175293055
+      }
+    ],
+    "centers_kmh": [
+      15.16,
+      38.16,
+      64.42
+    ],
+    "inertia": 766214.64,
+    "boundary_alignment_vs_paper": [
+      {
+        "kmeans_center_kmh": 15.16,
+        "nearest_paper_mid_kmh": 10.0,
+        "nearest_paper_bin": "低速(论文10)",
+        "deviation_kmh": 5.16
+      },
+      {
+        "kmeans_center_kmh": 38.16,
+        "nearest_paper_mid_kmh": 30.0,
+        "nearest_paper_bin": "中低速(论文30)",
+        "deviation_kmh": 8.16
+      },
+      {
+        "kmeans_center_kmh": 64.42,
+        "nearest_paper_mid_kmh": 70.0,
+        "nearest_paper_bin": "中高速(论文70)",
+        "deviation_kmh": -5.58
+      }
+    ],
+    "verdict": "审计证据：数据自然边界 vs 论文档位；最终档标签以论文为准"
+  },
+  "known_limit": "输入为趟级门到门平均速度，非逐秒剖面；OBD+GPS 上线后框架不变、输入升级"
+}

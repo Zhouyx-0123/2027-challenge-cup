@@ -84,6 +84,10 @@ RESULT_FILES: Dict[str, str] = {
     "carbon_ledger_quota": "carbon_ledger_quota.json",
     "carbon_ledger_activity_readiness": "carbon_ledger_activity_readiness.json",
     "carbon_ledger_rules": "carbon_ledger_rules.json",
+    # 论文锚定速度分段 + K-means 归档轨（docs/58）：**并列轨**，不改 E₀ 主账、
+    # 不参与主闸门对拍；由 src/vsp_segment.py 从趟次表确定性导出
+    "vsp_seg_trips": "vsp_seg_trips.parquet",
+    "vsp_seg_audit": "vsp_seg_audit.json",
 }
 
 # --------------------------------------------------------------------------

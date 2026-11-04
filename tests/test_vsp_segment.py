@@ -258,24 +258,109 @@ def test_result_tables_registered_in_schema():
     assert schema.RESULT_FILES["vsp_seg_rule_table"] == RESULT_RULES
 
 
-def test_module_writes_only_its_own_tables(tmp_path, sample_trips, monkeypatch):
-    """跑分段前后，主账结果表一个字节都不能变（与 OBD 轨同一纪律）。"""
-    main_tables = [
-        tmp_path / "baseline_carbon.parquet",
-        tmp_path / "wide_data.parquet",
-        tmp_path / "final_report.json",
-    ]
-    for p in main_tables:
+def test_module_writes_only_its_own_tables(tmp_path, monkeypatch):
+    """真跑一次 main()：主账结果表一个字节都不能变（并列轨纪律）。
+
+    这条测试以前是空壳（只比键集、且主表是 tmp_path 里的假文件），
+    现在改成真的调用 main()，并把「主账段表」当成被读入的输入文件，
+    跑完再逐字节比对。
+    """
+    import sys
+    from src import vsp_segment as vs
+
+    trips = pd.DataFrame({
+        "trip_id": [1, 2, 3],
+        "month": ["2023-11"] * 3,
+        "distance_km": [50.0, 30.0, 80.0],
+        "speed_kmh": [50.0, 30.0, 70.0],
+        "ef_g_km": [544.752] * 3,
+        "vehicle_group": ["中型代表组（18t代理）"] * 3,
+    })
+    trips_path = tmp_path / "vsp_physical_trips.parquet"
+    trips.to_parquet(trips_path, index=False)
+
+    ledger = pd.DataFrame({
+        "trip_id": [1, 2, 3],
+        "factor_gkm": [544.752, 544.752, 1055.952],
+        "kg_co2_phys": [10.0, 6.0, 30.0],
+        "load_t": [18.0, 18.0, 30.0],
+        "vclass": [2, 2, 3],
+        "vehicle_type": ["9.6米厢式货车"] * 3,
+        "trip_km": [50.0, 30.0, 80.0],
+        "speed_kmh": [50.0, 30.0, 70.0],
+        "factor_version": ["JCB2023-BASE-v1"] * 3,
+    })
+    ledger_path = tmp_path / "baseline_carbon.parquet"
+    ledger.to_parquet(ledger_path, index=False)
+
+    # 主账结果表：跑之前就存在，跑完必须一个字节都不变
+    # （ledger_path 是**真 parquet**——它是 main() 要读的输入，跑完也要原样不动）
+    main_tables = [ledger_path,
+                   tmp_path / "wide_data.parquet",
+                   tmp_path / "final_report.parquet"]
+    for p in main_tables[1:]:
         p.write_bytes(b"frozen-main-table")
     before = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in main_tables}
 
-    seg, audit = build_segments(sample_trips)   # 纯内存计算，无盘上副作用
-    for p in main_tables:
-        p.write_bytes(b"pretend-other-process")
+    out = tmp_path / "out"
+    monkeypatch.setattr(sys, "argv", ["vsp_segment", "--out", str(out),
+                                       "--trips", str(trips_path),
+                                       "--ledger", str(ledger_path)])
+    vs.main()
+
     after = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in main_tables}
-    # 计算本身不落盘（写盘只发生在 main() 的 out_dir），主表哈希由调用方持有
-    assert set(before) == set(after)
-    assert not seg.empty and audit["gates"]["passed"] == 6
+    assert before == after, f"主账表被改了：{before} -> {after}"
+    for name in (RESULT_TRIPS, RESULT_AUDIT, RESULT_CARBON, RESULT_RULES,
+                 RESULT_RECON):
+        assert (out / name).exists(), f"缺产出 {name}"
+    assert not (out / "baseline_carbon.parquet").exists()
+
+
+# --------------------------------------------------------------------------
+# 算碳纪律：缺失留空（不写 0 / 不写默认因子）
+# --------------------------------------------------------------------------
+def test_bin_carbon_leaves_excluded_delta_blank():
+    """被门禁排除的趟：偏差**留空**，不写 0（真的 0 仍然是 0）。"""
+    trips = pd.DataFrame({
+        "trip_id": [1, 2],
+        "month": ["2023-11", "2023-11"],
+        "distance_km": [50.0, 50.0],
+        "speed_kmh": [50.0, 200.0],           # 第 2 趟 >110 → 门禁排除
+        "ef_g_km": [544.752, 544.752],
+        "passed": [True, False],
+        "speed_bin": ["中速档 40-60", "invalid"],
+    })
+    audit = {"paper_bins": [{"speed_bin": "中速档 40-60", "bin_mean_speed": 50.0}]}
+    seg, _ = bin_carbon(trips, audit)
+    assert pd.isna(seg["binned_delta_pct"].iloc[1])
+    assert seg["binned_delta_pct"].iloc[0] == 0.0
+
+
+def test_bin_carbon_missing_factor_stays_blank():
+    """缺因子 → 碳留空，不许用默认因子 544.752 静默兜底。"""
+    trips = pd.DataFrame({
+        "trip_id": [1],
+        "month": ["2023-11"],
+        "distance_km": [50.0],
+        "speed_kmh": [50.0],
+        "ef_g_km": [float("nan")],
+        "passed": [True],
+        "speed_bin": ["中速档 40-60"],
+    })
+    audit = {"paper_bins": [{"speed_bin": "中速档 40-60", "bin_mean_speed": 50.0}]}
+    seg, _ = bin_carbon(trips, audit)
+    assert pd.isna(seg["kg_co2_binned"].iloc[0])
+    assert pd.isna(seg["kg_co2_vsp_own"].iloc[0])
+
+
+def test_kmeans_labels_follow_input_order():
+    """labels 必须对应**输入顺序**的下标（不是排序后的下标）。"""
+    import numpy as np
+    x = np.array([50.0, 10.0, 30.0, 70.0, 20.0, 60.0])
+    labels, centers, _ = kmeans_1d(x, 2)
+    for i, v in enumerate(x):
+        assert labels[i] == int(np.abs(centers - v).argmin()), \
+            f"第 {i} 个样本标签 {labels[i]} 不对应其值 {v}"
 
 
 # --------------------------------------------------------------------------

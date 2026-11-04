@@ -21,17 +21,17 @@
        界**逐一对齐，输出偏差审计。最终档标签以论文为准——K-means 回答
        的是"我们数据自己的结构长什么样、和论文口径差多少"，不是另立一套。
 
-因子口径差异（方案 B，2026-11-03）：分档轨用趟次表的**车辆组代表因子**，
-主账用 **(车型, 载重)** 因子，两套口径不同 → 同一趟碳值不同。差异**逐趟
-落成可查表** ``vsp_seg_factor_recon.parquet`` 并登记进 audit JSON，
-**本模块不改计碳逻辑**（详见 docs/58 §3.6）。
-
 边界纪律（与 OBD 实测轨同一套）：
     · 不改 ``src/pipeline.py`` 任何口径与 28 条主闸门判据；
     · 不写主链路结果表；结果单独落 ``data/processed/vsp_seg_*.parquet``；
     · 因子与 VSP 代理曲线只从 :mod:`src.factor_model` 读（唯一真源）；
     · 已知局限（诚实边界）：输入是**趟级平均速度**，不是逐秒剖面——
       OBD+GPS 上线后，同一套分档/归档框架可无缝切换到秒级输入。
+
+因子口径差异（方案 B，2026-11-03）：分档轨用趟次表的**车辆组代表因子**，
+主账用 **(车型, 载重)** 因子，两套口径不同 → 同一趟碳值不同。差异**逐趟
+落成可查表** ``vsp_seg_factor_recon.parquet`` 并登记进 audit JSON，
+**本模块不改计碳逻辑**（详见 docs/58 §3.6）。
 
 用法::
 
@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -97,6 +98,15 @@ FACTOR_RECON_THRESHOLD_PCT = 1.0
 # --------------------------------------------------------------------------
 # 数据门禁
 # --------------------------------------------------------------------------
+def _json_safe(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """NaN → None：严格 JSON 不允许 NaN，缺失一律留空（不写 0）。"""
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        out.append({k: (None if isinstance(v, float) and math.isnan(v) else v)
+                    for k, v in r.items()})
+    return out
+
+
 def speed_gates(speed_kmh: pd.Series) -> pd.DataFrame:
     """逐趟速度门禁：返回 flags 列表（空列表 = 通过）。"""
     s = pd.to_numeric(speed_kmh, errors="coerce")
@@ -137,7 +147,10 @@ def kmeans_1d(values: np.ndarray, k: int,
     k-means++ 初始化 + 固定种子，结果确定可复现。
     """
     rng = np.random.default_rng(seed)
-    x = np.sort(np.asarray(values, dtype=float))
+    raw = np.asarray(values, dtype=float)
+    # 排序只为算得稳；labels 必须映射回**输入顺序**（否则标签是排序后下标）
+    order = np.argsort(raw, kind="stable")
+    x = raw[order]
     n = x.size
     # ---- k-means++ 初始化 ----
     centers = [float(x[rng.integers(n)])]
@@ -173,6 +186,10 @@ def kmeans_1d(values: np.ndarray, k: int,
     remap = {old: new for new, old in enumerate(used)}
     labels = np.asarray([remap[l] for l in labels], dtype=int)
     centers = centers[used]
+    # 映射回**输入顺序**：inv[原始下标] = 排序后下标
+    inv = np.empty(order.size, dtype=int)
+    inv[order] = np.arange(order.size)
+    labels = labels[inv]
     return labels, centers, inertia
 
 
@@ -380,9 +397,11 @@ def bin_carbon(seg: pd.DataFrame, audit: Dict[str, Any]) -> Tuple[pd.DataFrame, 
     mult_bin = pd.to_numeric(mult_bin, errors="coerce")
     valid = df["passed"].to_numpy() & mult_bin.notna().to_numpy()
 
-    mult_bin = mult_bin.fillna(1.0).to_numpy(dtype=float)
-    factor = pd.to_numeric(df["ef_g_km"], errors="coerce").fillna(544.752).to_numpy(dtype=float)
-    seconds = df["seconds"].fillna(0.0).to_numpy(dtype=float)
+    # 缺失一律留空（NaN），不写默认因子/默认倍率——缺什么就算不出碳，
+    # 静默兜底会把「没数据」变成「看起来有结果」。
+    mult_bin = mult_bin.to_numpy(dtype=float)
+    factor = pd.to_numeric(df["ef_g_km"], errors="coerce").to_numpy(dtype=float)
+    seconds = df["seconds"].to_numpy(dtype=float)
 
     er_bin = factor / 72.0 * mult_bin
     kg_binned = er_bin * seconds / 1000.0
@@ -395,8 +414,9 @@ def bin_carbon(seg: pd.DataFrame, audit: Dict[str, Any]) -> Tuple[pd.DataFrame, 
 
     df["kg_co2_vsp_own"] = np.round(kg_vsp, 6)
     df["kg_co2_binned"] = np.round(kg_binned, 6)
+    # 被门禁排除的趟：两条轨都算不出碳 → 偏差**留空**，不写 0
     df["binned_delta_pct"] = np.round(
-        np.where(kg_vsp > 0, (kg_binned - kg_vsp) / kg_vsp * 100.0, 0.0), 3)
+        np.where(kg_vsp > 0, (kg_binned - kg_vsp) / kg_vsp * 100.0, np.nan), 3)
 
     ok = df[df["passed"]].copy()
     per_bin = (ok.groupby("speed_bin")
@@ -405,28 +425,34 @@ def bin_carbon(seg: pd.DataFrame, audit: Dict[str, Any]) -> Tuple[pd.DataFrame, 
                       kg_vsp=("kg_co2_vsp_own", "sum"),
                       kg_binned=("kg_co2_binned", "sum"),
                       avg_delta_pct=("binned_delta_pct", "mean"))
-                 .reindex(PAPER_BIN_LABELS).fillna(0.0).reset_index())
+                 .reindex(PAPER_BIN_LABELS).reset_index())
+    # 空档：趟数/里程/碳量是"真的 0 趟"，保留 0；比率类指标算不出 → 留空
+    for c in ("trips", "km", "kg_vsp", "kg_binned"):
+        per_bin[c] = per_bin[c].fillna(0.0)
+    per_bin["avg_delta_pct"] = per_bin["avg_delta_pct"].where(per_bin["trips"] > 0)
     per_bin["ef_binned_gkm"] = np.where(
-        per_bin["km"] > 0, per_bin["kg_binned"] * 1000.0 / per_bin["km"], 0.0)
+        per_bin["km"] > 0, per_bin["kg_binned"] * 1000.0 / per_bin["km"], np.nan)
     for c in ("km", "kg_vsp", "kg_binned"):
         per_bin[c] = per_bin[c].round(3)
     per_bin["ef_binned_gkm"] = per_bin["ef_binned_gkm"].round(2)
     per_bin["avg_delta_pct"] = per_bin["avg_delta_pct"].round(3)
 
+    kg_vsp_sum = float(ok["kg_co2_vsp_own"].sum())
+    kg_bin_sum = float(ok["kg_co2_binned"].sum())
     summary = {
         "rule_version": RULE_VERSION,
         "rule_statement": "排放率由速度档决定（档均速→档VSP→档乘数），时间按本趟实际；因子基准沿用趟次法定因子(g/km)",
         "downstream_contract": "Q-learning/运筹侧以 vsp_seg_rule_table.parquet 的 ef_gkm(档,载重) × 里程 为路段成本系数；本模块不做优化",
         "totals": {
             "km": round(float(ok["distance_km"].sum()), 3),
-            "kg_vsp_own_speed": round(float(ok["kg_co2_vsp_own"].sum()), 3),
-            "kg_binned": round(float(ok["kg_co2_binned"].sum()), 3),
-            "delta_t": round(float(ok["kg_co2_binned"].sum() - ok["kg_co2_vsp_own"].sum()), 3),
-            "delta_pct": round(float(
-                (ok["kg_co2_binned"].sum() / ok["kg_co2_vsp_own"].sum() - 1.0) * 100.0), 3),
+            "kg_vsp_own_speed": round(kg_vsp_sum, 3),
+            "kg_binned": round(kg_bin_sum, 3),
+            "delta_t": round(kg_bin_sum - kg_vsp_sum, 3),
+            "delta_pct": (round((kg_bin_sum / kg_vsp_sum - 1.0) * 100.0, 3)
+                          if kg_vsp_sum > 0 else None),
             "excluded_trips": int((~df["passed"]).sum()),
         },
-        "per_bin": per_bin.to_dict("records"),
+        "per_bin": _json_safe(per_bin.to_dict("records")),
     }
     cols = ["trip_id", "month", "speed_kmh", "speed_bin", "distance_km",
             "kg_co2_vsp_own", "kg_co2_binned", "binned_delta_pct", "passed"]

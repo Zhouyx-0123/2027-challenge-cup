@@ -90,6 +90,9 @@ RESULT_FILES: Dict[str, str] = {
     "vsp_seg_audit": "vsp_seg_audit.json",
     "vsp_seg_carbon": "vsp_seg_carbon.parquet",
     "vsp_seg_rule_table": "vsp_seg_rule_table.parquet",
+    # 因子口径对账表（docs/58 §3.6，方案 B）：分档轨代表因子 vs 主账
+    # (车型,载重) 因子的逐趟差异登记；**只读审计件**，不改计碳逻辑
+    "vsp_seg_factor_recon": "vsp_seg_factor_recon.parquet",
 }
 
 # --------------------------------------------------------------------------

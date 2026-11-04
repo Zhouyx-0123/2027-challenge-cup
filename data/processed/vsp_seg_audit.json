@@ -163,5 +163,35 @@
         "ef_binned_gkm": 460.61
       }
     ]
+  },
+  "factor_reconciliation": {
+    "status": "ok",
+    "policy": "并列轨口径差异登记：分档轨沿用车辆组代表因子，主账按(车型,载重)因子；本模块不改计碳逻辑，差异逐趟落成可查表",
+    "ledger_file": "data/processed/baseline_carbon.parquet",
+    "ledger_factor_version": "JCB2023-BASE-v1",
+    "basis": "主账物理轨 kg_co2_phys（分摊合计，对齐通过门禁的同一趟群）",
+    "threshold_pct": 1.0,
+    "trips_compared": 12036,
+    "trips_unmatched_ledger": 0,
+    "mismatch_trips": 428,
+    "mismatch_share_pct": 3.56,
+    "mismatch_carbon_share_pct": 20.8014,
+    "median_abs_factor_diff_pct": 30.18,
+    "max_abs_factor_diff_pct": 248.41,
+    "kg_ledger_physical_total": 2302240.876,
+    "kg_seg_vsp_own_total": 2387925.101,
+    "kg_seg_binned_total": 2378000.852,
+    "delta_kg_factor_effect": 85684.225,
+    "delta_pct_factor_effect": 3.7218,
+    "delta_kg_multiplier_effect": -9924.25,
+    "delta_pct_multiplier_effect": -0.4156,
+    "delta_kg_net": 75759.976,
+    "delta_pct_net": 3.2907,
+    "mismatch_delta_kg_factor": 85685.058,
+    "mismatch_delta_kg_multiplier": -1682.522,
+    "mismatch_delta_kg_net": 84002.537,
+    "mismatch_share_of_net_delta_pct": 110.8798,
+    "lookup_file": "vsp_seg_factor_recon.parquet",
+    "verdict": "净差 = 因子口径效应 + 分档乘数效应（档均速 VSP 替代本趟速度 VSP）；因子效应集中在少数趟，可按 trip_id 查 vsp_seg_factor_recon.parquet"
   }
 }

@@ -10,15 +10,18 @@ import pytest
 
 from src import schema
 from src.vsp_segment import (
+    FACTOR_RECON_THRESHOLD_PCT,
     PAPER_BIN_EDGES,
     RESULT_AUDIT,
     RESULT_CARBON,
+    RESULT_RECON,
     RESULT_RULES,
     RESULT_TRIPS,
     SPEED_MAX_KMH,
     bin_carbon,
     bin_multiplier,
     boundary_alignment,
+    build_factor_reconciliation,
     build_rule_table,
     build_segments,
     clean_speed_for_time,
@@ -273,3 +276,102 @@ def test_module_writes_only_its_own_tables(tmp_path, sample_trips, monkeypatch):
     # 计算本身不落盘（写盘只发生在 main() 的 out_dir），主表哈希由调用方持有
     assert set(before) == set(after)
     assert not seg.empty and audit["gates"]["passed"] == 6
+
+
+# --------------------------------------------------------------------------
+# 因子口径对账（方案 B：只登记，不改计碳逻辑）
+# --------------------------------------------------------------------------
+@pytest.fixture()
+def recon_sample():
+    """3 趟样例：2 趟因子一致（主账 758.0 vs 分档 759.24 → 差 0.16%，
+    低于阈值不计），1 趟代表因子远高于主账因子（必须进差异表）。"""
+    seg = pd.DataFrame({
+        "trip_id": [1, 2, 3],
+        "month": ["2023-11"] * 3,
+        "speed_kmh": [30.0, 50.0, 65.0],
+        "distance_km": [40.0, 50.0, 60.0],
+        "ef_g_km": [759.24, 759.24, 1374.672],
+        "vehicle_group": ["中型代表组（18t代理）"] * 2 + ["重型代表组（40t代理）"],
+    })
+    carbon = pd.DataFrame({
+        "trip_id": [1, 2, 3],
+        "kg_co2_vsp_own": [30.0, 37.5, 80.0],
+        "kg_co2_binned": [29.0, 37.5, 80.0],
+        "passed": [True, True, True],
+    })
+    ledger = pd.DataFrame({
+        "trip_id": [1, 2, 3],
+        "factor_gkm": [758.0, 759.24, 1055.952],
+        "kg_co2_phys": [25.0, 37.5, 50.0],
+        "load_t": [18.0, 18.0, 30.0],
+        "vclass": [2, 2, 3],
+        "vehicle_type": ["9.6米厢式货车"] * 2 + ["牵引车头"],
+        "trip_km": [40.0, 50.0, 60.0],
+        "speed_kmh": [30.0, 50.0, 65.0],
+        "factor_version": ["JCB2023-BASE-v1"] * 3,
+    })
+    return seg, carbon, ledger
+
+
+def test_factor_recon_registered_in_schema():
+    assert schema.RESULT_FILES["vsp_seg_factor_recon"] == RESULT_RECON
+
+
+def test_factor_recon_selects_only_mismatched_trips(recon_sample):
+    """只有因子差超阈值的趟进表；0.16% 的那趟不进。"""
+    seg, carbon, ledger = recon_sample
+    out, summary = build_factor_reconciliation(seg, carbon, ledger)
+    assert out["trip_id"].tolist() == [3]
+    assert summary["trips_compared"] == 3
+    assert summary["mismatch_trips"] == 1
+    assert summary["threshold_pct"] == FACTOR_RECON_THRESHOLD_PCT
+
+
+def test_factor_recon_decomposition_is_additive(recon_sample):
+    """三段差必须可加：因子效应 + 分档乘数效应 = 净差。"""
+    seg, carbon, ledger = recon_sample
+    out, _ = build_factor_reconciliation(seg, carbon, ledger)
+    row = out.iloc[0]
+    assert abs(row["kg_delta_factor"] + row["kg_delta_multiplier"]
+               - row["kg_delta_binned"]) < 1e-9
+    assert abs(row["kg_delta_factor"] - (80.0 - 50.0)) < 1e-9
+    assert abs(row["kg_delta_multiplier"] - (80.0 - 80.0)) < 1e-9
+    assert abs(row["kg_delta_binned"] - (80.0 - 50.0)) < 1e-9
+
+
+def test_factor_recon_summary_matches_rows(recon_sample):
+    seg, carbon, ledger = recon_sample
+    out, summary = build_factor_reconciliation(seg, carbon, ledger)
+    assert abs(summary["kg_ledger_physical_total"] - 112.5) < 1e-9
+    assert abs(summary["kg_seg_binned_total"] - 146.5) < 1e-9
+    assert abs(summary["delta_kg_net"] - 34.0) < 1e-9
+    assert abs(summary["delta_kg_factor_effect"] - 35.0) < 1e-9
+    assert abs(summary["delta_kg_multiplier_effect"] - (-1.0)) < 1e-9
+    assert abs(summary["mismatch_delta_kg_net"] - 30.0) < 1e-9
+    assert summary["lookup_file"] == RESULT_RECON
+
+
+def test_factor_recon_does_not_touch_carbon(recon_sample):
+    """对账是只读旁路：调用前后计碳表必须逐值不变（不改计碳逻辑）。"""
+    seg, carbon, ledger = recon_sample
+    before = carbon.copy(deep=True)
+    build_factor_reconciliation(seg, carbon, ledger)
+    pd.testing.assert_frame_equal(carbon, before)
+
+
+def test_factor_recon_requires_ledger_columns(recon_sample):
+    seg, carbon, ledger = recon_sample
+    with pytest.raises(ValueError):
+        build_factor_reconciliation(seg, carbon, ledger.drop(columns=["factor_gkm"]))
+
+
+def test_factor_recon_leaves_missing_out_and_counts_it(recon_sample):
+    """主账缺失的趟不进表、差异留空（不写 0），并计入 unmatched 计数。"""
+    seg, carbon, ledger = recon_sample
+    ledger2 = ledger.copy()
+    ledger2.loc[2, "factor_gkm"] = float("nan")
+    out, summary = build_factor_reconciliation(seg, carbon, ledger2)
+    assert out["trip_id"].tolist() == []
+    assert summary["trips_unmatched_ledger"] == 1
+    assert summary["mismatch_trips"] == 0
+    assert summary["median_abs_factor_diff_pct"] is None

@@ -21,6 +21,11 @@
        界**逐一对齐，输出偏差审计。最终档标签以论文为准——K-means 回答
        的是"我们数据自己的结构长什么样、和论文口径差多少"，不是另立一套。
 
+因子口径差异（方案 B，2026-11-03）：分档轨用趟次表的**车辆组代表因子**，
+主账用 **(车型, 载重)** 因子，两套口径不同 → 同一趟碳值不同。差异**逐趟
+落成可查表** ``vsp_seg_factor_recon.parquet`` 并登记进 audit JSON，
+**本模块不改计碳逻辑**（详见 docs/58 §3.6）。
+
 边界纪律（与 OBD 实测轨同一套）：
     · 不改 ``src/pipeline.py`` 任何口径与 28 条主闸门判据；
     · 不写主链路结果表；结果单独落 ``data/processed/vsp_seg_*.parquet``；
@@ -37,7 +42,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -82,6 +87,11 @@ RESULT_TRIPS = "vsp_seg_trips.parquet"
 RESULT_AUDIT = "vsp_seg_audit.json"
 RESULT_CARBON = "vsp_seg_carbon.parquet"
 RESULT_RULES = "vsp_seg_rule_table.parquet"
+#: 因子口径对账表（方案 B：只登记差异，不改计碳逻辑）
+RESULT_RECON = "vsp_seg_factor_recon.parquet"
+
+#: 因子口径差异登记阈值（%）：代表因子 vs 主账 (车型,载重) 因子
+FACTOR_RECON_THRESHOLD_PCT = 1.0
 
 
 # --------------------------------------------------------------------------
@@ -423,12 +433,153 @@ def bin_carbon(seg: pd.DataFrame, audit: Dict[str, Any]) -> Tuple[pd.DataFrame, 
     return df[[c for c in cols if c in df.columns]], summary
 
 
+# --------------------------------------------------------------------------
+# 因子口径对账（方案 B：只登记差异，不改计碳逻辑）
+# --------------------------------------------------------------------------
+def build_factor_reconciliation(seg: pd.DataFrame, carbon: pd.DataFrame,
+                                ledger: pd.DataFrame,
+                                threshold_pct: float = FACTOR_RECON_THRESHOLD_PCT
+                                ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    """**因子口径对账表**：分档轨 vs 主账轨，逐趟可查。
+
+    背景（口径硬伤，登记在案，不在本模块修）：
+        · 分档轨用趟次表的**车辆组代表因子** ``ef_g_km``（6 个代表组锚点）；
+        · 主账段表用 **(车型, 载重)** 因子 ``factor_gkm``（17 个组合）。
+        两套因子口径不同 → 同一趟的碳值不同，差异**全部来自因子**，与速度、
+        里程无关（里程逐趟一致，速度差 ≤5e-4 km/h）。
+
+    本函数**不修改任何计碳结果**：只读取 :func:`bin_carbon` 已算好的
+    ``kg_co2_vsp_own`` / ``kg_co2_binned``，与主账物理轨
+    (``kg_co2_phys`` 分摊合计) 并排对拍，把差异逐趟落成可查表，
+    并给出净差分解（因子效应 / 分档乘数效应）。
+
+    缺失值一律留空（NaN），不写 0。
+    """
+    need = {"trip_id", "factor_gkm", "kg_co2_phys"}
+    missing = need - set(ledger.columns)
+    if missing:
+        raise ValueError(f"主账段表缺少列：{sorted(missing)}")
+
+    agg_map: Dict[str, Any] = {
+        "ledger_factor_gkm": ("factor_gkm", "first"),
+        "ledger_kg_phys": ("kg_co2_phys", "sum"),
+    }
+    for src, dst in (("load_t", "ledger_load_t"),
+                     ("vclass", "ledger_vclass"),
+                     ("vehicle_type", "ledger_vehicle_type"),
+                     ("trip_km", "ledger_dist_km"),
+                     ("speed_kmh", "ledger_speed_kmh"),
+                     ("factor_version", "ledger_factor_version"),
+                     ("vtype_code", "ledger_vtype_code")):
+        if src in ledger.columns:
+            agg_map[dst] = (src, "first")
+    led = ledger.groupby("trip_id", as_index=False).agg(**agg_map)
+
+    left_cols = [c for c in ("trip_id", "month", "speed_kmh", "distance_km",
+                             "ef_g_km", "vehicle_group") if c in seg.columns]
+    right_cols = [c for c in ("trip_id", "kg_co2_vsp_own", "kg_co2_binned",
+                              "passed") if c in carbon.columns]
+    df = seg[left_cols].merge(carbon[right_cols], on="trip_id",
+                              how="inner", validate="1:1")
+    df = df.merge(led, on="trip_id", how="left", validate="1:1")
+
+    df["factor_diff_gkm"] = df["ef_g_km"] - df["ledger_factor_gkm"]
+    df["factor_diff_pct"] = df["factor_diff_gkm"] / df["ledger_factor_gkm"] * 100.0
+    # 三条差：因子效应（逐趟速度轨 vs 主账）/ 分档乘数效应 / 净差
+    df["kg_delta_factor"] = df["kg_co2_vsp_own"] - df["ledger_kg_phys"]
+    df["kg_delta_multiplier"] = df["kg_co2_binned"] - df["kg_co2_vsp_own"]
+    df["kg_delta_binned"] = df["kg_co2_binned"] - df["ledger_kg_phys"]
+
+    if "passed" in df.columns:
+        ok = df[df["passed"]].copy()
+    else:
+        ok = df.copy()
+    unmatched = int(ok["ledger_factor_gkm"].isna().sum())
+    ok = ok[ok["ledger_factor_gkm"].notna()]
+
+    mis = ok[ok["factor_diff_pct"].abs() > threshold_pct].copy()
+
+    kg_led = float(ok["ledger_kg_phys"].sum())
+    kg_vsp = float(ok["kg_co2_vsp_own"].sum())
+    kg_bin = float(ok["kg_co2_binned"].sum())
+    mis_led = float(mis["ledger_kg_phys"].sum())
+    mis_vsp = float(mis["kg_co2_vsp_own"].sum())
+    mis_bin = float(mis["kg_co2_binned"].sum())
+
+    def _pct(num: float, den: float) -> Optional[float]:
+        if den == 0.0:
+            return None
+        return round(num / den * 100.0, 4)
+
+    net = kg_bin - kg_led
+    mis_net = mis_bin - mis_led
+    summary: Dict[str, Any] = {
+        "status": "ok",
+        "policy": ("并列轨口径差异登记：分档轨沿用车辆组代表因子，主账按(车型,载重)因子；"
+                   "本模块不改计碳逻辑，差异逐趟落成可查表"),
+        "ledger_file": "data/processed/baseline_carbon.parquet",
+        "ledger_factor_version": (str(led["ledger_factor_version"].iloc[0])
+                                  if "ledger_factor_version" in led.columns
+                                  and len(led) else None),
+        "basis": "主账物理轨 kg_co2_phys（分摊合计，对齐通过门禁的同一趟群）",
+        "threshold_pct": float(threshold_pct),
+        "trips_compared": int(len(ok)),
+        "trips_unmatched_ledger": unmatched,
+        "mismatch_trips": int(len(mis)),
+        "mismatch_share_pct": round(len(mis) / max(len(ok), 1) * 100.0, 2),
+        "mismatch_carbon_share_pct": _pct(mis_bin, kg_bin),
+        "median_abs_factor_diff_pct": (round(float(mis["factor_diff_pct"].abs().median()), 2)
+                                       if len(mis) else None),
+        "max_abs_factor_diff_pct": (round(float(mis["factor_diff_pct"].abs().max()), 2)
+                                    if len(mis) else None),
+        "kg_ledger_physical_total": round(kg_led, 3),
+        "kg_seg_vsp_own_total": round(kg_vsp, 3),
+        "kg_seg_binned_total": round(kg_bin, 3),
+        "delta_kg_factor_effect": round(kg_vsp - kg_led, 3),
+        "delta_pct_factor_effect": _pct(kg_vsp - kg_led, kg_led),
+        "delta_kg_multiplier_effect": round(kg_bin - kg_vsp, 3),
+        "delta_pct_multiplier_effect": _pct(kg_bin - kg_vsp, kg_vsp),
+        "delta_kg_net": round(net, 3),
+        "delta_pct_net": _pct(net, kg_led),
+        "mismatch_delta_kg_factor": round(mis_vsp - mis_led, 3),
+        "mismatch_delta_kg_multiplier": round(mis_bin - mis_vsp, 3),
+        "mismatch_delta_kg_net": round(mis_net, 3),
+        "mismatch_share_of_net_delta_pct": _pct(mis_net, net),
+        "lookup_file": RESULT_RECON,
+        "verdict": ("净差 = 因子口径效应 + 分档乘数效应（档均速 VSP 替代本趟速度 VSP）；"
+                    "因子效应集中在少数趟，可按 trip_id 查 " + RESULT_RECON),
+    }
+
+    out_cols = ["trip_id", "month", "vehicle_group", "ledger_vehicle_type",
+                "ledger_vclass", "ledger_load_t", "ledger_vtype_code",
+                "speed_kmh", "ledger_speed_kmh", "distance_km", "ledger_dist_km",
+                "ef_g_km", "ledger_factor_gkm", "factor_diff_gkm", "factor_diff_pct",
+                "ledger_kg_phys", "kg_co2_vsp_own", "kg_co2_binned",
+                "kg_delta_factor", "kg_delta_multiplier", "kg_delta_binned",
+                "ledger_factor_version", "seg_version", "rule_version"]
+    out = mis[[c for c in out_cols if c in mis.columns]].copy()
+    out["seg_version"] = SEG_VERSION
+    out["rule_version"] = RULE_VERSION
+    for c in ("factor_diff_gkm", "factor_diff_pct", "kg_delta_factor",
+              "kg_delta_multiplier", "kg_delta_binned"):
+        if c in out.columns:
+            out[c] = out[c].round(6)
+    for c in ("ledger_kg_phys", "kg_co2_vsp_own", "kg_co2_binned"):
+        if c in out.columns:
+            out[c] = out[c].round(6)
+    out = out.sort_values(["factor_diff_pct"], key=lambda s: s.abs(),
+                          ascending=False).reset_index(drop=True)
+    return out, summary
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="论文锚定速度分段 + K-means 归档")
     parser.add_argument("--out", default="data/processed",
                         help="输出目录（默认 data/processed）")
     parser.add_argument("--trips", default="data/processed/vsp_physical_trips.parquet",
                         help="输入趟次表路径")
+    parser.add_argument("--ledger", default="data/processed/baseline_carbon.parquet",
+                        help="主账段表路径（因子口径对账用；缺失则跳过对账）")
     args = parser.parse_args()
 
     out_dir = Path(args.out)
@@ -453,8 +604,26 @@ def main() -> None:
     audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2),
                           encoding="utf-8")
 
+    # ---- 因子口径对账（方案 B：只登记，不改计碳逻辑）----
+    ledger_path = Path(args.ledger)
+    recon_path = out_dir / RESULT_RECON
+    if ledger_path.exists():
+        ledger = pd.read_parquet(ledger_path)
+        recon, recon_summary = build_factor_reconciliation(seg, carbon, ledger)
+        recon.to_parquet(recon_path, index=False)
+        audit["factor_reconciliation"] = recon_summary
+    else:
+        recon = pd.DataFrame()
+        audit["factor_reconciliation"] = {
+            "status": "skipped",
+            "reason": f"主账段表不存在：{ledger_path}",
+            "policy": "并列轨口径差异登记：分档轨沿用车辆组代表因子，主账按(车型,载重)因子",
+        }
+    audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+
     # 自检输出契约
-    for key in (RESULT_TRIPS, RESULT_CARBON, RESULT_RULES):
+    for key in (RESULT_TRIPS, RESULT_CARBON, RESULT_RULES, RESULT_RECON):
         assert key in schema.RESULT_FILES.values(), f"{key} 未在 schema.RESULT_FILES 注册"
     print(f"[vsp_segment] trips -> {seg_path} ({len(seg)} rows)")
     print(f"[vsp_segment] audit -> {audit_path}")
@@ -466,6 +635,14 @@ def main() -> None:
     t = audit["carbon"]["totals"]
     print(f"[vsp_segment] carbon: vsp_own={t['kg_vsp_own_speed']} kg | "
           f"binned={t['kg_binned']} kg | delta={t['delta_pct']}%")
+    fr = audit["factor_reconciliation"]
+    if fr.get("status") == "ok":
+        print(f"[vsp_segment] factor recon -> {recon_path} ({len(recon)} rows); "
+              f"mismatch {fr['mismatch_trips']}/{fr['trips_compared']} trips; "
+              f"net {fr['delta_kg_net']} kg ({fr['delta_pct_net']}%) = "
+              f"factor {fr['delta_kg_factor_effect']} + mult {fr['delta_kg_multiplier_effect']}")
+    else:
+        print(f"[vsp_segment] factor recon skipped: {fr.get('reason')}")
 
 
 if __name__ == "__main__":

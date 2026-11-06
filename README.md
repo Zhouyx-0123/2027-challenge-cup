@@ -30,10 +30,15 @@
 > **边界**：本通道是独立轨道 —— **不写入 E₀ 主口径、不参与主闸门对拍**，
 > 主账口径与 28 条判据保持冻结。设计细节见 `docs/52_OBD_GPS_实测碳排方向.md`。
 
+**没有大量 OBD 时怎么办**：主账不依赖 OBD，先用 12,036 趟历史数据做 5 档速度 × 2 档载重先验；
+OBD 只做校准轨，每层 25 单、完整试点 250 单、60 单最小试点。样本不足时因子自动退回 1，
+不改 E0、不把 demo 当实测。实现见 `src/obd_calibration.py`，方案见 `docs/62_OBD稀疏校准与试点方案.md`。
+
 ```bash
 python -m src.obd_pipeline --demo      # 生成演示结果表（确定性演示序列）
 python -m src.obd_pipeline              # 读 data/raw/obd_gps/ 的真实流
 python -m src.obd_vsp_crosscheck        # 模型(VSP) × 实测(碳平衡法) 对照验证
+python -m src.obd_calibration --out outputs/obd_calibration  # 无 OBD 时的 10 层先验与试点规划
 ```
 
 **对照验证轨**回答老师那句判据：「你测的和这些估的能不能对得上？对不上，那估的可能就不用了。」

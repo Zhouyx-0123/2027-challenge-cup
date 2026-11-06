@@ -129,6 +129,15 @@ data/interim/
 # ===== 负责人个人文档（不入库，团队看 docs/17）=====
 docs/19_负责人执行方案.*
 
+# ===== OBD 校准场景表：由 src/obd_calibration.py 从主表重生成 =====
+outputs/obd_calibration/
+
+# ===== 高德路线图渲染产物：HTML 含 JS key，Chrome profile 是本地状态 =====
+outputs/report/amap_route_figure.html
+outputs/report/_chrome_profile*/
+outputs/report/_map_test*
+outputs/report/_crop_right.png
+
 # ===== 临时文件 =====
 _tmp*
 .dsh-office-*/

@@ -1,0 +1,304 @@
+{
+  "version": "rl-policy-v1",
+  "updated": "2026-11-03",
+  "owner": "算法层；排放因子与价格只引用 config/calc_factors.json 的同源数值，不另立口径",
+  "notes": "Q-learning 动态路径决策的全部超参、因子与场景默认值。代码里不再硬编码任何系数；改这里的值必须 bump version 并重跑 tools/rl_fit_emission.py 与 pytest tests/test_rl_*.py。",
+  "emission": {
+    "model": "EF(g/km) = [A + a·(P/v) + B + b·P + (C + c·P)·v + (D + d·P)·v²] · k_{i,j}",
+    "units": {
+      "EF": "g CO2/km",
+      "v": "km/h（路段平均车速）",
+      "P": "kW（路段平均发动机功率）",
+      "k_ij": "无量纲"
+    },
+    "provenance": "占位标定：燃料守恒 + 功率模型生成目标曲线，锚定既有因子表 50 km/h；非 PEMS 实测。R²=0.954/0.977/0.977，锚点偏差 −14.3%/+2.6%/+0.5%。",
+    "coefficients": {
+      "1": {
+        "A": 388.582,
+        "a": 803.566,
+        "B": 0.0,
+        "b": 0.0,
+        "C": -9.3645,
+        "c": 0.0,
+        "D": 0.05493,
+        "d": 0.0
+      },
+      "2": {
+        "A": 488.822,
+        "a": 895.0,
+        "B": 0.0,
+        "b": 0.0,
+        "C": -17.5691,
+        "c": 0.0,
+        "D": 0.12395,
+        "d": 0.0
+      },
+      "3": {
+        "A": 592.21,
+        "a": 870.885,
+        "B": 0.0,
+        "b": 0.0,
+        "C": -20.0778,
+        "c": 0.0,
+        "D": 0.14009,
+        "d": 0.0
+      }
+    },
+    "speed_bins_kmh": [
+      0,
+      20,
+      40,
+      60,
+      80,
+      130
+    ],
+    "min_speed_kmh": 5.0,
+    "max_speed_kmh": 130.0,
+    "fuel": {
+      "diesel_kwh_per_l": 9.94,
+      "diesel_kg_co2_per_l": 3.16,
+      "engine_efficiency": 0.4,
+      "note": "3.16 = calc_factors.json 的 2.63(TTW)+0.53(WTT)；9.94 kWh/L 为柴油低位热值"
+    }
+  },
+  "vehicles": {
+    "1": {
+      "curb_mass_kg": 2500,
+      "cd_a_m2": 3.2,
+      "crr": 0.01,
+      "driveline_eff": 0.9,
+      "aux_kw": 1.0,
+      "idle_kw": 4.0,
+      "max_power_kw": 120
+    },
+    "2": {
+      "curb_mass_kg": 8000,
+      "cd_a_m2": 5.0,
+      "crr": 0.008,
+      "driveline_eff": 0.89,
+      "aux_kw": 2.0,
+      "idle_kw": 8.0,
+      "max_power_kw": 200
+    },
+    "3": {
+      "curb_mass_kg": 15000,
+      "cd_a_m2": 6.8,
+      "crr": 0.007,
+      "driveline_eff": 0.88,
+      "aux_kw": 3.0,
+      "idle_kw": 12.0,
+      "max_power_kw": 330
+    }
+  },
+  "k_ij": {
+    "note": "道路等级 i × 载重分箱 j 的修正系数。默认值为占位假设（支路低速起停多、重载爬坡多），接入 OBD 实测后用 src.rl.clustering.calibrate_k_table 按「实测/预测」比值中位数重标。",
+    "load_bins_edges": [
+      5.0,
+      15.0,
+      27.0
+    ],
+    "table": {
+      "1": [
+        0.97,
+        0.99,
+        1.0,
+        1.01
+      ],
+      "2": [
+        1.03,
+        1.04,
+        1.06,
+        1.08
+      ],
+      "3": [
+        1.1,
+        1.13,
+        1.16,
+        1.2
+      ],
+      "4": [
+        1.05,
+        1.06,
+        1.08,
+        1.1
+      ]
+    }
+  },
+  "correction": {
+    "_note": "模型残差修正器：按(道路等级×时段)学「实际/模型」比值，回灌路由边权。参数含义见 docs/59 §14.1。",
+    "n_buckets": 8,
+    "alpha": 0.25,
+    "min_samples": 3,
+    "floor": 0.5,
+    "ceiling": 2.5,
+    "enabled": true
+  },
+  "eta": {
+    "_note": "共形预测：P90 用滚动残差的分位数，样本不足时退回 2.5×MAE 缓冲。",
+    "p90_quantile": 0.9,
+    "residual_window": 400,
+    "min_residuals": 40
+  },
+  "sim": {
+    "_note": "仿真里故意保留的「模型偏差」：实际时间 = 模型 × 系数（按道路等级×时段）。学习器看不到这张表，只能从实测反推。默认值模拟「匝道/高架合流排队被模型低估」——这是真实导航最常见的系统性偏差。",
+    "model_bias": {
+      "time": {
+        "1": [
+          1.0,
+          1.0,
+          1.25,
+          1.1,
+          1.0,
+          1.05,
+          1.3,
+          1.15
+        ],
+        "4": [
+          1.15,
+          1.15,
+          1.45,
+          1.25,
+          1.15,
+          1.2,
+          1.55,
+          1.25
+        ]
+      },
+      "carbon": {}
+    }
+  },
+  "clustering": {
+    "k_state": 8,
+    "k_load": 4,
+    "features": [
+      "prev_congestion",
+      "out_congestion",
+      "load_t",
+      "grade_pct",
+      "hour"
+    ],
+    "progress_bins": 5,
+    "time_buckets": 8,
+    "seed": 20261103
+  },
+  "rl": {
+    "gamma": 1.0,
+    "alpha_v": 0.2,
+    "lambda": 0.7,
+    "alpha_var": 0.05,
+    "alpha_q": 0.15,
+    "gamma_q": 0.9,
+    "epsilon": 0.25,
+    "epsilon_min": 0.03,
+    "epsilon_decay": 0.99,
+    "double_q": true,
+    "max_steps": 120,
+    "switch_threshold": 0.08,
+    "switch_penalty": 0.02,
+    "min_replan_interval_min": 3.0
+  },
+  "strategies": [
+    {
+      "sid": "time",
+      "label": "时间优先",
+      "weights": {
+        "time": 1.0,
+        "carbon": 0.2,
+        "cost": 0.3
+      },
+      "description": "赶时效，碳与费用只做兜底"
+    },
+    {
+      "sid": "carbon",
+      "label": "低碳优先",
+      "weights": {
+        "time": 0.3,
+        "carbon": 1.0,
+        "cost": 0.25
+      },
+      "description": "配额吃紧或披露口径敏感时用"
+    },
+    {
+      "sid": "balanced",
+      "label": "均衡",
+      "weights": {
+        "time": 0.55,
+        "carbon": 0.55,
+        "cost": 0.45
+      },
+      "description": "日常默认，三维度都不吃亏"
+    },
+    {
+      "sid": "smooth",
+      "label": "抗堵稳健",
+      "weights": {
+        "time": 0.75,
+        "carbon": 0.35,
+        "cost": 0.55
+      },
+      "description": "事故/高峰时段优先绕开拥堵与收费"
+    }
+  ],
+  "operation_weights": {
+    "time": 0.45,
+    "carbon": 0.35,
+    "cost": 0.2,
+    "_note": "Q 的奖励口径（真实运营综合成本）。与策略预设解耦：预设是动作，这里是裁判标准。"
+  },
+  "traffic": {
+    "seed": 20261103,
+    "profile": "urban",
+    "weather": "clear",
+    "volume": 1.0,
+    "incident_rate_per_hour": 1.5,
+    "min_incident_min": 10,
+    "max_incident_min": 40
+  },
+  "economics": {
+    "fuel_price_yuan_per_l": 7.5,
+    "carbon_price_yuan_per_t": 100.0,
+    "energy_cost_per_km_yuan": 0.0
+  },
+  "scenarios": {
+    "_note": "答辩演示与离线训练用的行程组合。departure_minute 为 0–1440 的分钟数；6 个出发时刻 × 3 档载重 = 18 条样本，覆盖早晚高峰与夜间。",
+    "origins": [
+      "G00"
+    ],
+    "destinations": [
+      "G33"
+    ],
+    "departure_minutes": [
+      420,
+      480,
+      540,
+      780,
+      1020,
+      1140
+    ],
+    "loads_t": [
+      4.5,
+      18.0,
+      30.0
+    ],
+    "vclass": 3,
+    "weather": "clear"
+  },
+  "evaluation": {
+    "reference_strategy": "balanced",
+    "hindsight": true,
+    "report_path": "outputs/rl",
+    "eta_mae_tolerance_min": 3.0,
+    "carbon_mae_tolerance_pct": 15.0
+  },
+  "quota": {
+    "_note": "车队碳配额：配额越紧，运营口径的碳权重越高（压力→权重映射见 docs/59 §15）。enabled=false 或 pressure_buckets=1 时行为与 v1.1 一致；启用配额模式时程序把它设成 4。",
+    "enabled": false,
+    "budget_kg": 45.0,
+    "pressure_buckets": 1
+  },
+  "forecast": {
+    "_note": "15 分钟路段速度预报（BPR 反解 + 需求曲线外推），作为 ETA 的第三路预测；不改路由。",
+    "enabled": true,
+    "horizon_min": 15.0
+  }
+}

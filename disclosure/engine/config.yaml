@@ -1,0 +1,44 @@
+# ============================================================
+# 车辆碳排放转化演示 —— 唯一可调参数区
+# 改完本文件后重新运行 main.py，全部输出联动更新
+# 单位：碳价 = 元/tCO2e；基准线 = kgCO2e/km；区间幅度 = 小数
+# ============================================================
+
+# ---------- 碳价参数 ----------
+shadow_carbon_price_central: 80      # 影子碳价中枢：元/t，管理用前瞻价，明确区别于合规碳价（CEA 成交价）
+shadow_carbon_price_low: 50          # 影子碳价低情景：仅用于敏感性展示
+shadow_carbon_price_high: 120        # 影子碳价高情景：仅用于敏感性展示
+gap_carbon_price: 100                # 缺口模拟碳价：情景假设价，非 CEA 履约价
+shadow_price_source: "内部碳价演示假设；50/80/120元/t用于情景分析，不代表CEA现价，未进行市场校准"
+shadow_price_anchor_date: "2026-11-06"   # 情景设定日期，非市场成交日
+gap_price_source: "情景假设价（非 CEA 挂牌价、非履约成交价），用于演示传导，无政策依据"
+
+# ---------- 配额缺口参数 ----------
+baseline_intensity: 0.55             # 假设历史强度I，非历史统计结果、非官方基准；不是有效阈值
+
+scenario_control_factor: 0.99       # 北京方案第3.3节的99%控排系数
+scenario_intensity_mid: 0.52        # 假设历史强度情景二，非历史统计结果
+scenario_intensity_low: 0.50        # 假设历史强度情景三，非历史统计结果
+scenario_intensity_stress: 0.45     # 压力情景，仅展示正净缺口；非行业推荐值
+scenario_policy_source: "京环发〔2026〕7号附件3《北京市重点碳排放单位配额核定方案》第3.3节"
+scenario_policy_url: "https://sthjj.beijing.gov.cn/bjhrb/index/xxgk69/zfxxgk43/fdzdgknr2/zcfb/2024bzcwj/743948637/index.html"
+
+# ---------- 不确定性与因子 ----------
+uncertainty_range: 0.30              # 黄框假设带宽：±30%，演示假设，非量化不确定性
+gl_framework_version: "ISO 14083:2023（GLEC Framework 框架线）"
+gl_factor_set_version: "GLEC 中国默认排放系数集 v1.1（2024-12）"
+wtw_diesel: 96.175                   # 柴油 WTW，gCO2e/MJ
+wtw_petrol: 92.046                   # 汽油 WTW，gCO2e/MJ
+biofuel_declaration: "输入数据未申报生物燃料/HVO 掺混比例，按 0% 掺混处理；若实际存在掺混，黄框排放与因子一致性结论均需重算"
+
+# ---------- 报告期与口径 ----------
+report_period_start: "2026-11-01"    # 报告期起（含）
+report_period_end: "2026-11-10"      # 报告期止（含），单次快照，不年化
+scope2_declaration: "本演示未完成范围二单独核算；样例电力记录须复核范围归属，不能认定范围二不适用"
+
+# ---------- 体例与留档 ----------
+doc_version: "V1.0-policy-scenario"                  # 文件版本号
+data_cutoff: "2026-11-10"            # 数据截止日
+prepared_by: "（待填）"                # 编制人
+reviewed_by: "（待填）"                # 复核人
+retention_years: 5                   # 数据与底稿保留年限

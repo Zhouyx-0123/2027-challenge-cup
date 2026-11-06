@@ -9,7 +9,7 @@
 | 首页概览 | 展示总排放、配额缺口、财务风险和实时碳脉动 |
 | 发票数据感知 | DeepSeek 多模态识别、缺失油量 50 L 容错、统一碳核算 |
 | 云边端硬件监控 | ESP32 → Flask → CSV → Streamlit，2 秒刷新与 CO2 超标预警；监测窗口滑条联动实时窗口预览图；**第二个 tab 是 OBD+GPS 实测碳排**（守恒法，每车碳排）。⚠️ 第一个 tab 是**仓储/办公场所环境 CO₂ 监测与碳资产管理**，**不是运输排放测量**（运输排放由 OBD+GPS 实测轨与 VSP 模型轨承担，见 `docs/57`） |
-| 减碳路线沙盘 | 高德 JS API 2.0 精细地图、四维 NSGA-II、Q-learning 自适应变异与路线记忆；碳价滑条联动碳价敏感度图 |
+| 减碳路线沙盘 | 高德 JS API 2.0 精细地图、四维 NSGA-II、3×3 Q-learning 自适应变异与路线记忆；碳价滑条联动碳价敏感度图 |
 | 碳核算与台账 | 碳价和配额设置、动态配额缺口、披露附注与 CSV 下载；**第二个 tab 是碳会计 A0–A6 审计轨**（只读判定链） |
 
 ## OBD + GPS 实测碳排（工科测量方向）
@@ -40,6 +40,20 @@ python -m src.obd_vsp_crosscheck        # 模型(VSP) × 实测(碳平衡法) �
 实测轨 = 碳平衡法（守恒法，OBD 只测油耗）；模型轨 = VSP（速度剖面积分 / 平均速度法）。
 两者**互不替代、也不相加**。演示数据下模型 vs 实测偏差 **+3.75%**（±15% 容差内 → 对得上）；
 但**载重是扫描假设**，真实载重接入前不构成兜底结论。
+
+## Q-learning 动态路径决策（独立决策层）
+
+`src/rl/` 是 v1.2 的新决策栈：预测层用 TD(λ) 学「剩余时间 / 碳 / 费用」，决策层用 Double Q 在 4 套运营权重中选策略，再由 Dijkstra 按权重算路；支持拥堵快照、OBD 功率回填、配额压力与 15 分钟速度预报。
+
+**边界**：演示路网是 4×4 合成网 + 对角高架，不是京东真实线路；碳口径用 3.16 kgCO₂/L（WTW = 2.63 TTW + 0.53 WTT），与 E₀ 主账的 2.63 TTW 不同，不能与主账相加或直接对比；本模块不写 `data/processed`、不进 E₀ / 28 条闸门，也不与路段主表的 5 档 / 3 簇混用。`RecommendationService` 的 payload 与 `LiveTrip` 已就绪，Streamlit 页面尚未接线。
+
+```bash
+python tools/rl_demo.py --departure 480 --load 18
+python -m src.rl.train --episodes 900
+pytest tests/test_rl_*.py -q                 # 100 项
+```
+
+设计、实验与已知限制见 `docs/59_Q学习动态路径决策.md`。
 
 ## 碳账交付（碳会计线）
 
@@ -129,9 +143,10 @@ src/
   obd_pipeline.py              # OBD 实测碳排流水线（独立轨道，不动主闸门）
   carbon_ledger_export.py      # 碳账交付 → 前端只读结果表（适配器，不重算、不改交付物）
   routing/                     # 高德、路线碳核算与四维进化
+  rl/                          # Q-learning 动态路径决策（独立模块，demo 路网）
   ...                          # 数据复算与底层模型
 server.py                      # Flask 传感器接收服务 + OBD/GPS 接收端点
-config/                        # 因子表与本地密钥配置（含 OBD 契约与守恒物理量）
+config/                        # 因子表、本地密钥、OBD 契约与 Q-learning 策略配置
 data/                          # 业务数据、结果表与路线记忆
 carbon_ledger/                 # 碳账交付工作区（碳会计 A0–A6 阶段交付物）
 tests/                         # 当前功能及底层契约测试

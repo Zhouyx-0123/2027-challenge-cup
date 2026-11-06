@@ -121,6 +121,8 @@ outputs/figures/
 outputs/tables/
 # OSRM 原始响应（复核用，1 MB 起，不进 Git —— docs/35 §9 第 11 条）
 outputs/route_baseline/
+# Q-learning 训练产物（policy/report/trips，本地生成）
+outputs/rl*/
 db/
 data/interim/
 

@@ -10,7 +10,7 @@ import streamlit as st
 import live_services
 import services
 from components import (carbon_ledger_panel, dashboard_home, flags, obd_panel,
-                        route_sandbox, slider_kit, theme)
+                        qlearning_panel, route_sandbox, slider_kit, theme)
 from demo_state import carbon_snapshot, fallback_disclosure
 
 
@@ -291,9 +291,14 @@ def render_routes() -> None:
     theme.hero_compact(
         "减碳路线沙盘",
         "以高德路线为基因，让 NSGA-II 与 Q-learning 在成本、碳排、时间和距离之间寻找更优解。",
-        kicker="03 / ROUTE EVOLUTION", badges=["四维 NSGA-II", "Q-learning 探索", "持久化记忆"])
+        kicker="03 / ROUTE EVOLUTION",
+        badges=["四维 NSGA-II", "Q-learning 真实路网", "历史碳画像"])
     st.caption("实时演示通道：地点解析、路线规划与进化按需运行，不写主碳账；主账只读预计算宽表与结果表。")
-    route_sandbox.render(float(st.session_state["carbon_price"]))
+    sandbox_tab, real_tab = st.tabs(["四维进化沙盘", "Q-learning 真实路网"])
+    with sandbox_tab:
+        route_sandbox.render(float(st.session_state["carbon_price"]))
+    with real_tab:
+        qlearning_panel.render(float(st.session_state["carbon_price"]))
 
 
 def _sync_ledger_carbon_params() -> None:

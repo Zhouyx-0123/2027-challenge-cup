@@ -43,17 +43,21 @@ python -m src.obd_vsp_crosscheck        # 模型(VSP) × 实测(碳平衡法) �
 
 ## Q-learning 动态路径决策（独立决策层）
 
-`src/rl/` 是 v1.2 的新决策栈：预测层用 TD(λ) 学「剩余时间 / 碳 / 费用」，决策层用 Double Q 在 4 套运营权重中选策略，再由 Dijkstra 按权重算路；支持拥堵快照、OBD 功率回填、配额压力与 15 分钟速度预报。
+`src/rl/` 有两条并存的决策链：
 
-**边界**：演示路网是 4×4 合成网 + 对角高架，不是京东真实线路；碳口径用 3.16 kgCO₂/L（WTW = 2.63 TTW + 0.53 WTT），与 E₀ 主账的 2.63 TTW 不同，不能与主账相加或直接对比；本模块不写 `data/processed`、不进 E₀ / 28 条闸门，也不与路段主表的 5 档 / 3 簇混用。`RecommendationService` 的 payload 与 `LiveTrip` 已就绪，Streamlit 页面尚未接线。
+- **v1.2 合成网**：预测层用 TD(λ) 学「剩余时间 / 碳 / 费用」，决策层用 Double Q 在 4 套运营权重中选策略，再由 Dijkstra 按权重算路；支持拥堵快照、OBD 功率回填、配额压力与 15 分钟速度预报。
+- **v1.3 真实数据**：动作改为「四条高德候选路线」，Q 直接对候选排序；输入是 287 个高德缓存 OD、4,014 趟京东历史，碳来自速度 5 档 × 载重 4 带的历史 EF 画像（TTW 2.63 kgCO₂/L）。路线页第二个 Tab 可交互演示，默认案例“镇江句容 → 南京奥南”会看到时间优先走 S1、其余走 S6。
+
+**边界**：v1.2 演示路网是 4×4 合成网 + 对角高架，不是京东真实线路，碳口径用 3.16 kgCO₂/L（WTW），不能与 E₀ 主账的 2.63 TTW 相加或直接对比；v1.3 真实路网用 2.63 TTW，与主账同口径。两条链都不写 `data/processed`、不进 E₀ / 28 条闸门，也不与路段主表的 5 档 / 3 簇混用。v1.2 页面未接线；v1.3 已接 Streamlit。
 
 ```bash
 python tools/rl_demo.py --departure 480 --load 18
-python -m src.rl.train --episodes 900
-pytest tests/test_rl_*.py -q                 # 100 项
+python -m src.rl.train --episodes 900            # v1.2 合成网
+python -m src.rl.real_policy --epochs 30         # v1.3 真实 OD
+pytest tests/test_rl_*.py -q                     # 100 + 真实路网 6 项
 ```
 
-设计、实验与已知限制见 `docs/59_Q学习动态路径决策.md`。
+设计与实验见 `docs/59_Q学习动态路径决策.md`；真实路网细节见 `docs/61_真实路网Q学习演示.md`。
 
 ## 碳账交付（碳会计线）
 

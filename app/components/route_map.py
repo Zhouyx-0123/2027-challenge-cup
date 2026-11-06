@@ -83,8 +83,12 @@ def prepare_routes(routes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         points = simplify_polyline(route.get("polyline") or [])
         if len(points) < 2:
             continue
+        route_id = str(route.get("route_id", index + 1))
+        recommended = bool(route.get("recommended", index == 0))
         prepared.append({
-            "id": str(route.get("route_id", index + 1)),
+            "id": route_id,
+            "label": str(route.get("route_label") or route.get("label") or "路线 " + route_id),
+            "badge": str(route.get("badge") or ("BEST COST" if recommended else "ALTERNATIVE")),
             "color": COLORS[index % len(COLORS)],
             "points": points,
             "cost": round(float(route.get("total_cost_yuan", 0.0)), 2),
@@ -94,7 +98,7 @@ def prepare_routes(routes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "tolls": round(float(route.get("tolls", 0.0)), 2),
             "speed": round(float(route.get("avg_speed_kmh", 0.0)), 1),
             "congestion": round(float(route.get("congestion_factor", 1.0)), 2),
-            "recommended": index == 0,
+            "recommended": recommended,
         })
     return prepared
 
@@ -291,7 +295,7 @@ function escapeHtml(value){
     {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
 
-function routeLabel(route){ return '路线 ' + route.id; }
+function routeLabel(route){ return route.label || ('路线 ' + route.id); }
 
 function renderRouteList(){
   byId('routeCount').textContent = BOOT.routes.length + ' CANDIDATES';
@@ -299,7 +303,7 @@ function renderRouteList(){
     <button class="route" data-route="${escapeHtml(route.id)}">
       <i class="sw" style="background:${route.color}"></i>
       <span class="id">${escapeHtml(routeLabel(route))}</span>
-      ${route.recommended ? '<span class="best">BEST</span>' : ''}
+      ${route.recommended ? '<span class="best">' + escapeHtml(route.badge || 'BEST') + '</span>' : ''}
       <span class="sum">¥${fmt(route.cost, 0)}</span>
     </button>`).join('');
   document.querySelectorAll('.route').forEach(button => {
@@ -309,7 +313,7 @@ function renderRouteList(){
 
 function updateDetail(route){
   byId('detailId').textContent = routeLabel(route);
-  byId('detailBadge').textContent = route.recommended ? 'BEST COST' : 'ALTERNATIVE';
+  byId('detailBadge').textContent = route.badge || (route.recommended ? 'BEST COST' : 'ALTERNATIVE');
   byId('detailBadge').style.color = route.recommended ? 'var(--mint)' : 'var(--ink3)';
   byId('mCost').textContent = fmt(route.cost, 0);
   byId('mCarbon').textContent = fmt(route.carbon, 0);

@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -51,8 +51,27 @@ class HistoricalProfile:
     total_km: float
     total_carbon_kg: float
     source: str = "jd_segment_master.passed"
+    cluster_rules: Any = None
 
-    def cell(self, speed_kmh: float, load_t: float) -> Dict[str, Any]:
+    def cell(self, speed_kmh: float, load_t: float,
+             cluster_id: Optional[int] = None) -> Dict[str, Any]:
+        extra: Dict[str, Any] = {}
+        if cluster_id is not None and self.cluster_rules is not None:
+            hit = self.cluster_rules.cell(cluster_id, speed_kmh, load_t)
+            if hit is not None:
+                return hit
+            try:
+                cluster_ef = float(self.cluster_rules.ef_by_cluster[int(cluster_id)])
+            except (IndexError, KeyError, TypeError, ValueError):
+                cluster_ef = None
+            extra = {
+                "cluster_id": int(cluster_id),
+                "cluster_label": self.cluster_rules.label_for(cluster_id),
+                "cluster_ef_g_km": None if cluster_ef is None else round(cluster_ef, 3),
+                "rule_cell": None,
+                "cluster_fallback": True,
+            }
+
         si = int(_bin_index(np.asarray([float(speed_kmh)]), self.speed_edges)[0])
         li = int(_bin_index(np.asarray([float(load_t)]), self.load_edges)[0])
         ef = float(self.ef_g_km_matrix[si, li])
@@ -67,7 +86,7 @@ class HistoricalProfile:
             ef, source = float(self.ef_by_speed[si]), "speed_fallback"
         else:
             ef, source = float(self.global_ef_g_km), "global_fallback"
-        return {
+        result = {
             "speed_bin": SPEED_LABELS[si],
             "load_bin": LOAD_LABELS[li],
             "ef_g_km": round(ef, 3),
@@ -76,12 +95,17 @@ class HistoricalProfile:
             "source": source,
             "low_sample": bool(n < 30),
         }
+        result.update(extra)
+        return result
 
-    def ef_g_km(self, speed_kmh: float, load_t: float) -> float:
-        return float(self.cell(speed_kmh, load_t)["ef_g_km"])
+    def ef_g_km(self, speed_kmh: float, load_t: float,
+                cluster_id: Optional[int] = None) -> float:
+        return float(self.cell(speed_kmh, load_t, cluster_id=cluster_id)["ef_g_km"])
 
-    def fuel_l_per_km(self, speed_kmh: float, load_t: float) -> float:
-        return self.ef_g_km(speed_kmh, load_t) / (DIESEL_KG_CO2_PER_L * 1000.0)
+    def fuel_l_per_km(self, speed_kmh: float, load_t: float,
+                      cluster_id: Optional[int] = None) -> float:
+        return self.ef_g_km(speed_kmh, load_t, cluster_id=cluster_id) / (
+            DIESEL_KG_CO2_PER_L * 1000.0)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -103,13 +127,16 @@ class HistoricalProfile:
             "n_trips": int(self.n_trips),
             "total_km": round(self.total_km, 3),
             "total_carbon_kg": round(self.total_carbon_kg, 3),
+            "cluster_rules": (self.cluster_rules.to_dict()
+                              if self.cluster_rules is not None else None),
         }
 
 
 def build_profile(master: pd.DataFrame,
                   speed_edges: Sequence[float] = SPEED_EDGES,
                   load_edges: Sequence[float] = LOAD_EDGES,
-                  source: str = "jd_segment_master.passed") -> HistoricalProfile:
+                  source: str = "jd_segment_master.passed",
+                  cluster_rules: Any = None) -> HistoricalProfile:
     """从趟级主表建立 EF 画像；只使用 passed=True 且数值有效的行。"""
     need = {"trip_id", "speed_kmh", "load_t", "distance_km", "carbon_kg", "passed"}
     missing = need - set(master.columns)
@@ -150,7 +177,8 @@ def build_profile(master: pd.DataFrame,
         ef_g_km_matrix=ef, n_trips_matrix=n_trips, km_matrix=km,
         carbon_kg_matrix=carbon, ef_by_load=ef_by_load, ef_by_speed=ef_by_speed,
         global_ef_g_km=global_ef, n_trips=int(n_trips.sum()),
-        total_km=float(km.sum()), total_carbon_kg=float(carbon.sum()), source=source)
+        total_km=float(km.sum()), total_carbon_kg=float(carbon.sum()), source=source,
+        cluster_rules=cluster_rules)
 
 
 @dataclass(frozen=True)

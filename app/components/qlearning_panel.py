@@ -23,6 +23,8 @@ import live_services  # noqa: F401,E402  # 先把仓库根加入 sys.path
 from components import route_map  # noqa: E402
 from src.rl.historical import (HistoricalProfile, ODOption, build_od_catalog,  # noqa: E402
                                build_profile)
+from src.rl.kmeans_rules import (CLUSTER_LOAD_LABELS, MIN_CELL_N,  # noqa: E402
+                                 ClusterRules, load_cluster_rules)
 from src.rl.real_world import load_policy_payload, solve_real_route  # noqa: E402
 
 DATA_DIR = ROOT / "data" / "processed"
@@ -55,14 +57,15 @@ CSS = """
 
 
 @st.cache_data(show_spinner=False)
-def load_bundle() -> Tuple[HistoricalProfile, List[ODOption], Dict[str, Any]]:
+def load_bundle() -> Tuple[HistoricalProfile, Optional[ClusterRules], List[ODOption], Dict[str, Any]]:
     master = pd.read_parquet(DATA_DIR / "jd_segment_master.parquet")
     baseline = pd.read_parquet(DATA_DIR / "baseline_carbon.parquet")
     route_od = pd.read_parquet(DATA_DIR / "route_od.parquet")
     candidates = pd.read_parquet(DATA_DIR / "route_candidates.parquet")
-    profile = build_profile(master)
+    rules = load_cluster_rules(master, DATA_DIR)
+    profile = build_profile(master, cluster_rules=rules)
     options, meta = build_od_catalog(master, baseline, route_od, candidates)
-    return profile, options, meta
+    return profile, rules, options, meta
 
 
 def _distinct_routes(option: ODOption) -> int:
@@ -90,15 +93,42 @@ def _kpi(label: str, value: str, note: str = "") -> str:
             + ("<small>" + html.escape(note) + "</small>" if note else "") + "</div>")
 
 
-def _render_intro() -> None:
+def _render_intro(rules: Optional[ClusterRules]) -> None:
+    rule_text = ("K-means 3 簇×4 载重带历史 EF（样本<30 回退 5 档×4 载重带）"
+                 if rules is not None else "5 档×4 载重带历史 EF 画像")
     st.markdown(
-        "<div class='ql-wrap'><div class='ql-kicker'>REAL AMAP · HISTORICAL EF · Q POLICY</div>"
+        "<div class='ql-wrap'><div class='ql-kicker'>K-MEANS CARBON RULE · REAL AMAP · Q POLICY</div>"
         "<div class='ql-title'>真实路网上的 Q 策略</div>"
-        "<div class='ql-sub'>数据链：京东 33,214 张运单 → 12,167 趟 → 5 档×4 载重带历史 EF 画像"
-        "（TTW 2.63 kgCO2/L，与主账 E₀ 同口径）→ 高德 287 个缓存 OD / 四种策略实算里程·时长·收费"
+        "<div class='ql-sub'>数据链：京东 33,214 张运单 → 12,167 趟 → "
+        + rule_text
+        + "（TTW 2.63 kgCO2/L，与主账 E₀ 同口径）→ 高德 287 个缓存 OD / 四种策略实算里程·时长·收费"
         "→ Q 表在真实 OD 上离线拟合后给出策略，四策略枚举作为并排基线与兜底。</div></div>",
         unsafe_allow_html=True)
     st.caption("演示通道：只读 data/processed 的缓存表，不写主碳账，不改 E₀，不进 28 项闸门。")
+
+
+def _render_cluster_rules(rules: Optional[ClusterRules]) -> None:
+    st.markdown("#### 上游碳规则 · K-means 3 簇")
+    if rules is None:
+        st.warning("未找到 vsp_seg_cluster_audit.json；当前回退 5 档×4 载重带。")
+        return
+    st.caption("来自 data/processed/vsp_seg_cluster_audit.json；只统计 passed=True 的 12,036 趟；"
+               "EF = 1000 × Σ碳 / Σ里程。")
+    st.dataframe(pd.DataFrame(rules.summary_rows()), hide_index=True, width="stretch")
+    with st.expander("簇 × 载重带 EF 明细（括号内为样本趟数；少于 %d 回退）" % MIN_CELL_N,
+                     expanded=False):
+        rows = []
+        for i in range(rules.n_clusters):
+            row = {"簇": "C%d" % i, "画像": rules.labels[i]}
+            for j, label in enumerate(CLUSTER_LOAD_LABELS):
+                n = int(rules.n_by_cluster_load[i, j])
+                ef = float(rules.ef_by_cluster_load[i, j])
+                row[label] = ("%.0f (%s)" % (ef, "{:,}".format(n))
+                              if n >= MIN_CELL_N and pd.notna(ef)
+                              else "— (%s)" % "{:,}".format(n))
+            rows.append(row)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.caption("某格样本 < %d 时不拿单样本定规则，Q 成本模型回退 5 档×4 载重带。" % MIN_CELL_N)
 
 
 def _render_kpis(result: Dict[str, Any]) -> None:
@@ -111,7 +141,10 @@ def _render_kpis(result: Dict[str, Any]) -> None:
         "<div class='ql-kpis'>"
         + _kpi("选中策略", selected["label"], selected["route_id"] + " · " + flag)
         + _kpi("预计时长", "%.1f min" % selected["time_min"], "均速 %.1f km/h" % selected["avg_speed_kmh"])
-        + _kpi("碳排", "%.2f kg" % selected["carbon_kg"], "TTW 历史 EF")
+        + _kpi("碳排", "%.2f kg" % selected["carbon_kg"],
+               ("K-means 簇×载重 EF · " + str(selected.get("rule_cell") or "回退 5 档"))
+               if selected.get("carbon_rule") == "kmeans_cluster_load"
+               else "5 档×载重 EF · " + str(selected.get("rule_cell") or "回退"))
         + _kpi("综合费用", "%.2f 元" % selected["cost_yuan"], "含油/碳/路桥")
         + _kpi("里程", "%.1f km" % selected["distance_km"], "收费 %.0f 元" % selected["toll_yuan"])
         + "</div>"
@@ -186,6 +219,8 @@ def _render_solutions(result: Dict[str, Any]) -> None:
         rows.append({
             "策略": item["label"],
             "路线": item["route_id"],
+            "簇": item.get("cluster_label") or "-",
+            "碳规则": item.get("rule_cell") or "5档回退",
             "里程 km": item["distance_km"],
             "时长 min": item["time_min"],
             "碳 kg": item["carbon_kg"],
@@ -219,10 +254,12 @@ def _render_segments(result: Dict[str, Any]) -> None:
             "EF g/km": seg["ef_g_per_km"],
             "速度带": speed_bin,
             "载重带": load_bin,
+            "簇": seg.get("cluster_label") or "-",
+            "碳规则": seg.get("rule_cell") or "5档回退",
         })
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", height=260)
-    st.caption("EF 来自历史 12,036 趟有效样本的 5 档×4 载重带里程加权画像；"
-               "低样本单元会回退到载重/速度/全局均值。")
+    st.caption("EF 优先取 K-means 簇×4 载重带；某格样本 < %d 或路线无簇时回退"
+               "历史 12,036 趟的 5 档×4 载重带；再不足回退载重/速度/全局均值。" % MIN_CELL_N)
 
 
 def _render_notes(result: Dict[str, Any]) -> None:
@@ -232,16 +269,19 @@ def _render_notes(result: Dict[str, Any]) -> None:
         st.write("- 287 个 OD 中 22 个存在不同候选路线；其余四策略指标接近或相同。")
         st.write("- 若 Q 选择只在同一路线上换标签，运营成本可能不变；"
                  "此时以路线和费用表为准，不要只看策略名。")
+        st.write("- 簇是路线级代理映射：按候选路线均速/里程与 OD 中位载重分类，"
+                 "不是逐段聚类；碳规则来自上游路段主表，不改 E₀。")
 
 
 def render(carbon_price: float = 100.0) -> None:
     st.markdown(CSS, unsafe_allow_html=True)
-    _render_intro()
     try:
-        profile, options, meta = load_bundle()
+        profile, rules, options, meta = load_bundle()
     except Exception as exc:  # pragma: no cover - 数据缺失由页面提示
         st.error("无法读取真实 OD 缓存表：%s" % exc)
         return
+    _render_intro(rules)
+    _render_cluster_rules(rules)
     if not options:
         st.warning("没有可用真实 OD（需要 route_od 的 amap_rest 几何）。")
         return

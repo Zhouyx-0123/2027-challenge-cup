@@ -21,6 +21,7 @@ from .amap_network import build_real_network
 from .env import TripEnv, TripRequest
 from .historical import (HistoricalProfile, ODOption, build_od_catalog,
                          build_profile)
+from .kmeans_rules import load_cluster_rules
 from .policy import plan_route
 from .real_world import (DEFAULT_REAL_POLICY_PATH, HistoricalCostModel,
                          _default_strategies, _manual_operation_cost, _reference)
@@ -47,13 +48,25 @@ def fit_real_policy(options: Sequence[ODOption], profile: HistoricalProfile,
                                     departure_minute=departure)
         except ValueError:
             continue
+        rules = getattr(profile, "cluster_rules", None)
+        route_clusters: Dict[str, int] = {}
+        if rules is not None:
+            for route in rn.routes:
+                hit = rules.classify(route.avg_speed_kmh, route.distance_km,
+                                     float(option.load_t))
+                if hit is not None:
+                    route_clusters[route.route_id] = int(hit["cluster_id"])
         request = TripRequest("AMAP_ORIGIN", "AMAP_DEST", vclass=3,
                               load_t=float(option.load_t),
                               departure_minute=departure, order_id=option.od_key)
         model = HistoricalCostModel(request, profile, fuel_price=fuel_price,
-                                    carbon_price=carbon_price)
-        ref, normalizer = _reference(option, profile, float(option.load_t),
-                                     fuel_price, carbon_price)
+                                    carbon_price=carbon_price,
+                                    route_clusters=route_clusters)
+        primary = next((c for c in option.candidates if c.strategy == 0),
+                       option.candidates[0])
+        ref, normalizer = _reference(
+            option, profile, float(option.load_t), fuel_price, carbon_price,
+            cluster_id=route_clusters.get("AMAP-S%d" % primary.strategy))
         env = TripEnv(rn.network, rn.timeline, request, cost_model=model,
                       max_steps=max(20, rn.n_segments * 2 + 5))
         features = env.state_features().astype(float)
@@ -75,6 +88,7 @@ def fit_real_policy(options: Sequence[ODOption], profile: HistoricalProfile,
             })
         records.append({"od_key": option.od_key, "features": features,
                         "departure": departure, "load_t": float(option.load_t),
+                        "cluster_id": route_clusters.get("AMAP-S%d" % primary.strategy),
                         "plans": plans})
         feature_rows.append(features)
 
@@ -126,6 +140,17 @@ def fit_real_policy(options: Sequence[ODOption], profile: HistoricalProfile,
         "max_visits": int(state_visits.max()) if len(state_visits) else 0,
         "note": "每个 OD 枚举四策略后按运营成本给 Q 奖励；非逐段随机探索。",
     }
+    if getattr(profile, "cluster_rules", None) is not None:
+        rules = profile.cluster_rules
+        audit.update({
+            "carbon_rule": "kmeans_cluster_load",
+            "cluster_labels": list(rules.labels),
+            "cluster_ef_g_km": [round(float(v), 3) for v in rules.ef_by_cluster],
+            "n_od_with_cluster": int(sum(1 for item in records
+                                         if item.get("cluster_id") is not None)),
+            "cluster_rule_note": ("路线级簇由候选均速/里程与 OD 中位载重映射；"
+                                  "簇×载重带无样本回退 5档×4载重。"),
+        })
     return policy, audit
 
 
@@ -159,7 +184,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     baseline = pd.read_parquet(args.baseline)
     route_od = pd.read_parquet(args.route_od)
     candidates = pd.read_parquet(args.route_candidates)
-    profile = build_profile(master)
+    rules = load_cluster_rules(master, root / "data/processed")
+    profile = build_profile(master, cluster_rules=rules)
     options, catalog_meta = build_od_catalog(master, baseline, route_od, candidates)
     policy, audit = fit_real_policy(
         options, profile, epochs=args.epochs, seed=args.seed,

@@ -34,12 +34,14 @@ class HistoricalCostModel:
 
     def __init__(self, request: TripRequest, profile: HistoricalProfile,
                  *, fuel_price: float = 7.5, carbon_price: float = 100.0,
-                 corrector: Any = None):
+                 corrector: Any = None,
+                 route_clusters: Optional[Dict[str, int]] = None):
         self.request = request
         self.profile = profile
         self.fuel_price = float(fuel_price)
         self.carbon_price = float(carbon_price)
         self.corrector = corrector
+        self.route_clusters = {str(k): int(v) for k, v in (route_clusters or {}).items()}
 
     def evaluate(self, segment: Any, snapshot: TrafficSnapshot,
                  power_kw: Optional[float] = None,
@@ -47,7 +49,9 @@ class HistoricalCostModel:
         state = snapshot.state(segment.sid)
         speed = max(float(state.speed_kmh), 1e-3)
         time_min = float(segment.length_km) / speed * 60.0
-        cell = self.profile.cell(speed, self.request.load_t)
+        route_id = str(segment.sid).rsplit("-N", 1)[0]
+        cluster_id = self.route_clusters.get(route_id)
+        cell = self.profile.cell(speed, self.request.load_t, cluster_id=cluster_id)
         ef = float(cell["ef_g_km"])
         carbon_kg = ef * float(segment.length_km) / 1000.0
         fuel_l = carbon_kg / DIESEL_KG_CO2_PER_L
@@ -67,6 +71,10 @@ class HistoricalCostModel:
             "cost_yuan": toll + energy_cost + carbon_cost,
             "correction_time": 1.0, "correction_carbon": 1.0,
             "ef_cell": cell["speed_bin"] + "/" + cell["load_bin"],
+            "rule_cell": cell.get("rule_cell"),
+            "cluster_id": cell.get("cluster_id", cluster_id),
+            "cluster_label": cell.get("cluster_label"),
+            "cluster_fallback": bool(cell.get("cluster_fallback", False)),
             "ef_source": cell["source"], "ef_low_sample": bool(cell["low_sample"]),
         }
 
@@ -107,10 +115,12 @@ def _manual_operation_cost(vector: Sequence[float], normalizer: ObjectiveNormali
 
 
 def _reference(option: ODOption, profile: HistoricalProfile, load_t: float,
-               fuel_price: float, carbon_price: float) -> Tuple[Dict[str, Any], ObjectiveNormalizer]:
+               fuel_price: float, carbon_price: float,
+               cluster_id: Optional[int] = None) -> Tuple[Dict[str, Any], ObjectiveNormalizer]:
     primary = next((c for c in option.candidates if c.strategy == 0), option.candidates[0])
     speed = primary.distance_km / (primary.duration_min / 60.0)
-    ef = profile.ef_g_km(speed, load_t)
+    cell = profile.cell(speed, load_t, cluster_id=cluster_id)
+    ef = float(cell["ef_g_km"])
     carbon = ef * primary.distance_km / 1000.0
     fuel = carbon / DIESEL_KG_CO2_PER_L
     cost = fuel * fuel_price + carbon / 1000.0 * carbon_price + primary.toll_yuan
@@ -124,6 +134,10 @@ def _reference(option: ODOption, profile: HistoricalProfile, load_t: float,
         "distance_km": float(primary.distance_km),
         "toll_yuan": float(primary.toll_yuan),
         "ef_g_km": float(ef),
+        "cluster_id": cell.get("cluster_id", cluster_id),
+        "cluster_label": cell.get("cluster_label"),
+        "rule_cell": cell.get("rule_cell"),
+        "ef_source": cell.get("source"),
     }
     return ref, ObjectiveNormalizer(ref["time_min"], ref["carbon_kg"], ref["cost_yuan"])
 
@@ -149,6 +163,10 @@ def _segments(plan: RoutePlan, model: HistoricalCostModel, rn: RealRouteNetwork)
             "toll_yuan": round(float(row["toll_yuan"]), 3),
             "ef_g_per_km": round(float(row["ef_g_per_km"]), 2),
             "ef_cell": row.get("ef_cell"),
+            "rule_cell": row.get("rule_cell"),
+            "cluster_id": row.get("cluster_id"),
+            "cluster_label": row.get("cluster_label"),
+            "cluster_fallback": row.get("cluster_fallback"),
             "ef_source": row.get("ef_source"),
             "road_class": row.get("road_class"),
             "congestion_index": round(float(row.get("congestion_index", 0.0)), 4),
@@ -165,6 +183,14 @@ def _solution(strategy: Strategy, plan: RoutePlan, normalizer: ObjectiveNormaliz
         return None
     route_id = rn.route_of_path(plan.path)
     segments = _segments(plan, model, rn)
+    cluster_id = next((s.get("cluster_id") for s in segments
+                       if s.get("cluster_id") is not None), None)
+    cluster_label = next((s.get("cluster_label") for s in segments
+                          if s.get("cluster_label") is not None), None)
+    rule_cell = next((s.get("rule_cell") for s in segments
+                      if s.get("rule_cell") is not None), None)
+    carbon_rule = ("kmeans_cluster_load" if any(
+        s.get("ef_source") == "kmeans_cluster_load" for s in segments) else "speed_load")
     time_min = float(plan.time_min)
     carbon_kg = float(plan.carbon_kg)
     cost_yuan = float(plan.cost_yuan)
@@ -190,6 +216,10 @@ def _solution(strategy: Strategy, plan: RoutePlan, normalizer: ObjectiveNormaliz
         "avg_speed_kmh": round(sum(s["length_km"] for s in segments) /
                                max(time_min / 60.0, 1e-9), 3),
         "n_segments": len(segments),
+        "cluster_id": cluster_id,
+        "cluster_label": cluster_label,
+        "rule_cell": rule_cell,
+        "carbon_rule": carbon_rule,
         "segments": segments,
         "points": rn.points,
     }
@@ -215,12 +245,23 @@ def solve_real_route(option: ODOption, profile: HistoricalProfile,
     rn = build_real_network(option.polyline, (option.o_lng, option.o_lat),
                             (option.d_lng, option.d_lat), option.candidates,
                             departure_minute=departure)
+    rules = getattr(profile, "cluster_rules", None)
+    route_clusters: Dict[str, int] = {}
+    if rules is not None:
+        for route in rn.routes:
+            hit = rules.classify(route.avg_speed_kmh, route.distance_km, load)
+            if hit is not None:
+                route_clusters[route.route_id] = int(hit["cluster_id"])
     request = TripRequest(ORIGIN_NODE, DEST_NODE, vclass=3, load_t=load,
                           departure_minute=departure,
                           strategy="balanced", order_id=option.od_key)
     model = HistoricalCostModel(request, profile, fuel_price=fuel_price,
-                                carbon_price=carbon_price)
-    ref, normalizer = _reference(option, profile, load, fuel_price, carbon_price)
+                                carbon_price=carbon_price,
+                                route_clusters=route_clusters)
+    primary = next((c for c in option.candidates if c.strategy == 0), option.candidates[0])
+    ref, normalizer = _reference(
+        option, profile, load, fuel_price, carbon_price,
+        cluster_id=route_clusters.get("AMAP-S%d" % primary.strategy))
     env = TripEnv(rn.network, rn.timeline, request, cost_model=model,
                   max_steps=max(20, rn.n_segments * 2 + 5))
 
@@ -329,7 +370,10 @@ def solve_real_route(option: ODOption, profile: HistoricalProfile,
                     "carbon_price": float(carbon_price), "fuel_price": float(fuel_price)},
         "network": rn.to_dict(),
         "profile": profile.to_dict(),
-        "profile_cell": profile.cell(selected["avg_speed_kmh"], load),
+        "profile_cell": profile.cell(selected["avg_speed_kmh"], load,
+                                      cluster_id=selected.get("cluster_id")),
+        "route_clusters": dict(route_clusters),
+        "carbon_rule": ("kmeans_cluster_load" if rules is not None else "speed_load"),
         "reference": ref,
         "solutions": solutions,
         "q": q_info,
@@ -343,7 +387,12 @@ def solve_real_route(option: ODOption, profile: HistoricalProfile,
         "notes": [
             "几何 = 高德缓存主路线 polyline；四策略共享同一几何。",
             "四策略里程/时长/收费 = 高德 route_candidates 实算。",
+            ("碳 = K-means %d 簇×4 载重带 EF（样本<30 回退 5 档×4 载重带）× 里程，"
+             "TTW 2.63 kgCO2/L，与主账 E0 同口径。" % rules.n_clusters)
+            if rules is not None else
             "碳 = 历史 5 档×4 载重带 EF × 里程，TTW 2.63 kgCO2/L，与主账 E0 同口径。",
+            "路线级簇是代理映射：按候选路线均速/里程与 OD 中位载重分类，不是逐段聚类。"
+            if rules is not None else "历史 EF 为 5 档×4 载重带里程加权画像。",
             "演示通道，不写 data/processed，不进 E0/28 闸门。",
         ],
     }

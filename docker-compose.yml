@@ -128,6 +128,8 @@ services:
       # 对外端口：只影响 8080 的跳转目标，容器内监听端口固定 8443 / 8080
       HTTPS_PORT: ${HTTPS_PORT:-8443}
       HTTP_PORT: ${HTTP_PORT:-8080}
+      # 进 Caddy 自签证书 SAN；局域网部署改成宿主对内 IP 或内网域名
+      SITE_ADDRESS: ${SITE_ADDRESS:-127.0.0.1}
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       # 命名卷：保住 Caddy 自签 CA 与证书，容器重建后不换 CA

@@ -57,6 +57,7 @@
 cd <仓库根目录>
 cp deploy/env.example deploy/env      # deploy/env 不要提交进 git
 # 编辑 deploy/env，填入高德 / DeepSeek 密钥；不填也能起，页面相应功能降级
+# 局域网部署把 SITE_ADDRESS 改成宿主对内 IP（默认 127.0.0.1），它决定 Caddy 证书 SAN
 ```
 
 `deploy/env` 是 compose 的插值来源，用 `--env-file` 指定：
@@ -100,14 +101,19 @@ docker compose down -v         # 连 Caddy 的证书卷一起删（会导致 CA 
 
 | 地址 | 说明 |
 | --- | --- |
-| `https://<主机IP>:8443` | 统一入口（推荐，评审人员走这个） |
+| `https://<SITE_ADDRESS>:8443` | 统一入口（推荐，评审人员走这个）；证书 SAN 取 deploy/env 的 SITE_ADDRESS |
 | `https://<主机IP>:8443/api/upload_sensor` | ESP32 数据上报入口 |
 | `http://<主机IP>:8080` | 明文入口，会 308 跳到 8443 |
 | `http://<主机IP>:8501` | Streamlit 直连（绕过 TLS，排障用） |
 
 ### 4.2 内网自签证书的信任
 
-Caddy 用 `tls internal` 自建内网 CA，浏览器第一次访问会提示「不安全」。两种处理方式：
+Caddy 用 `tls internal` 自建内网 CA，为 `localhost`、`caddy`、`SITE_ADDRESS` 分别签发证书。
+按 IP 访问且客户端不发 SNI 时，`default_sni` 回落到 `SITE_ADDRESS`。
+如果 `SITE_ADDRESS` 还是默认的 `127.0.0.1`，局域网其他机器按 IP 访问会提示证书名不匹配；
+这不是 CA 没导入，而是证书 SAN 没覆盖该 IP。
+
+浏览器第一次访问会提示「不安全」。两种处理方式：
 
 **方式 A：把 CA 根证书导出并导入客户端信任库（推荐，一次配置，团队通用）**
 
@@ -338,7 +344,10 @@ docker compose logs caddy
 
 - `caddy_data` 卷里的 CA 损坏 → `docker compose down -v` 后重启（客户端需重新信任证书）；
 - 8443 被占 → 改 `HTTPS_PORT`；
-- `sensor:5000` / `app:8501` 解析失败 → 两个服务是否 healthy（`docker compose ps`）。
+- `sensor:5000` / `app:8501` 解析失败 → 两个服务是否 healthy（`docker compose ps`）；
+- `automation policy ... key without hostname` → Caddyfile 的站点地址不能写成裸 `:8443`；当前版本用 `https://localhost:8443, https://caddy:8443, https://{$SITE_ADDRESS:127.0.0.1}:8443, https://:8443`，不要回退；
+- `TLSV1_ALERT_INTERNAL_ERROR` 或 `/data/caddy/certificates` 没有 leaf 证书 → 站点没有可签发的主机名；确认 `SITE_ADDRESS` 已传入容器，然后 `docker compose up -d --no-build --force-recreate --no-deps caddy`；证书日志应出现 `certificate obtained successfully`；
+- Windows `curl` 报 `schannel: the revocation status is unknown` → 加 `--ssl-no-revoke`（内网 CA 没有 OCSP/CRL，浏览器不受影响）。
 
 ### 8.8 传感器数据重启后没了
 

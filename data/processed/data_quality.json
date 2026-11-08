@@ -1,6 +1,6 @@
 {
   "source": "real",
-  "generated_at": "2026-10-24T14:33:07",
+  "generated_at": "2026-11-08T19:28:47",
   "rows_raw": 36329,
   "rows_wide": 36329,
   "rows_dedup": 33214,
@@ -45,6 +45,7 @@
   "fill_vehicle": 0,
   "fill_load": 0,
   "fill_invoice": 0,
+  "invoice_applicable": 0,
   "fill_duration": 1,
   "valid_speed_rows": 33213,
   "avg_speed": 49.5127,

@@ -1,5 +1,8 @@
 {
-  "generated_at": "2026-10-24T14:33:03",
+  "generated_at": "2026-11-08T19:28:41",
+  "run_id": "20261108-192841-3196bc75",
+  "code_version": "7dbb397",
+  "input_fingerprint": "3196bc759ba8",
   "source": "real",
   "mode": "auto",
   "stages": [
@@ -7,28 +10,28 @@
       "key": "preprocess",
       "name": "① 数据层 preprocess.py",
       "status": "ok",
-      "seconds": 4.501,
+      "seconds": 6.707,
       "error": ""
     },
     {
       "key": "optimizer",
       "name": "② 引擎层 optimizer.py",
       "status": "ok",
-      "seconds": 0.339,
+      "seconds": 0.286,
       "error": ""
     },
     {
       "key": "evaluator",
       "name": "③ 分析层 evaluator.py",
       "status": "ok",
-      "seconds": 6.602,
+      "seconds": 8.732,
       "error": ""
     },
     {
       "key": "reports",
       "name": "④ 报表段（G3 台账 + G4 披露）",
       "status": "ok",
-      "seconds": 3.311,
+      "seconds": 3.903,
       "error": ""
     }
   ],
@@ -39,5 +42,7 @@
     "fail": 0,
     "skip": 0
   },
-  "total_seconds": 14.908
+  "total_seconds": 19.801,
+  "published": true,
+  "published_run_id": "20261108-192841-3196bc75"
 }

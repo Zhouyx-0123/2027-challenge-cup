@@ -49,7 +49,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 #: 关键 Python 依赖（缺失会挡住某一块功能）
 REQUIRED_PACKAGES = (
-    ("streamlit", "决策台（五页）"),
+    ("streamlit", "决策台（六页）"),
     ("pandas", "数据层"),
     ("numpy", "数据层"),
     ("pyarrow", "Parquet 结果表"),
@@ -378,6 +378,46 @@ def check_backup(report: Report, quick: bool) -> None:
 # 7) 硬件与固件
 # ---------------------------------------------------------------------------
 
+#: USB 串口芯片关键字：命中说明大概率是 ESP32 用的 USB-TTL 转接板（CH340/CP210x/FTDI 等）
+ESP32_SERIAL_HINTS = ("CH340", "CH341", "CP210", "FTDI", "USB-SERIAL", "USB SERIAL", "SILICON LABS")
+
+
+def _serial_ports() -> List[Tuple[str, str]]:
+    """枚举串口，返回 [(友好名, DeviceID)]。
+
+    优先 Win32_PnPEntity（PNPClass=Ports）：能拿到 "USB-SERIAL CH340 (COM5)" 这种友好名，
+    才分得清 USB 转串口和蓝牙/主板虚拟串口；取不到时回退 Win32_SerialPort（只有 COMx）。
+    超时 20s；命令失败或解析不出都返回空列表，由调用方按「未发现 COM 口」处理。
+    """
+    ps = ("[Console]::OutputEncoding=[Text.Encoding]::UTF8;"
+          "Get-CimInstance Win32_PnPEntity | Where-Object { $_.PNPClass -eq 'Ports' } | "
+          "ForEach-Object { '{0}|{1}' -f $_.Name, $_.DeviceID }")
+    _, out = _run(["powershell", "-NoProfile", "-Command", ps], timeout=20)
+    ports: List[Tuple[str, str]] = []
+    for line in out.splitlines():
+        if "|" not in line:
+            continue
+        name, _, devid = line.partition("|")
+        name, devid = name.strip(), devid.strip()
+        if name or devid:
+            ports.append((name, devid))
+    if ports:
+        return ports
+
+    _, out = _run(["powershell", "-NoProfile", "-Command",
+                   "Get-CimInstance Win32_SerialPort | Select-Object -ExpandProperty DeviceID"],
+                  timeout=20)
+    return [(p.strip(), "") for p in out.splitlines() if p.strip()]
+
+
+def _looks_like_esp32(name: str, devid: str) -> bool:
+    """名字或 DeviceID 带 USB 串口芯片特征（CH340/CP210x/FTDI…）→ 疑似 ESP32 串口。"""
+    blob = ("%s %s" % (name, devid)).upper()
+    if any(hint in blob for hint in ESP32_SERIAL_HINTS):
+        return True
+    return devid.upper().startswith("USB\\")
+
+
 def check_hardware(report: Report) -> None:
     firmware = ROOT / "hardware" / "esp32" / "esp32_sensor_client.ino"
     micropython = ROOT / "hardware" / "esp32" / "micropython_sensor_client.py"
@@ -393,16 +433,25 @@ def check_hardware(report: Report) -> None:
         report.add("硬件", "固件令牌配置", "WARN",
                    "缺 config.h → 复制 config.example.h 并填入令牌")
 
-    code, out = _run(["powershell", "-NoProfile", "-Command",
-                      "Get-CimInstance Win32_SerialPort | Select-Object -ExpandProperty DeviceID"],
-                     timeout=20)
-    ports = [line.strip() for line in out.splitlines() if line.strip()]
-    real = [p for p in ports if not p.upper().startswith("COM")]
-    if real:
-        report.add("硬件", "串口设备", "OK", "检测到：%s" % "、".join(real))
+    ports = _serial_ports()
+    esp32_like = [(name, devid) for name, devid in ports if _looks_like_esp32(name, devid)]
+    if esp32_like:
+        report.add("硬件", "串口设备", "OK",
+                   "检测到 %d 个串口：%s" % (len(esp32_like),
+                                          "、".join("%s（疑似 ESP32 串口）" % (name or devid)
+                                                   for name, devid in esp32_like)))
+    elif ports:
+        labels = "、".join(name or devid for name, devid in ports)
+        if all("BTHENUM" in devid.upper() or "蓝牙" in name for name, devid in ports):
+            report.add("硬件", "串口设备", "WARN",
+                       "只发现 %d 个蓝牙虚拟串口（%s），没有 USB 串口 → ESP32 未接入或驱动未装"
+                       % (len(ports), labels))
+        else:
+            report.add("硬件", "串口设备", "WARN",
+                       "发现 %d 个串口（%s），未识别到 CH340/CP210x/FTDI 之类的 USB 串口 → ESP32 未接入或驱动未装"
+                       % (len(ports), labels))
     else:
-        report.add("硬件", "串口设备", "WARN",
-                   "没有检测到真实串口（%s）→ ESP32 未接入或驱动未装" % ("、".join(ports) or "无"))
+        report.add("硬件", "串口设备", "WARN", "未发现 COM 口（ESP32 未接入或驱动未装）")
 
     readme = ROOT / "hardware" / "README.md"
     if readme.exists():

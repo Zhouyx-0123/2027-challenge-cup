@@ -185,6 +185,18 @@ div[class*="st-key-dh_cta_1"] [data-testid="stPageLink-NavLink"]:hover{
   letter-spacing:-.05em; color:var(--dh-ink); font-variant-numeric:tabular-nums;
 }
 .dh-total small{ font-size:14px; font-weight:500; letter-spacing:0; color:var(--dh-muted); }
+/* 口径注脚：主数字是 E0 基线；毛口径（同一趟多张运单重复计入）只作明细核对，
+   两条边界可关联、不可相减。 */
+.dh-basis{
+  margin-top:8px; font-size:11px; line-height:1.65; color:var(--dh-muted);
+  font-variant-numeric:tabular-nums;
+}
+.dh-basis b{ color:var(--dh-ink); font-weight:600; }
+.dh-basis-note{
+  margin:14px 0 0; padding:11px 15px; border-radius:12px;
+  background:rgba(255,255,255,.04); box-shadow:0 0 0 1px rgba(255,255,255,.08);
+  font-size:11.5px; line-height:1.75;
+}
 .dh-chart{ width:100%; height:118px; margin:10px 0 18px; display:block; }
 .dh-mini-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .dh-mini{
@@ -357,6 +369,23 @@ def _e(value: Any) -> str:
     return html.escape(str(value))
 
 
+def _e0_t() -> tuple[float, bool]:
+    """E0 基线（t）：只读 data/processed/kpi.json 的 total_kg / 1000。
+
+    E0 是对外披露口径（12,167 实趟去重后的尾管燃烧排放）；demo_state 的
+    total_t 是毛口径（同一趟多张运单重复计入），两者可关联、不可相减。
+    读不到 total_kg 时返回 (0.0, False)，调用方回落到毛口径并明确标注，
+    绝不拿 0 冒充 E0。
+    """
+    import services
+
+    try:
+        kg = float(services.kpis().get("total_kg") or 0.0)
+    except (TypeError, ValueError):
+        kg = 0.0
+    return (kg / 1000.0, kg > 0.0)
+
+
 def _page_link(url_path: str, label: str) -> None:
     """渲染真实跳转链接。
 
@@ -417,6 +446,19 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
                       else ("已同步" if has_invoice else "等待识别"))
     sensor_text = "超标预警" if sensor_warning else ("运行正常" if co2 is not None else "等待数据")
 
+    # ---- 口径分离（收口⑦）------------------------------------------------
+    # 主数字 = E0 基线（kpi.json total_kg / 1000，对外披露口径）；
+    # 毛口径 total_t = 基准 gross_t + 会话内发票/传感器增量，只作明细核对。
+    e0_t, e0_ok = _e0_t()
+    gross_t = float(snap.get("total_t") or 0.0)
+    headline_t = e0_t if e0_ok else gross_t
+    headline_label = ("当前总碳排放（E0 基线）" if e0_ok
+                      else "当前总碳排放（毛口径 · E0 未取到）")
+    gross_line = (
+        "<div class='dh-basis'>毛口径 <b>%.4f t</b>"
+        "（多运单趟次重复计入，仅用于明细核对，不用于披露）</div>" % gross_t
+        if gross_t > 0 else "")
+
     palette = [
         ("#46B7FF", "DATA"), ("#8BF3E6", "LIVE"), ("#FFC46B", "ESTIMATE"),
         ("#FF8A5B", "ALERT"), ("#151A22", "LEDGER"),
@@ -451,8 +493,9 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
             "<div class='dh-visual'><div class='dh-live-card'>"
             "<div class='dh-live-head'><span>REAL-TIME CARBON PULSE</span>"
             "<span class='dh-live'>LIVE</span></div>"
-            "<div class='dh-total-label'>当前总碳排放</div>"
+            "<div class='dh-total-label'>%s</div>"
             "<div class='dh-total'>%.4f <small>tCO2e</small></div>"
+            "%s"
             "<svg class='dh-chart' viewBox='0 0 420 118' preserveAspectRatio='none'>"
             "<defs><linearGradient id='dhFill' x1='0' y1='0' x2='0' y2='1'>"
             "<stop offset='0' stop-color='#46B7FF' stop-opacity='.30'/>"
@@ -469,8 +512,9 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
             "<div class='dh-mini-grid'>"
             "<div class='dh-mini'><label>今日发票</label><b>%d 张</b></div>"
             "<div class='dh-mini'><label>传感器</label><b>%s</b></div></div></div>"
-            "<div class='dh-float'><label>碳配额余额</label><b>%.4f t</b></div></div>"
-            % (snap["total_t"], invoice_count, _e(sensor_text), snap["balance_t"]),
+            "<div class='dh-float'><label>碳配额余额（毛口径）</label><b>%.4f t</b></div></div>"
+            % (_e(headline_label), headline_t, gross_line, invoice_count,
+               _e(sensor_text), snap["balance_t"]),
             unsafe_allow_html=True)
 
     # ---------------------------------------------------- 信任信号（生效版本）
@@ -482,8 +526,8 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
         "<h2>此刻，系统在感知什么</h2><span>LIVE DECISION SNAPSHOT</span></div></section>",
         unsafe_allow_html=True)
     kpis = [
-        ("当前总碳排放", "%.4f t" % snap["total_t"],
-         "新增 %.4f t" % (snap["invoice_t"] + snap["sensor_t"]), "#46B7FF",
+        (headline_label, "%.4f t" % headline_t,
+         "新增 %.4f t · 未计入 E0" % (snap["invoice_t"] + snap["sensor_t"]), "#46B7FF",
          ROUTE_LEDGER, "查看台账 →"),
         ("今日发票识别", "%d 张" % invoice_count,
          "当前 %.1f L" % float(st.session_state.get("current_invoice_fuel") or 0), "#8BF3E6",
@@ -491,9 +535,9 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
         ("传感器实时状态", sensor_text,
          ("%.0f ppm" % co2) if co2 is not None else "等待 ESP32 数据",
          "#FF8A5B" if sensor_warning else "#8BF3E6", ROUTE_SENSOR, "看监控 →"),
-        ("碳配额余额", "%.4f t" % snap["balance_t"],
-         ("缺口 %.4f t" % snap["gap_t"]) if snap["gap_t"] else "当前配额充足", "#FFC46B",
-         ROUTE_LEDGER, "算缺口 →"),
+        ("碳配额余额（毛口径）", "%.4f t" % snap["balance_t"],
+         ("缺口 %.4f t（毛口径）" % snap["gap_t"]) if snap["gap_t"] else "毛口径配额充足",
+         "#FFC46B", ROUTE_LEDGER, "算缺口 →"),
     ]
     kpi_cols = st.columns(4, gap="medium")
     for idx, (col, (label, value, note, accent, target, cta)) in enumerate(
@@ -508,14 +552,23 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
                     unsafe_allow_html=True)
                 _page_link(target, cta)
 
+    st.markdown(
+        "<div class='dh-basis dh-basis-note'>口径说明：主数字为 <b>E0 基线</b>"
+        "（data/processed/kpi.json 的 total_kg / 1000，对外披露口径）；"
+        "毛口径是同一趟多张运单重复计入的合计，只做明细核对。"
+        "<b>两个口径可关联、不可相减。</b>"
+        "碳配额余额与缺口按毛口径对账，不用于披露。</div>",
+        unsafe_allow_html=True)
+
     # ---------------------------------------------------------------- 决策区
     rows = [
-        ("基准碳账", "%.4f tCO2e" % snap["base_t"],
+        ("基准碳账（毛口径）", "%.4f tCO2e" % snap["base_t"],
          "结果表载入" if snap.get("base_source") == "result" else "静态演示快照"),
         ("发票数据感知", "新增 %.6f tCO2e" % snap["invoice_t"], invoice_status),
         ("云边端硬件监控", "突发成本 ¥%.4f" % snap["sensor_cost_yuan"], sensor_text),
         ("财务风险", "¥%.2f" % snap["financial_risk_yuan"],
-         "需购买 %.4f t 配额" % snap["gap_t"] if snap["gap_t"] else "无配额缺口"),
+         "需购买 %.4f t 配额（毛口径缺口）" % snap["gap_t"]
+         if snap["gap_t"] else "无配额缺口（毛口径）"),
     ]
     rows_html = "".join(
         "<div class='dh-row'><b>%s</b><span>%s</span><em class='dh-status'>%s</em></div>"

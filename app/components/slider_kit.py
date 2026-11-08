@@ -606,17 +606,19 @@ LAB_JS = r"""
       }
       if (yy !== null) { dot.setAttribute('cx', px); dot.setAttribute('cy', yy); dot.setAttribute('opacity', 1); }
     }
+    /* 读数条数不足滑条上限时，标签与窗口都按实际条数夹紧，避免出现「共 2 条 / 窗口右端 100 条」的自我矛盾 */
+    const vShow = (C.count !== undefined && C.count !== null) ? Math.min(v, C.count) : v;
     if (cur.label) {
       const el = $('chRead');
       if (el) {
         const txt = String(cur.label);
         el.textContent = txt.indexOf('{v}') >= 0
-          ? txt.replace('{v}', fmt(v, P.decimals))
+          ? txt.replace('{v}', fmt(vShow, P.decimals))
           : txt;
       }
     }
     if (C.window) {
-      const x0 = geo.sx(C.count - v), x1 = geo.sx(C.count);
+      const x0 = geo.sx(Math.max(0, C.count - vShow)), x1 = geo.sx(C.count);
       const rect = svg.querySelector('rect[fill="url(#winGrad)"]');
       if (rect) { rect.setAttribute('x', Math.min(x0, x1)); rect.setAttribute('width', Math.abs(x1 - x0)); }
     }

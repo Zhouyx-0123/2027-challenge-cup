@@ -93,6 +93,15 @@ RESULT_FILES: Dict[str, str] = {
     # 因子口径对账表（docs/58 §3.6，方案 B）：分档轨代表因子 vs 主账
     # (车型,载重) 因子的逐趟差异登记；**只读审计件**，不改计碳逻辑
     "vsp_seg_factor_recon": "vsp_seg_factor_recon.parquet",
+    # 多维 K-means 聚类并列轨（2026-11-06 用户确认）：只读归档，不改 E0/闸门
+    "vsp_seg_clusters": "vsp_seg_clusters.parquet",
+    "vsp_seg_cluster_profiles": "vsp_seg_cluster_profiles.parquet",
+    "vsp_seg_plate_map": "vsp_seg_plate_map.parquet",
+    "vsp_seg_cluster_audit": "vsp_seg_cluster_audit.json",
+    # 京东趟级 trip_proxy 主表（2026-11-06）：论文 5 档 + K-means 3 簇并列，
+    # 一行=一趟；carbon_kg = baseline_carbon.kg_co2 按 trip 求和，等于 E0 主账
+    "jd_segment_master": "jd_segment_master.parquet",
+    "jd_segment_master_audit": "jd_segment_master_audit.json",
 }
 
 # --------------------------------------------------------------------------

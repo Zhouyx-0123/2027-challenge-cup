@@ -30,10 +30,12 @@ from main_views import (
     render_routes,
     render_sensor,
 )
+from views_chain import render_chain
 
 init_state()
 PAGES = [
     st.Page(render_dashboard, title="🏠 首页概览", url_path="dashboard", default=True),
+    st.Page(render_chain, title="🔗 数据链总览", url_path="chain"),
     st.Page(render_invoice, title="📄 发票数据感知", url_path="invoice"),
     st.Page(render_sensor, title="📡 云边端硬件监控", url_path="sensor"),
     st.Page(render_routes, title="🗺️ 减碳路线沙盘", url_path="routes"),

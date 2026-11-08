@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""一键启动：环境自检 → 一键复算 → 打开五页。
+"""一键启动：环境自检 → 一键复算 → 打开六页。
 
 给两类人用：
   - **团队自己**：日常开发，一条命令看全项目健康度；
@@ -7,7 +7,7 @@
 
 设计原则（工程师建议 #1/#9：静态兜底、不许红屏）：
   - 任何一步失败都**不阻断启动**，只打印警告并继续；
-  - 高德 key 缺失 → 自动走离线降级（五页照常演）；
+  - 高德 key 缺失 → 自动走离线降级（六页照常演）；
   - 路线表缺失 → 跳过路线段，主口径照常；
   - 永远不出现"启动脚本报错、演示机打不开"。
 
@@ -37,9 +37,10 @@ WARN = "!"
 BAD = "[X]"
 
 # 前端只读铁律：这些必须成立
-# 闸门当前 26 项（8 目标 + 18 结构）；pipeline 的 passed 标志才是权威，
-# 这里只作参考值，不对具体 PASS 数做硬编码断言（结构项还会增长）。
-GATE_EXPECT_PASS = 26
+# 闸门当前 28 项（10 目标 + 18 结构）；实测 2026-11-08 的 data/processed/gate_report.json：
+# counts = {pass: 28, fail: 0, skip: 0}，targets 10 项 + structural 18 项（route_checks 3 项另计）。
+# pipeline 的 passed 标志才是权威，这里只作参考值，不对具体 PASS 数做硬编码断言（结构项还会增长）。
+GATE_EXPECT_PASS = 28
 
 
 def _print_header(title: str) -> None:
@@ -82,7 +83,7 @@ def check_data() -> Tuple[bool, str]:
 
 
 def check_gate() -> Tuple[bool, str]:
-    """闸门：passed 为真且 FAIL=0 才算健康（当前 26 项：8 目标 + 18 结构）。"""
+    """闸门：passed 为真且 FAIL=0 才算健康（当前 28 项：10 目标 + 18 结构）。"""
     import json
     path = PROCESSED / "gate_report.json"
     if not path.exists():
@@ -119,7 +120,7 @@ def check_amap() -> Tuple[bool, str]:
 def check_routes() -> Tuple[bool, str]:
     path = PROCESSED / "route_od.parquet"
     if not path.exists():
-        return True, "路线基线表未生成 → 不影响五页主应用与实时路线沙盘"
+        return True, "路线基线表未生成 → 不影响六页主应用与实时路线沙盘"
     try:
         import pandas as pd
         df = pd.read_parquet(path)
@@ -184,7 +185,7 @@ def start_streamlit(port: int, open_browser: bool = False) -> int:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="一键启动：自检 + 复算 + 五页")
+    parser = argparse.ArgumentParser(description="一键启动：自检 + 复算 + 六页")
     parser.add_argument("--check", action="store_true", help="只自检，不复算不启动")
     parser.add_argument("--no-recalc", action="store_true", help="不复算，直接启动")
     parser.add_argument("--no-routes", action="store_true", help="复算时不带路线段")

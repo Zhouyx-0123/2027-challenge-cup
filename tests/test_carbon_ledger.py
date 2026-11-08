@@ -415,13 +415,18 @@ def test_panel_offers_no_write_or_approval_control():
         assert banned not in source, "审计轨面板出现写控件：%s" % banned
 
 
-def test_ledger_page_has_two_tabs_not_six_pages():
-    """碳账进的是「碳台账」页的第二个 tab，不新增第六页。"""
+def test_ledger_page_has_two_tabs_not_a_ledger_only_page():
+    """碳账进的是「碳台账」页的第二个 tab，不为它单开一页。
+
+    第六页是「数据链总览」（app/views_chain.py，只读状态盘点），
+    与碳账无关；此处只守住「碳账没有独立页」这件事。
+    """
     source = MAIN_VIEWS_PATH.read_text(encoding="utf-8")
     assert "碳会计口径 A0–A6（审计轨）" in source
     assert "carbon_ledger_panel.render_carbon_ledger_panel()" in source
     nav = (APP_DIR / "components" / "main_nav.py").read_text(encoding="utf-8")
-    assert nav.count('{"id":') == 5, "主导航应保持 5 页"
+    assert nav.count('{"id":') == 6, "主导航应为六页（业务五页 + 数据链总览）"
+    assert "ledger" in nav and "chain" in nav
 
 
 def test_panel_states_the_boundary_and_simulation():

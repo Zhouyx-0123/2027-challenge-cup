@@ -1,6 +1,6 @@
 # 58 · 论文锚定速度分段与 K-means 归档（并列轨）
 
-> 状态：**已实现并可复现**（2026-11-03）
+> 状态：**已实现并可复现**（2026-11-03；多维 K-means 并列轨 2026-11-06）
 > 依据：吴老师 2026-11-02 指导（录音文本/AI纪要）＋ 两篇工科论文
 > 边界：**并列轨**——不改 E₀ 主口径、不参与主闸门 28 条判据对拍；因子与 VSP 代理曲线只从 `src/factor_model.py` 读（唯一真源）。
 > 关联：`docs/41`（VSP 现状，G1 缺速度剖面）｜`docs/52`（OBD 实测轨）｜`docs/57`（方向对齐）
@@ -71,10 +71,17 @@ K-means：肘部法选 **K\*=3**，簇心 **15.16 / 38.16 / 64.42 km/h**，与�
 | `data/processed/vsp_seg_rule_table.parquet` | `vsp_seg_rule_table` | **计碳规则卡**：档位×载重锚点 → VSP 代理 / 乘数 / ER(g/s) / EF(g/km)，30 行 |
 | `data/processed/vsp_seg_carbon.parquet` | `vsp_seg_carbon` | 每趟：kg_co2_vsp_own（现行逐趟速度轨）/ kg_co2_binned（分档规则轨）/ delta% |
 | `data/processed/vsp_seg_factor_recon.parquet` | `vsp_seg_factor_recon` | **因子口径对账表**（§3.6，方案 B）：因子差超阈值的趟逐条可查，428 行 |
+| `data/processed/vsp_seg_clusters.parquet` | `vsp_seg_clusters` | **多维 K-means 归属表**（§3.9）：每趟一行，`cluster_id` 可空；只读并列轨 |
+| `data/processed/vsp_seg_cluster_profiles.parquet` | `vsp_seg_cluster_profiles` | **簇画像**（§3.9）：簇规模、原始/标准化簇心、车型与车牌摘要 |
+| `data/processed/vsp_seg_plate_map.parquet` | `vsp_seg_plate_map` | **车牌哈希映射**（§3.9）：原车牌只在此表，归属表只留 `plate_id` |
+| `data/processed/vsp_seg_cluster_audit.json` | `vsp_seg_cluster_audit` | **聚类审计**（§3.9）：门禁、缺失/剔除原因、K 扫描、缩放参数、局限 |
 
 ```bash
 python -m src.vsp_segment --out data/processed
-pytest -q tests/test_vsp_segment.py        # 45 项
+pytest -q tests/test_vsp_segment.py tests/test_segment_cluster.py   # 45 + 9 项
+
+# OBD 段表单独聚类（先跑 src/obd_text.py 产出 obd_text_segments.parquet）
+python -m src.segment_cluster --in data/processed/obd_text_segments.parquet --grain segment --feature-set obd_v1 --out data/processed
 ```
 
 ## 3.5 计碳规则（本模块只定规则，优化在下游 Q-learning）
@@ -265,6 +272,61 @@ k_A(A) = 5.498e-8·A² − 1.81e-4·A + 1.008    # 海拔，最低点约 1647 m
 1. **低速段碳口径**（影响 20% 的碳量）：显式区分行驶/停留，或对 < 某阈值 km/h 设怠速上限不折碳——与末端配送口径、枢纽停留是同一件事，**待拍板**。
 2. **速度-载重交互**：按分车型 `k(车型,v)` 给 5 个速度档各定载重斜率（当前模型把载重与速度完全解耦：实测 EF 的载重倍数在 5 个速度档上恒为 3.49~3.90，极差 12.0%，而论文实测 k 相差 18.9 倍）。
 3. **温度/海拔修正 `k_T` / `k_A`**：+3.42%，按出发城市 × 月份维度接入。
+
+## 3.9 多维 K-means 并列轨（2026-11-06 用户确认）
+
+### 定位
+
+原有 §3.3 的 1D K-means 只对**速度**做归档，回答“数据自然分层与论文档位差多少”。本节的多维 K-means 是**独立的描述性归档轨**：按用户确认的六项口径，对“趟/路段”整体画像，输出可回连的 `cluster_id`，供后续按路段、车牌做分层统计。它**不改变** E₀ 主账、28 条主闸门、分档规则卡或任何碳值。
+
+### 口径
+
+| 项 | 历史趟次（proxy_v1） | OBD 文本段（obd_v1） |
+|---|---|---|
+| 粒度 | 一趟一行（`trip_id`） | 一段一行（`segment_id`） |
+| 特征 | 平均速度 / log1p(里程) / 载重 | 平均速度 / 平均转速 / 实际扭矩 / 瞬时油耗 / 怠速占比 / log1p(里程) |
+| 载重 | 趟次表无载重，从主账 `baseline_carbon` 按 `trip_id` 取 first 代理 | 文本段无载重，**不硬造**；接入车辆主数据后再评估 `obd_load_v1` |
+| K | 固定 3（用户拍板；K=2–6 只进审计） | 同左 |
+| 初始化 | 纯 numpy k-means++，`n_init=10`，`seed=20261106` | 同左 |
+| 缩放 | 逐列 robust：中位数中心 + IQR 尺度 | 同左 |
+| 缺失 | **不插补**：任一特征缺失，该行 `cluster_id` 留空 | 同左 |
+| 物理门禁 | 速度 <0 或 >110 km/h 剔除（与 §2① 同口径） | 同左 |
+
+### 实测（2026-11-06，12,167 趟）
+
+- 输入 12,167，有效 **12,036**，剔除 **131**（全部 `speed_out_of_range`，与分档轨完全同一批）；缺失 0。
+- K=3，簇规模 **6,644 / 4,001 / 1,391**，inertia **6,991.91**，迭代 16 次；抽样轮廓系数 **0.425**，seed 与 seed+777 两次独立复跑 ARI **1.0**（同一数据上的初始化稳定性，不是跨数据稳定性）。
+- K 扫描（inertia / silhouette）：K=2 10,692.5 / **0.533**；K=3 6,991.9 / 0.422；K=4 5,755.3 / 0.335；K=5 4,837.4 / 0.360；K=6 4,039.9 / 0.368。K=2 的轮廓系数最高，但只分“快/慢”；**K=3 是用户拍板的业务首版固定值**，不因轮廓系数改 K。
+- 簇心（速度 km/h、里程 km、载重 t）：
+
+| cluster_id | 趟数 | 占比 | 平均速度 | 平均里程 | 平均载重 | 代表车型 |
+|---|---:|---:|---:|---:|---:|---|
+| 0 | 6,644 | 55.20% | 23.57 | 25.88 | 6.34 | 4.2 米厢式 |
+| 1 | 4,001 | 33.24% | 54.76 | 100.15 | 13.19 | 9.6 米厢式 |
+| 2 | 1,391 | 11.56% | 60.27 | 785.67 | 37.02 | 牵引车头 |
+
+读法：0 簇是“短途轻载低速”，1 簇是“中长途中载”，2 簇是“长途重载”；簇 2 速度与簇 1 接近但里程/载重把长途重载单独分出。**这是描述性画像，不是新的碳口径**。
+
+### 输出与回连
+
+- `vsp_seg_clusters.parquet`：每趟一行，含 `grain / unit_id / feature_set / cluster_id / cluster_distance / n_missing_features / plate_id` 与三特征值；`cluster_id` 为可空 `Int64`。
+- `vsp_seg_cluster_profiles.parquet`：簇规模/占比、原始簇心（`center_raw_*`，其中 `log1p_distance_km` 已反变换回 km）、标准化簇心、车型与 top 车牌。
+- `vsp_seg_plate_map.parquet`：原车牌 → 16 位加盐 SHA-256；**原车牌只在该表**，归属表只落 `plate_id`。
+- `vsp_seg_cluster_audit.json`：门禁计数、缺失/剔除原因、缩放参数、K 扫描、局限。
+- `vsp_seg_trips.parquet` 追加 `cluster_id`；131 趟被门禁剔除的行留空，不写 0。
+
+```bash
+python -m src.segment_cluster --in data/processed/obd_text_segments.parquet \
+    --grain segment --feature-set obd_v1 --out data/processed
+```
+
+### 诚实边界
+
+1. 聚类是**描述性归档**，不参与 E₀、28 闸门、规则卡或 Q-learning 成本；K=3 是业务首版固定值，不是统计最优。
+2. 历史趟次表的车牌已被上游剥离，`plate_id` 只能从主账 `baseline_carbon` 按 `trip_id` 补；补不到的行留空。
+3. 载重是主账 trip 级代理（first），不是逐段实测；OBD 文本段没有载重。
+4. 131 趟速度异常被剔除，不插补、不折中；这与分档轨的“留空”纪律一致。
+5. 还没有前端页面或下游消费方读取 `cluster_id`；当前完成度是“可复现的审计/归档件”，不是“已接入决策”。
 
 ## 4. 诚实边界（答辩主动说）
 

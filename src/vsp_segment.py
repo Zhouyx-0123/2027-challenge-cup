@@ -48,7 +48,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-from src import schema
+from src import schema, segment_cluster, segment_master
 from src.factor_model import (
     INDUSTRY_SPEED_KMH,
     LOAD_ANCHORS,
@@ -611,11 +611,25 @@ def main() -> None:
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     trips = pd.read_parquet(args.trips)
+    ledger_path = Path(args.ledger)
+    ledger_df = pd.read_parquet(ledger_path) if ledger_path.exists() else None
 
     seg, audit = build_segments(trips)
+
+    # ---- 多维 K-means 并列轨：只追加 cluster_id，不改分档/计碳 ----
+    cluster = segment_cluster.build_cluster_table(
+        trips, grain="trip", feature_set="proxy_v1", ledger=ledger_df)
+    seg = segment_cluster.attach_cluster_ids(seg, cluster["assignments"], key="trip_id")
+    audit["segment_cluster"] = cluster["audit"]
+
     seg_path = out_dir / RESULT_TRIPS
     audit_path = out_dir / RESULT_AUDIT
     seg.to_parquet(seg_path, index=False)
+    cluster["assignments"].to_parquet(out_dir / segment_cluster.RESULT_CLUSTERS, index=False)
+    cluster["profiles"].to_parquet(out_dir / segment_cluster.RESULT_PROFILES, index=False)
+    cluster["plate_map"].to_parquet(out_dir / segment_cluster.RESULT_PLATE_MAP, index=False)
+    (out_dir / segment_cluster.RESULT_AUDIT).write_text(
+        json.dumps(cluster["audit"], ensure_ascii=False, indent=2), encoding="utf-8")
     audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2),
                           encoding="utf-8")
 
@@ -631,11 +645,9 @@ def main() -> None:
                           encoding="utf-8")
 
     # ---- 因子口径对账（方案 B：只登记，不改计碳逻辑）----
-    ledger_path = Path(args.ledger)
     recon_path = out_dir / RESULT_RECON
-    if ledger_path.exists():
-        ledger = pd.read_parquet(ledger_path)
-        recon, recon_summary = build_factor_reconciliation(seg, carbon, ledger)
+    if ledger_df is not None:
+        recon, recon_summary = build_factor_reconciliation(seg, carbon, ledger_df)
         recon.to_parquet(recon_path, index=False)
         audit["factor_reconciliation"] = recon_summary
     else:
@@ -648,8 +660,47 @@ def main() -> None:
     audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2),
                           encoding="utf-8")
 
+    # ---- 京东趟级 trip_proxy 主表（5 档 + 3 簇并列，供聚合/页面只读）----
+    # 主表不是新计碳逻辑：carbon_kg 逐值等于 baseline_carbon.kg_co2 按 trip 求和。
+    # 输入契约不满足时明确 skip（老测试/旧数据不伪造一张空表）。
+    missing_contract = []
+    if ledger_df is None:
+        missing_contract.append("ledger")
+    else:
+        missing_contract += sorted(segment_master.LEDGER_REQUIRED - set(ledger_df.columns))
+    missing_contract += sorted(segment_master.SEG_REQUIRED - set(seg.columns))
+    missing_contract += sorted(segment_master.ASSIGN_REQUIRED
+                               - set(cluster["assignments"].columns))
+    if missing_contract:
+        audit["segment_master"] = {
+            "status": "skipped",
+            "reason": "输入契约不满足",
+            "missing": missing_contract,
+        }
+    else:
+        kpi_path = out_dir / "kpi.json"
+        kpi_total = None
+        if kpi_path.exists():
+            kpi_total = json.loads(kpi_path.read_text(encoding="utf-8")).get("total_kg")
+        master, master_audit = segment_master.build_master(
+            seg, cluster["assignments"], ledger_df,
+            trips=trips, kpi_total_kg=kpi_total)
+        master_path = out_dir / segment_master.RESULT_MASTER
+        master.to_parquet(master_path, index=False)
+        (out_dir / segment_master.RESULT_AUDIT).write_text(
+            json.dumps(master_audit, ensure_ascii=False, indent=2), encoding="utf-8")
+        audit["segment_master"] = master_audit
+        print(f"[vsp_segment] master -> {master_path} ({len(master)} rows); "
+              f"carbon {master_audit['carbon_kg']:.3f} kg; "
+              f"recon {master_audit['reconciliation'].get('status')}")
+    audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+
     # 自检输出契约
-    for key in (RESULT_TRIPS, RESULT_CARBON, RESULT_RULES, RESULT_RECON):
+    for key in (RESULT_TRIPS, RESULT_CARBON, RESULT_RULES, RESULT_RECON,
+                segment_cluster.RESULT_CLUSTERS, segment_cluster.RESULT_PROFILES,
+                segment_cluster.RESULT_PLATE_MAP, segment_cluster.RESULT_AUDIT,
+                segment_master.RESULT_MASTER, segment_master.RESULT_AUDIT):
         assert key in schema.RESULT_FILES.values(), f"{key} 未在 schema.RESULT_FILES 注册"
     print(f"[vsp_segment] trips -> {seg_path} ({len(seg)} rows)")
     print(f"[vsp_segment] audit -> {audit_path}")

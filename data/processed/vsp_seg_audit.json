@@ -104,6 +104,189 @@
     "verdict": "审计证据：数据自然边界 vs 论文档位；最终档标签以论文为准"
   },
   "known_limit": "输入为趟级门到门平均速度，非逐秒剖面；OBD+GPS 上线后框架不变、输入升级",
+  "segment_cluster": {
+    "cluster_version": "SEG-CLUSTER-v1",
+    "feature_version": "SEG-FEAT-v1",
+    "feature_set": "proxy_v1",
+    "feature_description": "历史趟次代理特征: 平均速度 + log(里程) + 载重",
+    "grain": "trip",
+    "k_selected": 3,
+    "selection": "固定 K=3 (用户 2026-11-06 确认); K 扫描仅审计, 不用肘部法改 K",
+    "seed": 20261106,
+    "n_init": 10,
+    "n_input": 12167,
+    "n_valid": 12036,
+    "n_missing": 0,
+    "n_invalid": 131,
+    "n_excluded": 131,
+    "exclusion_by_reason": {
+      "speed_out_of_range": 131
+    },
+    "missing_by_feature": {
+      "speed_mean_kmh": 0,
+      "log1p_distance_km": 0,
+      "load_t": 0
+    },
+    "features": [
+      "speed_mean_kmh",
+      "log1p_distance_km",
+      "load_t"
+    ],
+    "scaling": {
+      "method": "robust_iqr",
+      "center": [
+        36.243548,
+        3.869324,
+        4.5
+      ],
+      "scale": [
+        34.224702,
+        1.338598,
+        13.5
+      ],
+      "note": "中位数中心 + IQR 尺度; 退化列用 std 或 1; 不做插补"
+    },
+    "plate": {
+      "n_plates": 5868,
+      "hash": "sha256_hex_16",
+      "salt_version": "dsh-seg-plate-v1",
+      "raw_in_mapping_only": true
+    },
+    "limitations": [
+      "车牌在历史趟次表中已被剥离; 仅当输入或主账段表带 plate 时才能出 plate_id",
+      "OBD 文本段没有载重字段, obd_v1 因而不含 load_t; 接入车辆主数据后再评估 obd_load_v1",
+      "聚类是描述性归档, 不改变 E0 主账、28 条闸门或分档计碳规则",
+      "K=3 是业务首版固定值; K 扫描只供审计, 不代表统计最优"
+    ],
+    "status": "ok",
+    "inertia": 6991.914989,
+    "silhouette": 0.425074,
+    "silhouette_sample": 4000,
+    "stability_ari": 1.0,
+    "stability_note": "seed 与 seed+777 两次独立 n_init 的 ARI；不是跨数据稳定性",
+    "n_iter": 16,
+    "n_init_used": 10,
+    "cluster_sizes": [
+      6644,
+      4001,
+      1391
+    ],
+    "centers_scaled": [
+      [
+        -0.370233,
+        -0.43178,
+        0.136659
+      ],
+      [
+        0.541044,
+        0.558254,
+        0.643571
+      ],
+      [
+        0.702005,
+        2.09061,
+        2.408526
+      ]
+    ],
+    "centers_raw": [
+      [
+        23.572426,
+        25.878989,
+        6.344898
+      ],
+      [
+        54.760616,
+        100.149796,
+        13.188203
+      ],
+      [
+        60.269459,
+        785.671642,
+        37.015097
+      ]
+    ],
+    "k_scan": [
+      {
+        "k": 2,
+        "inertia": 10692.512418,
+        "silhouette": 0.53322,
+        "n_iter": 13,
+        "n_init": 3,
+        "cluster_sizes": [
+          9287,
+          2749
+        ],
+        "min_cluster_size": 2749,
+        "relative_inertia_drop_pct": null
+      },
+      {
+        "k": 3,
+        "inertia": 6991.914989,
+        "silhouette": 0.421848,
+        "n_iter": 16,
+        "n_init": 3,
+        "cluster_sizes": [
+          6644,
+          4001,
+          1391
+        ],
+        "min_cluster_size": 1391,
+        "relative_inertia_drop_pct": 34.6092
+      },
+      {
+        "k": 4,
+        "inertia": 5755.326125,
+        "silhouette": 0.33453,
+        "n_iter": 27,
+        "n_init": 3,
+        "cluster_sizes": [
+          5060,
+          4004,
+          1215,
+          1757
+        ],
+        "min_cluster_size": 1215,
+        "relative_inertia_drop_pct": 17.686
+      },
+      {
+        "k": 5,
+        "inertia": 4837.373318,
+        "silhouette": 0.359771,
+        "n_iter": 49,
+        "n_init": 3,
+        "cluster_sizes": [
+          4556,
+          1967,
+          2750,
+          1214,
+          1549
+        ],
+        "min_cluster_size": 1214,
+        "relative_inertia_drop_pct": 15.9496
+      },
+      {
+        "k": 6,
+        "inertia": 4039.868695,
+        "silhouette": 0.368194,
+        "n_iter": 44,
+        "n_init": 3,
+        "cluster_sizes": [
+          1801,
+          3988,
+          1883,
+          1725,
+          1207,
+          1432
+        ],
+        "min_cluster_size": 1207,
+        "relative_inertia_drop_pct": 16.4863
+      }
+    ],
+    "profile_file": "vsp_seg_cluster_profiles.parquet",
+    "assignment_file": "vsp_seg_clusters.parquet",
+    "plate_map_file": "vsp_seg_plate_map.parquet",
+    "known_limit": "历史趟次无逐段载重/车牌时用主账 trip 级 first/sum 代理; 不是实测值"
+  },
   "carbon": {
     "rule_version": "SEG-RULE-v1",
     "rule_statement": "排放率由速度档决定（档均速→档VSP→档乘数），时间按本趟实际；因子基准沿用趟次法定因子(g/km)",
@@ -193,5 +376,285 @@
     "mismatch_share_of_net_delta_pct": 110.8798,
     "lookup_file": "vsp_seg_factor_recon.parquet",
     "verdict": "净差 = 因子口径效应 + 分档乘数效应（档均速 VSP 替代本趟速度 VSP）；因子效应集中在少数趟，可按 trip_id 查 vsp_seg_factor_recon.parquet"
+  },
+  "segment_master": {
+    "status": "ok",
+    "version": "SEG-MASTER-v1",
+    "grain": "trip_proxy",
+    "source": "JD_WAYBILL",
+    "n_rows": 12167,
+    "n_passed": 12036,
+    "n_invalid": 131,
+    "n_clustered": 12036,
+    "n_unclustered": 131,
+    "n_plates": 5868,
+    "n_waybills": 33214,
+    "distance_km": 2174173.86,
+    "duration_h": 50396.4504,
+    "carbon_kg": 2258438.376208,
+    "carbon_kg_valid": 2214933.439918,
+    "carbon_kg_invalid": 43504.936289,
+    "carbon_kg_phys": 2324654.342193,
+    "carbon_basis": "carbon_kg = sum(baseline_carbon.kg_co2 by trip_id); carbon_kg_phys 仅对账",
+    "reconciliation": {
+      "status": "ok",
+      "kpi_total_kg": 2258438.376208,
+      "master_total_kg": 2258438.376208,
+      "delta_kg": 0.0,
+      "matches": true
+    },
+    "by_paper_bin": [
+      {
+        "paper_bin": "低速档 <20",
+        "trips": 2793,
+        "waybills": 4937,
+        "distance_km": 105777.89,
+        "duration_h": 13525.7131,
+        "carbon_kg": 73234.363094,
+        "carbon_share_pct": 3.3064,
+        "ef_g_km": 692.3409,
+        "avg_speed_trip_kmh": 11.3367,
+        "avg_speed_dist_weighted_kmh": 12.0971,
+        "avg_speed_kmh": 7.8205,
+        "avg_load_t": 15.2255,
+        "avg_load_trip_t": 7.1301,
+        "n_plates": 1809
+      },
+      {
+        "paper_bin": "中低速档 20-40",
+        "trips": 3867,
+        "waybills": 8744,
+        "distance_km": 257837.23,
+        "duration_h": 8469.7304,
+        "carbon_kg": 211449.872912,
+        "carbon_share_pct": 9.5466,
+        "ef_g_km": 820.0905,
+        "avg_speed_trip_kmh": 29.8247,
+        "avg_speed_dist_weighted_kmh": 31.5938,
+        "avg_speed_kmh": 30.4422,
+        "avg_load_t": 19.9151,
+        "avg_load_trip_t": 8.5741,
+        "n_plates": 2349
+      },
+      {
+        "paper_bin": "中速档 40-60",
+        "trips": 3027,
+        "waybills": 9337,
+        "distance_km": 500094.19,
+        "duration_h": 9755.8684,
+        "carbon_kg": 496051.577833,
+        "carbon_share_pct": 22.3958,
+        "ef_g_km": 991.9163,
+        "avg_speed_trip_kmh": 49.6176,
+        "avg_speed_dist_weighted_kmh": 51.9265,
+        "avg_speed_kmh": 51.2609,
+        "avg_load_t": 26.0265,
+        "avg_load_trip_t": 13.965,
+        "n_plates": 1836
+      },
+      {
+        "paper_bin": "中高速档 60-80",
+        "trips": 2144,
+        "waybills": 8560,
+        "distance_km": 1134003.54,
+        "duration_h": 16937.9065,
+        "carbon_kg": 1355337.955379,
+        "carbon_share_pct": 61.1909,
+        "ef_g_km": 1195.1797,
+        "avg_speed_trip_kmh": 66.897,
+        "avg_speed_dist_weighted_kmh": 67.1673,
+        "avg_speed_kmh": 66.9506,
+        "avg_load_t": 32.9806,
+        "avg_load_trip_t": 22.6451,
+        "n_plates": 1295
+      },
+      {
+        "paper_bin": "高速档 ≥80",
+        "trips": 205,
+        "waybills": 466,
+        "distance_km": 114106.61,
+        "duration_h": 1197.4713,
+        "carbon_kg": 78859.6707,
+        "carbon_share_pct": 3.5604,
+        "ef_g_km": 691.1052,
+        "avg_speed_trip_kmh": 92.3529,
+        "avg_speed_dist_weighted_kmh": 96.0873,
+        "avg_speed_kmh": 95.2896,
+        "avg_load_t": 15.4741,
+        "avg_load_trip_t": 12.2732,
+        "n_plates": 133
+      }
+    ],
+    "by_cluster": [
+      {
+        "cluster_id": 0,
+        "trips": 6644,
+        "waybills": 14449,
+        "distance_km": 201852.13,
+        "duration_h": 14010.2802,
+        "carbon_kg": 86716.800723,
+        "carbon_share_pct": 3.9151,
+        "ef_g_km": 429.6056,
+        "avg_speed_trip_kmh": 23.5724,
+        "avg_speed_dist_weighted_kmh": 25.1003,
+        "avg_speed_kmh": 14.4074,
+        "avg_load_t": 5.8922,
+        "avg_load_trip_t": 6.3449,
+        "n_plates": 3301
+      },
+      {
+        "cluster_id": 1,
+        "trips": 4001,
+        "waybills": 15207,
+        "distance_km": 539595.98,
+        "duration_h": 10699.5145,
+        "carbon_kg": 346045.799843,
+        "carbon_share_pct": 15.6233,
+        "ef_g_km": 641.3054,
+        "avg_speed_trip_kmh": 54.7606,
+        "avg_speed_dist_weighted_kmh": 59.0554,
+        "avg_speed_kmh": 50.4318,
+        "avg_load_t": 13.7921,
+        "avg_load_trip_t": 13.1882,
+        "n_plates": 1855
+      },
+      {
+        "cluster_id": 2,
+        "trips": 1391,
+        "waybills": 2388,
+        "distance_km": 1370371.35,
+        "duration_h": 25176.895,
+        "carbon_kg": 1782170.839352,
+        "carbon_share_pct": 80.4616,
+        "ef_g_km": 1300.5021,
+        "avg_speed_trip_kmh": 60.2695,
+        "avg_speed_dist_weighted_kmh": 62.4599,
+        "avg_speed_kmh": 54.4297,
+        "avg_load_t": 36.702,
+        "avg_load_trip_t": 37.0151,
+        "n_plates": 1048
+      }
+    ],
+    "by_month": [
+      {
+        "month": "2023-01",
+        "trips": 1552,
+        "waybills": 4415,
+        "distance_km": 232649.45,
+        "duration_h": 5695.0373,
+        "carbon_kg": 236835.311821,
+        "carbon_share_pct": 10.6927,
+        "ef_g_km": 1017.9921,
+        "avg_speed_trip_kmh": 36.3093,
+        "avg_speed_dist_weighted_kmh": 56.8742,
+        "avg_speed_kmh": 40.8513,
+        "avg_load_t": 26.7967,
+        "avg_load_trip_t": 11.4233,
+        "n_plates": 1263
+      },
+      {
+        "month": "2023-02",
+        "trips": 6321,
+        "waybills": 17921,
+        "distance_km": 1055424.8,
+        "duration_h": 22308.7427,
+        "carbon_kg": 1081200.610413,
+        "carbon_share_pct": 48.8141,
+        "ef_g_km": 1024.4222,
+        "avg_speed_trip_kmh": 39.0274,
+        "avg_speed_dist_weighted_kmh": 60.7241,
+        "avg_speed_kmh": 47.3099,
+        "avg_load_t": 27.0835,
+        "avg_load_trip_t": 12.0083,
+        "n_plates": 3338
+      },
+      {
+        "month": "2023-03",
+        "trips": 10,
+        "waybills": 10,
+        "distance_km": 1229.17,
+        "duration_h": 34.7254,
+        "carbon_kg": 693.434485,
+        "carbon_share_pct": 0.0313,
+        "ef_g_km": 564.1486,
+        "avg_speed_trip_kmh": 32.6448,
+        "avg_speed_dist_weighted_kmh": 47.5463,
+        "avg_speed_kmh": 35.3969,
+        "avg_load_t": 10.8088,
+        "avg_load_trip_t": 7.95,
+        "n_plates": 9
+      },
+      {
+        "month": "2023-11",
+        "trips": 1915,
+        "waybills": 5128,
+        "distance_km": 351241.12,
+        "duration_h": 8640.707,
+        "carbon_kg": 374330.541611,
+        "carbon_share_pct": 16.9003,
+        "ef_g_km": 1065.7367,
+        "avg_speed_trip_kmh": 38.1478,
+        "avg_speed_dist_weighted_kmh": 56.9832,
+        "avg_speed_kmh": 40.6496,
+        "avg_load_t": 28.3382,
+        "avg_load_trip_t": 12.1094,
+        "n_plates": 1420
+      },
+      {
+        "month": "2023-12",
+        "trips": 2238,
+        "waybills": 4570,
+        "distance_km": 471274.92,
+        "duration_h": 13207.4773,
+        "carbon_kg": 521873.541589,
+        "carbon_share_pct": 23.5616,
+        "ef_g_km": 1107.3654,
+        "avg_speed_trip_kmh": 37.1418,
+        "avg_speed_dist_weighted_kmh": 53.3258,
+        "avg_speed_kmh": 35.6824,
+        "avg_load_t": 30.0065,
+        "avg_load_trip_t": 13.1845,
+        "n_plates": 1639
+      }
+    ],
+    "checks": {
+      "distance_mismatch_trips": 0,
+      "missing_carbon_trips": 0,
+      "missing_plate_id": 0,
+      "missing_vehicle_type": 0,
+      "missing_duration": 0
+    },
+    "limitations": [
+      "京东运单只有整趟均速；一行=一趟，不是同趟内多段真实轨迹",
+      "没有逐秒 GPS/OBD，无法给 rpm/扭矩/瞬时油耗/怠速",
+      "plate_id 为加盐哈希；原始车牌只在 vsp_seg_plate_map",
+      "paper_bin 是论文 5 档（碳规则轨）；cluster_id 是速度+里程+载重的运营分层，二者并列不互替",
+      "131 条速度门禁未过趟保留在主表，passed=False；聚合时必须显式过滤"
+    ],
+    "aggregation_contract": {
+      "keys": [
+        "trip_id",
+        "plate_id",
+        "month",
+        "paper_bin",
+        "cluster_id"
+      ],
+      "additive": [
+        "carbon_kg",
+        "carbon_kg_phys",
+        "distance_km",
+        "duration_h",
+        "n_waybills"
+      ],
+      "non_additive": {
+        "ef_g_km": "1000 * sum(carbon_kg) / sum(distance_km)",
+        "avg_speed_kmh": "sum(distance_km) / sum(duration_h)  # 时间加权，车队运营口径",
+        "avg_speed_trip_kmh": "mean(speed_kmh)  # 趟等权，与 K-means 簇心同口径",
+        "avg_speed_dist_weighted_kmh": "sum(speed_kmh * distance_km) / sum(distance_km)",
+        "avg_load_t": "sum(load_t * distance_km) / sum(distance_km)  # 吨公里口径",
+        "avg_load_trip_t": "mean(load_t)  # 每趟平均装载"
+      },
+      "do_not": "不要对 ef_g_km 直接求平均；不要把 n_waybills 当碳权重；报告平均速度必须注明是趟等权、距离加权还是时间加权"
+    }
   }
 }

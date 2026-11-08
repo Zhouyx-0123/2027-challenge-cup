@@ -16,6 +16,7 @@ import streamlit as st
 
 NAV_ITEMS = [
     {"id": "dashboard", "label": "首页"},
+    {"id": "chain", "label": "数据链总览"},
     {"id": "invoice", "label": "发票感知"},
     {"id": "sensor", "label": "硬件监控"},
     {"id": "routes", "label": "路线沙盘"},
@@ -134,6 +135,8 @@ div[class*="st-key-main_nav_"] [data-testid="stPageLink-NavLink"] p *{
 
 @media (max-width:1080px){
   .cm-brand .sub{ display:none; }
+  .cm-head-status{ gap:.4rem; }
+  .cm-head-pill{ letter-spacing:.04em; }
   div[class*="st-key-main_nav_"] [data-testid="stPageLink-NavLink"]{
     padding:.36rem .6rem !important;
   }
@@ -141,9 +144,14 @@ div[class*="st-key-main_nav_"] [data-testid="stPageLink-NavLink"] p *{
     font-size:12px !important;
   }
 }
+/* ≤1000px：右侧状态只留脉冲点。文字节点不能单独隐藏，故用 font-size:0 收起文案。 */
+@media (max-width:1000px){
+  .cm-head-pill{ font-size:0; gap:0; }
+  .cm-head-sep{ display:none; }
+  .cm-head-status{ gap:.5rem; }
+}
 @media (max-width:820px){
   .cm-brand .word{ font-size:14px; }
-  .cm-head-pill span:not(.cm-dot){ display:none; }
   .cm-head-status{ gap:.35rem; }
 }
 @media (prefers-reduced-motion:reduce){

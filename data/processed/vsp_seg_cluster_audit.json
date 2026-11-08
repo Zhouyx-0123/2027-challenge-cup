@@ -1,0 +1,183 @@
+{
+  "cluster_version": "SEG-CLUSTER-v1",
+  "feature_version": "SEG-FEAT-v1",
+  "feature_set": "proxy_v1",
+  "feature_description": "历史趟次代理特征: 平均速度 + log(里程) + 载重",
+  "grain": "trip",
+  "k_selected": 3,
+  "selection": "固定 K=3 (用户 2026-11-06 确认); K 扫描仅审计, 不用肘部法改 K",
+  "seed": 20261106,
+  "n_init": 10,
+  "n_input": 12167,
+  "n_valid": 12036,
+  "n_missing": 0,
+  "n_invalid": 131,
+  "n_excluded": 131,
+  "exclusion_by_reason": {
+    "speed_out_of_range": 131
+  },
+  "missing_by_feature": {
+    "speed_mean_kmh": 0,
+    "log1p_distance_km": 0,
+    "load_t": 0
+  },
+  "features": [
+    "speed_mean_kmh",
+    "log1p_distance_km",
+    "load_t"
+  ],
+  "scaling": {
+    "method": "robust_iqr",
+    "center": [
+      36.243548,
+      3.869324,
+      4.5
+    ],
+    "scale": [
+      34.224702,
+      1.338598,
+      13.5
+    ],
+    "note": "中位数中心 + IQR 尺度; 退化列用 std 或 1; 不做插补"
+  },
+  "plate": {
+    "n_plates": 5868,
+    "hash": "sha256_hex_16",
+    "salt_version": "dsh-seg-plate-v1",
+    "raw_in_mapping_only": true
+  },
+  "limitations": [
+    "车牌在历史趟次表中已被剥离; 仅当输入或主账段表带 plate 时才能出 plate_id",
+    "OBD 文本段没有载重字段, obd_v1 因而不含 load_t; 接入车辆主数据后再评估 obd_load_v1",
+    "聚类是描述性归档, 不改变 E0 主账、28 条闸门或分档计碳规则",
+    "K=3 是业务首版固定值; K 扫描只供审计, 不代表统计最优"
+  ],
+  "status": "ok",
+  "inertia": 6991.914989,
+  "silhouette": 0.425074,
+  "silhouette_sample": 4000,
+  "stability_ari": 1.0,
+  "stability_note": "seed 与 seed+777 两次独立 n_init 的 ARI；不是跨数据稳定性",
+  "n_iter": 16,
+  "n_init_used": 10,
+  "cluster_sizes": [
+    6644,
+    4001,
+    1391
+  ],
+  "centers_scaled": [
+    [
+      -0.370233,
+      -0.43178,
+      0.136659
+    ],
+    [
+      0.541044,
+      0.558254,
+      0.643571
+    ],
+    [
+      0.702005,
+      2.09061,
+      2.408526
+    ]
+  ],
+  "centers_raw": [
+    [
+      23.572426,
+      25.878989,
+      6.344898
+    ],
+    [
+      54.760616,
+      100.149796,
+      13.188203
+    ],
+    [
+      60.269459,
+      785.671642,
+      37.015097
+    ]
+  ],
+  "k_scan": [
+    {
+      "k": 2,
+      "inertia": 10692.512418,
+      "silhouette": 0.53322,
+      "n_iter": 13,
+      "n_init": 3,
+      "cluster_sizes": [
+        9287,
+        2749
+      ],
+      "min_cluster_size": 2749,
+      "relative_inertia_drop_pct": null
+    },
+    {
+      "k": 3,
+      "inertia": 6991.914989,
+      "silhouette": 0.421848,
+      "n_iter": 16,
+      "n_init": 3,
+      "cluster_sizes": [
+        6644,
+        4001,
+        1391
+      ],
+      "min_cluster_size": 1391,
+      "relative_inertia_drop_pct": 34.6092
+    },
+    {
+      "k": 4,
+      "inertia": 5755.326125,
+      "silhouette": 0.33453,
+      "n_iter": 27,
+      "n_init": 3,
+      "cluster_sizes": [
+        5060,
+        4004,
+        1215,
+        1757
+      ],
+      "min_cluster_size": 1215,
+      "relative_inertia_drop_pct": 17.686
+    },
+    {
+      "k": 5,
+      "inertia": 4837.373318,
+      "silhouette": 0.359771,
+      "n_iter": 49,
+      "n_init": 3,
+      "cluster_sizes": [
+        4556,
+        1967,
+        2750,
+        1214,
+        1549
+      ],
+      "min_cluster_size": 1214,
+      "relative_inertia_drop_pct": 15.9496
+    },
+    {
+      "k": 6,
+      "inertia": 4039.868695,
+      "silhouette": 0.368194,
+      "n_iter": 44,
+      "n_init": 3,
+      "cluster_sizes": [
+        1801,
+        3988,
+        1883,
+        1725,
+        1207,
+        1432
+      ],
+      "min_cluster_size": 1207,
+      "relative_inertia_drop_pct": 16.4863
+    }
+  ],
+  "profile_file": "vsp_seg_cluster_profiles.parquet",
+  "assignment_file": "vsp_seg_clusters.parquet",
+  "plate_map_file": "vsp_seg_plate_map.parquet",
+  "known_limit": "历史趟次无逐段载重/车牌时用主账 trip 级 first/sum 代理; 不是实测值"
+}

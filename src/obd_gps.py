@@ -333,6 +333,17 @@ def normalize_records(records: Sequence[Dict[str, Any]],
         row = _empty_row()
         flags: List[str] = []
         for key, value in raw.items():
+            # CSV 往返后，缺失的可选字段会变成 NaN/NaT。它们表示“没上报”，
+            # 不是越界值，也不是故障码；先在这里滤掉，避免给每条记录误挂
+            # out_of_range / ecu_fault（见 tests/test_obd_gps.py 的回归用例）。
+            if value is None:
+                continue
+            if not isinstance(value, (list, tuple, dict, set)):
+                try:
+                    if pd.isna(value):
+                        continue
+                except (TypeError, ValueError):
+                    pass
             canonical = lookup.get(_norm_key(key))
             if canonical is None:
                 continue

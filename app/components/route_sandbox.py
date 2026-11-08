@@ -243,7 +243,7 @@ def _table(frame: pd.DataFrame) -> None:
 def _carbon_price_chart(current: int) -> Dict[str, Any]:
     """碳价敏感度联动图。
 
-    三条线全部由当前碳账快照真实算出（口径与 demo_state.carbon_snapshot 一致）：
+    三条线全部由当前碳账快照真实算出（毛口径，与 demo_state.carbon_snapshot 一致）：
       · 当期全额碳成本 = 当期总碳排(t) × 碳价   —— 情景口径：假设全部碳排都按碳价计价
       · 配额抵扣额度   = 当期配额(t)   × 碳价   —— 配额覆盖部分不计成本
       · 配额缺口采购成本 = 配额缺口(t) × 碳价   —— 需要自己掏钱的部分
@@ -260,7 +260,7 @@ def _carbon_price_chart(current: int) -> Dict[str, Any]:
     covered = [[p, quota_t * p] for p in prices]
     gap_cost = [[p, gap_t * p] for p in prices]
     palette = slider_kit.PALETTE
-    subtitle = ("总碳排 %.2f t · 配额 %.2f t · 缺口 %.2f t · 发票新增 %.4f t · 硬件成本 ¥%.2f"
+    subtitle = ("毛口径 总碳排 %.2f t · 配额 %.2f t · 缺口 %.2f t · 发票新增 %.4f t · 硬件成本 ¥%.2f"
                 % (total_t, quota_t, gap_t, invoice_t, sensor_cost))
     return {
         "title": "碳价敏感度",

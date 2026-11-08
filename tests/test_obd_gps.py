@@ -77,6 +77,26 @@ def test_normalize_accepts_aliases_and_flags_missing_fuel():
     assert rejects.iloc[0]["reason"] == "missing_fuel"
 
 
+def test_normalize_ignores_nan_optional_fields_from_csv_roundtrip():
+    """CSV 里未上报的可选字段是 NaN，不是越界值，也不是故障码。"""
+    records = [{
+        "ts": "2026-10-29T10:00:00+08:00",
+        "vehicle_id": "TRK-NAN-001",
+        "instant_fuel_lph": 18.0,
+        "engine_rpm": float("nan"),
+        "fault_codes": float("nan"),
+        "engine_temp_c": float("nan"),
+        "lat": float("nan"),
+        "lng": float("nan"),
+    }]
+    normalized, rejects = obd_gps.normalize_records(records)
+    assert len(normalized) == 1
+    assert len(rejects) == 0
+    flags = normalized.iloc[0]["qc_flags"]
+    assert "out_of_range" not in flags
+    assert "ecu_fault" not in flags
+
+
 def test_normalize_rejects_missing_timestamp_and_vehicle():
     records = [
         {"vehicle_id": "TRK-001", "instant_fuel_lph": 10.0},
@@ -323,6 +343,10 @@ def test_obd_pipeline_writes_its_own_tables_only(tmp_path, monkeypatch):
                         processed / "obd_vehicle_carbon.parquet")
     monkeypatch.setattr(obd_pipeline, "TRIPS_PATH", processed / "obd_trips.parquet")
     monkeypatch.setattr(obd_pipeline, "SUMMARY_PATH", processed / "obd_summary.json")
+    # 本机可能已把真实/模拟原始流灌到 data/raw/obd_gps/obd_stream.csv；
+    # load_records() 优先读 CSV，只有空表才走演示序列 -> 这里把它指向不存在的路径，
+    # 否则断言会随本机数据漂移（曾因倒进 10,000 行而变成 8 台）。
+    monkeypatch.setattr(obd_gps, "stream_path", lambda: tmp_path / "no_stream.csv")
 
     report = obd_pipeline.run_obd_pipeline(use_demo=True)
     assert report["status"] == "ok"

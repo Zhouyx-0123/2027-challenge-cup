@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 ROOT=Path(__file__).resolve().parents[1]
 def load_parts(path,names,env):
- tree=ast.parse(path.read_text());nodes=[]
+ tree=ast.parse(path.read_text(encoding="utf-8"));nodes=[]
  for node in tree.body:
   name=node.name if isinstance(node,(ast.FunctionDef,ast.ClassDef)) else node.target.id if isinstance(node,ast.AnnAssign) and isinstance(node.target,ast.Name) else node.targets[0].id if isinstance(node,ast.Assign) and isinstance(node.targets[0],ast.Name) else ''
   if name in names:nodes.append(node)

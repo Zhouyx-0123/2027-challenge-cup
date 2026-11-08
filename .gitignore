@@ -178,3 +178,31 @@ env/
 .idea/
 .vscode/
 .DS_Store
+
+# ===== 交付包（含车牌/发票/大数据）：只在本地与网盘流转，不入库 =====
+交付_*/
+_pack*/
+*.zip
+
+# ===== Agent 协作产物与验收截图（体积大，本地留存）=====
+outputs/report/agent-audit/
+outputs/report/output/
+outputs/report/_crop_*.png
+
+# ===== 固件构建产物与烧录镜像 =====
+firmware_*/build/
+firmware_*/*/build/
+_app*.bin
+_flash_*.bin
+_otadata.bin
+firmware_backup_*.bin
+
+# ===== 本地临时备份 / 清理暂存 =====
+_backup_*/
+# ===== 路段主表 / K-means 归档：页面只读取数来源，需随结果入库 =====
+# 注意：vsp_seg_plate_map.parquet（车牌→哈希）故意不入库，避免可逆映射
+!data/processed/jd_segment_master.parquet
+!data/processed/jd_segment_master_audit.json
+!data/processed/vsp_seg_clusters.parquet
+!data/processed/vsp_seg_cluster_profiles.parquet
+!data/processed/vsp_seg_cluster_audit.json

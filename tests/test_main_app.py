@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""五页主应用：共享状态与跨模块联动测试。"""
+"""六页主应用：共享状态与跨模块联动测试。"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -136,7 +136,7 @@ def test_all_five_views_render_without_exceptions():
 def test_main_entry_uses_custom_top_navigation():
     source = (APP_DIR / "app.py").read_text(encoding="utf-8")
     nav_source = (APP_DIR / "components" / "main_nav.py").read_text(encoding="utf-8")
-    assert source.count("st.Page(") == 5
+    assert source.count("st.Page(") == 6
     assert 'position="hidden"' in source
     assert "render_main_nav(page.url_path, PAGES)" in source
     assert "cm_nav_source" not in nav_source
@@ -149,14 +149,14 @@ def test_main_entry_uses_custom_top_navigation():
     assert "theme.inject()" not in source
 
 
-def test_only_five_visible_pages_remain():
-    """旧 pages 目录已删除，顶部导航只保留当前五个业务页面。"""
+def test_only_six_visible_pages_remain():
+    """旧 pages 目录已删除，顶部导航只保留当前六个业务页面（含数据链总览）。"""
     from components.main_nav import NAV_ITEMS
 
     assert not (APP_DIR / "pages").exists(), "app/pages 会触发旧页面自动注册"
     assert not (APP_DIR / "legacy_pages").exists(), "旧页面归档也应完成清理"
     assert [item["id"] for item in NAV_ITEMS] == [
-        "dashboard", "invoice", "sensor", "routes", "ledger"]
+        "dashboard", "chain", "invoice", "sensor", "routes", "ledger"]
     config = (APP_DIR.parent / ".streamlit" / "config.toml").read_text(encoding="utf-8")
     assert "showSidebarNavigation = false" in config
 

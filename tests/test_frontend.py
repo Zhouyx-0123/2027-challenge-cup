@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""当前五页主入口与全项目源码的前端质量防线。"""
+"""当前六页主入口与全项目源码的前端质量防线。"""
 import ast
 import re
 from pathlib import Path

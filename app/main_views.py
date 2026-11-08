@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""五页主应用视图：所有跨页数字均通过 demo_state 共享。"""
+"""六页主应用视图：所有跨页数字均通过 demo_state 共享（第 6 页数据链总览在 views_chain.py）。"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -197,6 +197,29 @@ def _sensor_window_chart() -> dict:
     }
 
 
+def _obd_raw_caption() -> None:
+    """OBD tab 顶部口径提示：图表读 processed（demo 基线），实流只落 data/raw。
+
+    两条通道数字不同源，必须在同一屏里写清楚，避免把 demo 基线当成现场读数。
+    """
+    raw = services.latest_raw_stream()
+    prefix = ("页面图表读 data/processed（demo 基线）；设备实流落 "
+              "data/raw/obd_gps/obd_stream.csv，")
+    if not raw:
+        st.caption(prefix + "当前暂无实流文件（等待设备上报），详见 🔗 数据链总览。")
+        return
+    first = str(raw.get("first_ts") or "").replace("T", " ").replace("Z", "")
+    last = str(raw.get("last_ts") or "").replace("T", " ").replace("Z", "")
+    if first and last and first[:10] == last[:10]:
+        window = first[:19] + " → " + last[11:19] + " UTC"
+    elif first and last:
+        window = first[:19] + " → " + last[:19] + " UTC"
+    else:
+        window = "—"
+    st.caption(prefix + "最近 " + str(raw.get("rows") or 0) + " 行 / UTC "
+               + window + "，详见 🔗 数据链总览。")
+
+
 def render_sensor() -> None:
     theme.hero_compact(
         "云边端硬件监控",
@@ -208,6 +231,7 @@ def render_sensor() -> None:
     with tab_co2:
         _render_sensor_co2()
     with tab_obd:
+        _obd_raw_caption()
         obd_panel.render_obd_panel()
 
 
@@ -331,6 +355,17 @@ def render_ledger() -> None:
         carbon_ledger_panel.render_carbon_ledger_panel()
 
 
+def _e0_disclosure_text() -> str:
+    """对外披露口径 E0 的显示文本：只读 kpi.json（total_kg / 1000），不改任何算术。
+
+    读不到就明说“暂不可读”，不拿 0 或毛口径数字冒充 E0。
+    """
+    e0_t = float(services.kpis().get("total_kg") or 0.0) / 1000.0
+    if e0_t <= 0:
+        return "E0（kpi.json 暂不可读）"
+    return f"{e0_t:,.4f} t"
+
+
 def _render_ledger_e0() -> None:
     with st.expander("碳账参数设置", expanded=True):
         param_a, param_b = st.columns(2)
@@ -346,17 +381,17 @@ def _render_ledger_e0() -> None:
                 key="ledger_carbon_quota_input", on_change=_sync_ledger_carbon_params)
     snap = carbon_snapshot()
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("当期总碳排", f"{snap['total_t']:.4f} t")
-    c2.metric("碳配额缺口", f"{snap['gap_t']:.4f} t")
+    c1.metric("当期总碳排（毛口径）", f"{snap['total_t']:.4f} t")
+    c2.metric("碳配额缺口（毛口径）", f"{snap['gap_t']:.4f} t")
     c3.metric("财务罚单/风险", f"¥{snap['financial_risk_yuan']:.2f}")
-    c4.metric("配额余额", f"{snap['balance_t']:.4f} t")
+    c4.metric("配额余额（毛口径）", f"{snap['balance_t']:.4f} t")
     if snap["gap_t"] > 0:
         st.error("综合刚才的发票和硬件超标，本期需购买 %.4f 吨碳配额。" % snap["gap_t"])
     else:
         st.success("当前配额充足，无需新增购买。")
 
     breakdown = pd.DataFrame([
-        {"项目": "基准总碳排", "排放量(tCO2e)": snap["base_t"], "财务影响(元)": 0.0},
+        {"项目": "基准总碳排（毛口径）", "排放量(tCO2e)": snap["base_t"], "财务影响(元)": 0.0},
         {"项目": "当前发票新增", "排放量(tCO2e)": snap["invoice_t"],
          "财务影响(元)": snap["invoice_cost_yuan"]},
         {"项目": "硬件超标事件", "排放量(tCO2e)": snap["sensor_t"],
@@ -369,7 +404,10 @@ def _render_ledger_e0() -> None:
     st.caption(
         "财务风险 = 发票新增排放 × 全局碳价 + 硬件突发成本；"
         "硬件超标碳成本不在配额购买成本中重复计提。基准总碳排只读 kpi 结果表，"
-        "结果缺失时才显示静态演示快照。")
+        "结果缺失时才显示静态演示快照。"
+        f"本页总碳排 / 缺口 / 余额均为毛口径：按运单明细行累加（同一趟的多张运单重复计入），"
+        f"是配额情景的保守上界；对外披露口径为 E0 {_e0_disclosure_text()}"
+        "（kpi.json total_kg / 1000），两口径可关联、不可相减。")
 
     if st.button("生成智能披露附注", width="stretch"):
         try:

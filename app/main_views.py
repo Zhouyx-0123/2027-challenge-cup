@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -523,6 +524,28 @@ def _render_transport_records():
             st.dataframe(result.get(key, []))
         result['run']['stale'] = stale
         st.download_button('下载核验结果', json.dumps(result, ensure_ascii=False, indent=2), file_name='transport_result_'+batch+'.json')
+        from src.fuel_layer import build_fuel_layer, write_fuel_layer
+        layer = build_fuel_layer(result)
+        layer_liters = float(layer['allocated_liters'].fillna(0).sum()) if len(layer) else 0.0
+        layer_km = float(layer['trip_km'].fillna(0).sum()) if len(layer) else 0.0
+        weighted = 100.0 * layer_liters / layer_km if layer_km else 0.0
+        st.caption(
+            f"油耗中间层：{len(layer)} 条趟级分摊，{layer_km:,.1f} km，"
+            f"{layer_liters:,.2f} L，加权 {weighted:.2f} L/100km。"
+            "只汇总运输证据，不自动写财务主表分摊，不改碳账。"
+        )
+        layer_path = directory / ('fuel_layer_' + mode + '.xlsx')
+        if st.button('生成本批次油耗中间层', key='transport_fuel_layer_' + batch):
+            try:
+                report = write_fuel_layer(result, directory)
+                st.success(f"已生成：{Path(report['xlsx']).name}（{report['rows']} 行）")
+                if report.get('json'):
+                    st.caption('同时生成可审计 JSON：' + Path(report['json']).name)
+            except (ValueError, OSError) as exc:
+                st.error(str(exc))
+        if layer_path.is_file():
+            st.download_button('下载油耗中间层（xlsx）', layer_path.read_bytes(),
+                               file_name=layer_path.name, key='transport_fuel_download_' + batch)
         if st.button('使用该批次原始快照重新复算', key='transport_replay_'+batch):
             try:
                 replayed = replay_run(batch, mode, directory)

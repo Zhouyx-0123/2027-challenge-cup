@@ -6,7 +6,7 @@
 3. 运输分析 CLI：使用 39 条合成行程、8 辆车、合成理论因子执行成功；统计期间 2026-10-31 至 2026-11-04；期间内 44 张票据证据，其中 39 张柴油票进入核算，5 张维修/保养票被排除（excluded_invoice_count=5，金额合计 5,932.5 元）；2025-06-01 第 6 张维修票在期间外。得到 31 条周期分配、1 条路线指标。
    总里程 4,641 km，分配覆盖里程 3,565 km，关联覆盖率 100%，分配覆盖率 76.82%（3,565/4,641）；matches 39 条全部 matched，checks 234 条（101 checked/133 unavailable）、gaps 149 条、anomalies 0；维修票不进入 matches/checks。
 4. 批次复算：历史批次保存了 45 条原始票据结构、39 条行程结构、参考配置、统计范围及 2 张实际上传原图的 Base64 快照。修改当前输入并移走原图后，仍可从批次快照复算，覆盖率、分配数与统计范围一致。
-5. 全仓回归（本轮实跑，2026-11-08）：`PYTHONUTF8=1 PYTHONIOENCODING=utf-8 PYTHONPATH=. python -m pytest -q` → 594 passed, 1 deselected in 70.52s。streamlit、pymoo、pyarrow 均可用；Streamlit AppTest 与 Parquet 路径已随套件执行。本记录不声称做过浏览器人工点检。
+5. 全仓回归（本轮实跑，2026-11-08）：`PYTHONUTF8=1 PYTHONIOENCODING=utf-8 PYTHONPATH=. python -m pytest -q` → 599 passed, 1 deselected in 65.07s。streamlit、pymoo、pyarrow 均可用；Streamlit AppTest 与 Parquet 路径已随套件执行。新增 `tests/test_fuel_layer.py` 5 项，覆盖一行一条分配、加权油耗、未覆盖/排除边界、xlsx/json 幂等、20 位票号读回保持文本。本记录不声称做过浏览器人工点检。
 6. 实际图片 OCR：当前环境未配置 DEEPSEEK_API_KEY 或 config/deepseek_key.txt，本轮没有调用在线 OCR。使用仓库内合成的结构化真值（`tools/make_finance_sim_fixture.py` 生成，不是用户原始凭证）验证字段导入和分析链路，并用两张图片验证原图登记与批次快照。
 7. 周期锚点修正：统计期间开始前只保留最后一张燃油/充电类票作为周期起点，不再让维修发票覆盖能源票锚点；新增回归用例已通过。
 8. 离线图片入口：invoice_ocr CLI 成功接收两张模拟 PNG，离线模式输出 2 条 offline 记录、状态 warn，不产生伪造识别字段；在线 OCR 未执行。

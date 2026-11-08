@@ -1,6 +1,6 @@
 # 运输成本证据模块 v2
 
-本模块基于 `origin/main` 的分支交付，合并状态以 git 为准；保留主项目原有路线、仪表盘、财务主表等功能。
+本模块已合入 `main`（`e7e4985`，2026-11-08）；保留主项目原有路线、仪表盘、财务主表等功能。
 
 ## 本轮原八项与本次三项补齐
 
@@ -19,7 +19,11 @@
 
 ## 操作入口
 
-发票页保留财务主表登记/下载；运输成本证据登记收在同页「运输成本证据（票面原始记录，15 列证据表）」expander 内，先主表、后证据表，不再有两个并列入口。证据表负责票面原始记录、补充、检索、原图查看、证据表下载、参考配置导入、行程CSV/Parquet上传、分析和历史批次复算；财务主表负责人工确认、抵扣判断与跨趟分摊。多明细票保留逐行明细，暂不允许误写入单行财务主表。CLI示例：
+发票页保留财务主表登记/下载；运输成本证据登记收在同页「运输成本证据（票面原始记录，15 列证据表）」expander 内，先主表、后证据表，不再有两个并列入口。证据表负责票面原始记录、补充、检索、原图查看、证据表下载、参考配置导入、行程CSV/Parquet上传、分析和历史批次复算；财务主表负责人工确认、抵扣判断与跨趟分摊。多明细票保留逐行明细，暂不允许误写入单行财务主表。
+
+运输证据批次生成后，页面会显示「油耗中间层」预览，并可点击「生成本批次油耗中间层」；财务页新增「油耗中间层」标签页读取同一文件。该层是财务归集的中间产物：一行一条趟级分摊，按车牌和月份加权汇总，不自动写财务主表分摊，也不写碳账。
+
+CLI示例：
 
 ```bash
 python -m tools.transport_evidence_report --invoices outputs/transport_simulated_invoices.json --trips tests/fixtures/finance_transport/simulated_trips.csv --source-mode simulated --output outputs/transport_result.json --references tests/fixtures/finance_transport/simulated_team_factors.json --complete-history --image-dir tests/fixtures/finance_transport
@@ -102,6 +106,24 @@ python -m tools.transport_evidence_report --invoices outputs/transport_simulated
 - 覆盖率：总里程 4,641 km；关联里程 4,641 km（100.00%）；分配里程 3,565 km（76.82%）。
 - 分配量：1,069.5 L；分配成本 8,622.25 元（`invoice_gross`）。
 - 检查：234 条（101 `checked` / 133 `unavailable`）；缺口 149 条；异常 0 条。
+
+
+### 油耗中间层（本轮新增）
+
+生成命令：
+
+```bash
+python -m src.fuel_layer --run outputs/finance/runs/simulated/<batch_id>.json
+```
+
+默认写到 `outputs/finance/fuel_layer_simulated.xlsx` 和同名 JSON；也可在页面「运输成本证据」的分析批次结果下点击「生成本批次油耗中间层」。工作簿包含 7 个 sheet：`00_说明`、`01_趟级油耗`、`02_按车牌汇总`、`03_按月份汇总`、`04_未覆盖行程`、`05_已排除非能源票`、`06_数据缺口`。
+
+- `01_趟级油耗` 32 列，一行一条 allocation；保留 `invoice_record_id / invoice_no / next_invoice_no / cycle_id / share / allocated_liters / allocated_cost / theory_liters / deviation / source_image / input_sha256`，可从金额回到票号和原图。
+- `02/03` 只做加权汇总：`L/100km = 100 × Σ油量 / Σ里程`，`元/km = Σ费用 / Σ里程`，不平均单行油耗。
+- 本层不写 `carbon_kg`，不改 `baseline_carbon`、`kpi.json` 或 28 项闸门；碳值仍只由主账产生。
+- 本层不自动写财务主表「分摊明细」：主表 `allocate` 要求人工确认成本且分摊总额必须等于确认成本，自动写会绕过人工决定。
+
+本轮合成数据实测：39 趟行程，31 条 allocation，8 条未覆盖，5 张非能源票排除，149 条数据缺口；分配里程 3,565 km / 总里程 4,641 km（76.82%），分配油量 1,069.5 L，分配成本 8,622.25 元，加权油耗 30.00 L/100km。2026-10 为 8 趟 / 828 km / 248.4 L / 2,001.16 元；2026-11 为 23 趟 / 2,737 km / 821.1 L / 6,621.09 元。
 
 45 票验收摘要（计数与关键数字，不含原图 Base64）见 `docs/finance/transport_simulated_acceptance_45.json`。
 

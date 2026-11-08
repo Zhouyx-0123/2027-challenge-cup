@@ -4,6 +4,7 @@ import json
 import pandas as pd
 import streamlit as st
 from src.finance_workflow import finance_dir
+from src.fuel_layer import load_fuel_layer
 from tools import finance_register_v3 as service
 
 def render():
@@ -33,13 +34,39 @@ def render():
                 elif report['duplicates']:st.info('重复票，未重复登记。')
                 else:st.success('已登记并记录操作人和时间。')
             except (ValueError,OSError) as exc:st.error(str(exc))
-    tabs=st.tabs(['已登记与汇总','异常处理／人工登记','旧表迁移'])
+    tabs=st.tabs(['已登记与汇总','异常处理／人工登记','旧表迁移','油耗中间层'])
     with tabs[2]:
         st.write('支持原28/33列主表。迁移生成v3文件和原文件备份，不覆盖已有v3账簿。历史录入人、时间未知时不补造。')
         upload=st.file_uploader('选择旧财务主表',type=['xlsx'],key='finance_legacy')
         if st.button('迁移旧表',disabled=upload is None or not actor.strip()):
             try:st.success(str(service.migrate(upload.getvalue(),path,mode,actor)));st.rerun()
             except (ValueError,OSError,KeyError) as exc:st.error(str(exc))
+    with tabs[3]:
+        st.write('运输证据 → 油耗中间层。一层一行趟级分摊，按车牌和月份加权汇总；不自动写财务主表分摊，也不写碳账。')
+        layer=finance_dir()/('fuel_layer_'+mode+'.xlsx')
+        if not layer.is_file():
+            st.caption('当前账簿还没有油耗中间层。请到“运输成本证据”展开区选择分析批次，点击“生成本批次油耗中间层”。')
+        else:
+            try:
+                sheets=load_fuel_layer(layer)
+            except (ValueError,OSError) as exc:
+                st.error('油耗中间层无法读取：'+str(exc))
+            else:
+                meta=sheets.get('00_说明',pd.DataFrame())
+                values={str(row['项目']):row['值'] for _,row in meta.iterrows()} if len(meta) else {}
+                cols=st.columns(4)
+                cols[0].metric('已分配趟数',values.get('allocated_trips',0))
+                cols[1].metric('分配里程 km',f"{float(values.get('allocated_distance_km') or 0):,.1f}")
+                cols[2].metric('分配油量 L',f"{float(values.get('allocated_liters') or 0):,.2f}")
+                cols[3].metric('加权 L/100km',f"{float(values.get('l_per_100km') or 0):.2f}")
+                st.caption(f"批次 {values.get('batch_id','')}；能源票 {values.get('accounting_invoice_count',0)} 张，证据票 {values.get('evidence_invoice_count',0)} 张，已排除非能源票 {values.get('excluded_invoice_count',0)} 张；未覆盖行程 {values.get('uncovered_trips',0)} 趟。")
+                st.caption(str(values.get('carbon_boundary') or ''))
+                st.dataframe(pd.DataFrame([{'项目':k,'值':str(v)} for k,v in values.items()]),hide_index=True)
+                for name in ['01_趟级油耗','02_按车牌汇总','03_按月份汇总','04_未覆盖行程','05_已排除非能源票']:
+                    if name in sheets and len(sheets[name]):
+                        st.write(name)
+                        st.dataframe(sheets[name],hide_index=True)
+                st.download_button('下载油耗中间层（xlsx）',layer.read_bytes(),file_name=layer.name,key='finance_fuel_layer_download')
     with tabs[0]:
         try:wb=service.load(path);rows=service.records(wb)
         except (ValueError,OSError) as exc:st.error(str(exc));return

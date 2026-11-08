@@ -91,15 +91,17 @@ python -m tools.transport_evidence_report --invoices outputs/transport_simulated
 
 ### 本轮实测输出（2026-11-08）
 
-以下命令在项目根目录依次执行，`source_mode=simulated`、`complete_history=true`；批次 ID 由工具按运行生成（本次复跑为 `2ef595f05f0547cfaeb31d8553931bc3`，每次运行可能不同，不影响计数与覆盖率）：
+以下命令在项目根目录依次执行，`source_mode=simulated`、`complete_history=true`；批次 ID 由工具按运行生成（本次复跑为 `e59589e464de4b1c875688d6d5fc6d0a`，每次运行可能不同，不影响计数与覆盖率）：
+
+口径先说清楚：**只有能源票（燃油/充电）进入油耗与碳核算**。维修、保养、轮胎、四轮定位等非能源票保留在凭证库和运输证据表中，但不计入 `invoice_count`、不生成票级检查/缺口、不参与覆盖率分母。用户已拍板“保养不纳入，只算油和碳”。
 
 - 工作簿导入：45 条票据记录（39 张柴油票、6 张维修/服务票、2 张多明细票、8 个车牌），43 个原图文件名缺失。
-- 统计范围：45 票中 44 票进入分析范围（2025-06-01 维修票在期间外且非能源票）、39 趟行程。
-- 匹配：44 条票级匹配记录，其中 39 条 `matched`（全部柴油票）、5 条期间内维修票无对应行程；39 张运单全部 `matched`。
+- 统计期间：2026-10-31 至 2026-11-04。期间内共 44 张票据证据，其中 39 张柴油票进入核算；5 张维修/保养票被排除（`excluded_invoice_count=5`，金额合计 5,932.5 元）。2025-06-01 第 6 张维修票在期间外。
+- 匹配：39 条票级匹配记录，全部 `matched`；39 张运单全部 `matched`；维修票不再产生 `unmatched_without_trip`。
 - 分配：31 条分配、31 个 closed cycles、8 个车牌、1 条路线（A|B），规则 `docs45-section5`，理论因子 31/31 全部 `matched`。
 - 覆盖率：总里程 4,641 km；关联里程 4,641 km（100.00%）；分配里程 3,565 km（76.82%）。
 - 分配量：1,069.5 L；分配成本 8,622.25 元（`invoice_gross`）。
-- 检查：264 条（101 `checked` / 163 `unavailable`）；缺口 184 条；异常 0 条。
+- 检查：234 条（101 `checked` / 133 `unavailable`）；缺口 149 条；异常 0 条。
 
 45 票验收摘要（计数与关键数字，不含原图 Base64）见 `docs/finance/transport_simulated_acceptance_45.json`。
 

@@ -382,7 +382,27 @@ def analyze(records, trips, *, source_mode, complete_history=False, capacities=N
     required = {'trip_id', 'waybill_no', 'plate', 'depart_ts', 'arrive_ts', 'trip_km', 'od_site'}
     if required - set(trips.columns):
         raise ValueError('行程缺少字段: ' + ','.join(sorted(required - set(trips.columns))))
+    # Only energy invoices take part in fuel/charging cycles and carbon accounting.
+    # Repair and maintenance invoices stay in the evidence store, but must not
+    # inflate invoice counts, checks, gaps or the unmatched list.
+    accounting_records, excluded_records = [], []
+    for r in records:
+        energy, _ = assess(r)
+        if energy in {'fuel', 'electricity'}:
+            accounting_records.append(r)
+        else:
+            excluded_records.append({
+                'record_id': r.get('record_id'), 'invoice_no': r.get('invoice_no'),
+                'plate': plate(r.get('plate')), 'invoice_date': r.get('invoice_date'),
+                'item_name': r.get('item_name'), 'invoice_amount': numeric(r.get('invoice_amount')),
+                'energy_type': energy, 'reason': 'non_energy_invoice',
+            })
+    scope['evidence_invoice_count'] = len(records)
+    scope['invoice_count'] = len(accounting_records)
+    scope['excluded_invoice_count'] = len(excluded_records)
+    records = accounting_records
     result = {k: [] for k in ('matches', 'allocations', 'routes', 'anomalies', 'gaps', 'waybills')}
+    result['excluded'] = excluded_records
     result['run'] = {'batch_id': uuid.uuid4().hex, 'rule': RULE, 'source_mode': source_mode,
                      'complete_history': complete_history, 'scope': scope,
                      'input_sha256': hashlib.sha256((json.dumps(raw_records, sort_keys=True, ensure_ascii=False) + raw_trips.to_json(orient='records') + json.dumps(scope, sort_keys=True, ensure_ascii=False)).encode()).hexdigest()}

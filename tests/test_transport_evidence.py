@@ -59,6 +59,19 @@ def test_registration_preserves_incomplete_multiline_and_audit(tmp_path):
     assert wb['发票证据表'].cell(2,2).value=='0001'
 
 
+def test_non_energy_invoice_excluded_from_fuel_accounting():
+    repair = invoice(no='R1')
+    repair.update(item_name='轮胎', quantity=2, unit='条', unit_price=600, invoice_amount=1200)
+    r = analyze([invoice(), repair], trips(), source_mode='simulated')
+    assert r['run']['scope']['evidence_invoice_count'] == 2
+    assert r['run']['scope']['invoice_count'] == 1
+    assert r['run']['scope']['excluded_invoice_count'] == 1
+    assert [m['invoice_no'] for m in r['matches']] == ['001']
+    assert r['excluded'][0]['reason'] == 'non_energy_invoice'
+    assert r['excluded'][0]['invoice_amount'] == 1200
+    assert not any(g.get('record_id') == 'R1' for g in r['gaps'])
+
+
 def test_conflicting_trip_excluded_and_cost_factor():
     data=trips();other=data.iloc[:1].copy();other['trip_km']=200
     r=analyze([invoice()],pd.concat([data,other]),source_mode='simulated')

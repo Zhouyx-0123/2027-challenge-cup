@@ -3,6 +3,7 @@
 本目录的 Excel/CSV/JSON 数据均为**仓库内合成测试数据**，由 `tools/make_finance_sim_fixture.py` 按固定规则确定性生成，不是用户提供的原始凭证，也不是真实发票。原始 45 票真值工作簿未随该分支或全部 git 历史提交；以下工作簿与行程是按 `tests/test_invoice_workbook_transport_integration.py` 测试契约重建的合成替代。
 
 - `invoice_simulated_truth.xlsx`：合成 45 票票级真值（45 行票级、48 行明细），含 39 张柴油票（`unit=L`、项目名称含“柴油”）、6 张维修/服务票（其中 2 张多明细）、8 个车牌。备注列带“模拟样张”标记，`--source-mode real` 会被导入器拒绝。
+  核算口径：只有 39 张柴油票进入油耗/碳账；6 张维修/保养票只保留为证据，不进入 `invoice_count`、匹配、检查或覆盖率分母。
 - `invoice_template.xlsx`：与真值工作簿同表头/样式的空白导入模板（仅表头，无数据行）。
 - `simulated_trips.csv`：39 趟合成行程，与 39 张柴油票一一对应；`vehicle_type=牵引车`，`trip_km=100+i`，合计 4,641 km。
 - `simulated_team_factors.json`：`vehicle_type=牵引车`、`energy_type=fuel` 的合成理论因子（30 L/100km），来源注明“仅供自动化测试”。

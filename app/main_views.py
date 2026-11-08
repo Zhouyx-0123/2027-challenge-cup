@@ -510,7 +510,15 @@ def _render_transport_records():
         if stale:
             st.warning('此批次依据的票据或参考配置已更新，请重新计算。下方保留历史结果。')
         st.write(result['coverage'])
-        for label, key in [('匹配结果','matches'), ('周期分配','allocations'), ('路线指标','routes'), ('检查执行状态','checks'), ('异常','anomalies'), ('数据缺口','gaps')]:
+        scope = result['run'].get('scope', {})
+        if scope.get('excluded_invoice_count'):
+            st.caption(
+                f"核算口径：{scope.get('invoice_count', 0)} 张能源票进入油耗/碳账；"
+                f"{scope['excluded_invoice_count']} 张维修/保养等非能源票只保留证据，已排除。"
+            )
+        for label, key in [('匹配结果','matches'), ('周期分配','allocations'), ('路线指标','routes'), ('检查执行状态','checks'), ('异常','anomalies'), ('数据缺口','gaps'), ('已排除非能源票','excluded')]:
+            if key == 'excluded' and not result.get('excluded'):
+                continue
             st.write(label)
             st.dataframe(result.get(key, []))
         result['run']['stale'] = stale

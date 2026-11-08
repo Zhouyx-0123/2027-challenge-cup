@@ -1,0 +1,61 @@
+{
+  "cost_basis": "invoice_gross",
+  "capacities": {
+    "京A1": 500
+  },
+  "theory_l_per_100km": {
+    "京A1": {
+      "value": 20,
+      "version": "simulated-v1",
+      "source": "模拟接口示例"
+    }
+  },
+  "price_checks": {
+    "001": {
+      "expected": 6,
+      "relative_threshold": 0.2,
+      "basis_confirmed": true,
+      "source": "模拟同口径油价"
+    }
+  },
+  "time_checks": {
+    "001": {
+      "replenished_at": "2026-01-01 08:30:00",
+      "coverage_start": "2026-01-01 00:00:00",
+      "coverage_end": "2026-01-03 00:00:00",
+      "history_complete": true,
+      "source": "模拟补能事件"
+    }
+  },
+  "location_checks": {
+    "001": {
+      "lat": 40,
+      "lon": 116,
+      "replenished_at": "2026-01-01 08:30:00",
+      "source": "模拟站点坐标",
+      "max_distance_km": 5,
+      "max_time_delta_minutes": 5,
+      "observations": [
+        {
+          "plate": "京A1",
+          "lat": 40.001,
+          "lon": 116.001,
+          "observed_at": "2026-01-01 08:30:00",
+          "source": "模拟GPS"
+        }
+      ]
+    }
+  },
+  "team_theory_factors": [
+    {
+      "factor_id": "TEAM-DIESEL-TRACTOR-001",
+      "vehicle_type": "牵引车",
+      "energy_type": "fuel",
+      "valid_from": "2026-01-01",
+      "valid_to": "2026-12-31",
+      "value": 20,
+      "version": "team-factor-v1",
+      "source": "团队理论油耗因子表（示例）"
+    }
+  ]
+}

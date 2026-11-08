@@ -1,0 +1,44 @@
+[
+  {
+    "record_id": "001",
+    "invoice_no": "001",
+    "invoice_date": "2026-01-01",
+    "seller_name": "站",
+    "item_name": "柴油",
+    "quantity": 100,
+    "unit": "L",
+    "unit_price": 6,
+    "invoice_amount": 600,
+    "plate": "京A1",
+    "source_image": "a.png",
+    "source_mode": "simulated"
+  },
+  {
+    "record_id": "002",
+    "invoice_no": "002",
+    "invoice_date": "2026-01-03",
+    "seller_name": "站",
+    "item_name": "柴油",
+    "quantity": 100,
+    "unit": "L",
+    "unit_price": 6,
+    "invoice_amount": 600,
+    "plate": "京A1",
+    "source_image": "a.png",
+    "source_mode": "simulated"
+  },
+  {
+    "record_id": "003",
+    "invoice_no": "003",
+    "invoice_date": "2026-01-05",
+    "seller_name": "站",
+    "item_name": "柴油",
+    "quantity": 100,
+    "unit": "L",
+    "unit_price": 6,
+    "invoice_amount": 600,
+    "plate": "京A1",
+    "source_image": "a.png",
+    "source_mode": "simulated"
+  }
+]

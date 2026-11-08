@@ -82,13 +82,16 @@ def test_page_save_button_and_download(monkeypatch,tmp_path):
     assert not at.exception
     assert at.session_state['current_invoice_carbon']==0
     assert at.session_state['current_invoice_fuel'] is None
+    at.text_input(key='finance_actor').set_value('模拟录入员')
+    at.selectbox(key='finance_mode').select('模拟').run()
     at.button(key='finance_register_save').click().run()
     assert not at.exception and len(at.success)==1
-    path=workflow.master_path('simulated',tmp_path)
-    assert len(export_master(path,'simulated')['records'])==1
+    from tools.finance_register_v3 import list_records
+    path=tmp_path/'finance_master_v3_simulated.xlsx'
+    assert len(list_records(path))==1
     at.button(key='finance_register_save').click().run()
     assert not at.exception and len(at.info)==1
-    assert len(export_master(path,'simulated')['records'])==1
+    assert len(list_records(path))==1
 
 def test_source_flag_required(tmp_path):
     with pytest.raises(ValueError,match='来源标记'):workflow.register_invoice(FIXTURE,IMAGE,'repair.jpg',directory=tmp_path)

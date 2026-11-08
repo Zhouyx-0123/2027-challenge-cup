@@ -86,7 +86,16 @@ def prepare(records,mode,source,existing=None):
     return rows,report
 def read_records(path):
     if path.suffix.lower()=='.csv':
-        with path.open(encoding='utf-8-sig',newline='') as f:return list(csv.DictReader(f))
+        with path.open(encoding='utf-8-sig',newline='') as f:
+            rows = list(csv.DictReader(f))
+        for row in rows:
+            raw_items = row.get('items_json')
+            if raw_items:
+                try: row['items'] = json.loads(raw_items)
+                except (TypeError, ValueError): raise ValueError('items_json 不是有效 JSON')
+            if 'multiple_items' in row:
+                row['multiple_items'] = text(row.get('multiple_items')).lower() in {'true','1','yes'}
+        return rows
     with path.open(encoding='utf-8-sig') as f:obj=json.load(f,parse_float=Decimal)
     if isinstance(obj,list):return obj
     if isinstance(obj,dict) and isinstance(obj.get('records'),list):return obj['records']

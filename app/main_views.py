@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""六页主应用视图：所有跨页数字均通过 demo_state 共享（第 6 页数据链总览在 views_chain.py）。"""
+"""五页主应用视图：所有跨页数字均通过 demo_state 共享。"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -34,6 +34,15 @@ def _run_invoice(uploaded) -> None:
         st.session_state['finance_invoice_image'] = (uploaded.getvalue(), uploaded.name)
         # Non-diesel invoices must not inherit the legacy 50 L diesel fallback.
         name = str(result.get('item_name') or '')
+        multiple_items = bool(result.get('multiple_items') or len(result.get('items') or []) > 1)
+        if multiple_items:
+            st.session_state['current_invoice_result'] = None
+            st.session_state['current_invoice_carbon'] = 0.0
+            st.session_state['current_invoice_fuel'] = None
+            st.session_state['current_invoice_estimated'] = False
+            st.session_state['invoice_error'] = ''
+            st.session_state['finance_invoice_notice'] = '识别到多条发票明细，已保留逐行数据；请登记到运输成本证据表，暂不写入单行财务主表。'
+            return
         if name and '柴油' not in name:
             st.session_state['current_invoice_result'] = None
             st.session_state['current_invoice_carbon'] = 0.0
@@ -68,6 +77,9 @@ def _run_invoice(uploaded) -> None:
 
 
 def _render_finance_register():
+    _render_transport_records()
+    from finance_panel import render
+    render()
     raw = st.session_state.get('finance_invoice_raw')
     image = st.session_state.get('finance_invoice_image')
     if not raw or not image:
@@ -79,7 +91,10 @@ def _render_finance_register():
               '发票税额': raw.get('tax_amount'), '税率/征收率': raw.get('tax_rate'),
               '价税合计': raw.get('invoice_amount')})
     st.caption('按票面信息登记；税额、税率直接保存，抵扣资格另行判断。')
-    if st.button('记录到财务主表', key='finance_register_save'):
+    multiple_items = bool(raw.get('multiple_items') or len(raw.get('items') or []) > 1)
+    if multiple_items:
+        st.info('本票包含多条明细，已保留逐行项目；暂不直接写入单行财务主表，请先登记到运输成本证据表。')
+    if st.button('记录到财务主表', key='finance_register_save', disabled=multiple_items):
         try:
             report = live_services.register_finance_invoice(raw, image[0], image[1])
             if report['rejected']:
@@ -92,6 +107,21 @@ def _render_finance_register():
                 st.session_state['finance_download_mode'] = report['source_mode']
         except (ValueError, OSError) as exc:
             st.error('登记未完成：%s' % exc)
+    if st.button('记录到运输成本证据表', key='transport_register_save'):
+        try:
+            report = live_services.register_transport_invoice(raw, image[0], image[1])
+            if report.get('rejected'):
+                st.error(report['rejected'][0]['reason'])
+            elif report.get('conflicts'):
+                st.warning('同票号提交存在冲突，已保留版本并标记待核。')
+            elif report.get('duplicates'):
+                st.info('这张发票已登记到运输成本证据表，本次未重复新增。')
+            else:
+                st.success('已记录到运输成本证据表。')
+            if not report.get('rejected'):
+                st.session_state['transport_download_mode'] = report['source_mode']
+        except (ValueError, OSError) as exc:
+            st.error('运输成本证据登记未完成：%s' % exc)
     mode = st.session_state.get('finance_download_mode')
     if mode:
         try:
@@ -197,29 +227,6 @@ def _sensor_window_chart() -> dict:
     }
 
 
-def _obd_raw_caption() -> None:
-    """OBD tab 顶部口径提示：图表读 processed（demo 基线），实流只落 data/raw。
-
-    两条通道数字不同源，必须在同一屏里写清楚，避免把 demo 基线当成现场读数。
-    """
-    raw = services.latest_raw_stream()
-    prefix = ("页面图表读 data/processed（demo 基线）；设备实流落 "
-              "data/raw/obd_gps/obd_stream.csv，")
-    if not raw:
-        st.caption(prefix + "当前暂无实流文件（等待设备上报），详见 🔗 数据链总览。")
-        return
-    first = str(raw.get("first_ts") or "").replace("T", " ").replace("Z", "")
-    last = str(raw.get("last_ts") or "").replace("T", " ").replace("Z", "")
-    if first and last and first[:10] == last[:10]:
-        window = first[:19] + " → " + last[11:19] + " UTC"
-    elif first and last:
-        window = first[:19] + " → " + last[:19] + " UTC"
-    else:
-        window = "—"
-    st.caption(prefix + "最近 " + str(raw.get("rows") or 0) + " 行 / UTC "
-               + window + "，详见 🔗 数据链总览。")
-
-
 def render_sensor() -> None:
     theme.hero_compact(
         "云边端硬件监控",
@@ -231,7 +238,6 @@ def render_sensor() -> None:
     with tab_co2:
         _render_sensor_co2()
     with tab_obd:
-        _obd_raw_caption()
         obd_panel.render_obd_panel()
 
 
@@ -355,17 +361,6 @@ def render_ledger() -> None:
         carbon_ledger_panel.render_carbon_ledger_panel()
 
 
-def _e0_disclosure_text() -> str:
-    """对外披露口径 E0 的显示文本：只读 kpi.json（total_kg / 1000），不改任何算术。
-
-    读不到就明说“暂不可读”，不拿 0 或毛口径数字冒充 E0。
-    """
-    e0_t = float(services.kpis().get("total_kg") or 0.0) / 1000.0
-    if e0_t <= 0:
-        return "E0（kpi.json 暂不可读）"
-    return f"{e0_t:,.4f} t"
-
-
 def _render_ledger_e0() -> None:
     with st.expander("碳账参数设置", expanded=True):
         param_a, param_b = st.columns(2)
@@ -381,17 +376,17 @@ def _render_ledger_e0() -> None:
                 key="ledger_carbon_quota_input", on_change=_sync_ledger_carbon_params)
     snap = carbon_snapshot()
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("当期总碳排（毛口径）", f"{snap['total_t']:.4f} t")
-    c2.metric("碳配额缺口（毛口径）", f"{snap['gap_t']:.4f} t")
+    c1.metric("当期总碳排", f"{snap['total_t']:.4f} t")
+    c2.metric("碳配额缺口", f"{snap['gap_t']:.4f} t")
     c3.metric("财务罚单/风险", f"¥{snap['financial_risk_yuan']:.2f}")
-    c4.metric("配额余额（毛口径）", f"{snap['balance_t']:.4f} t")
+    c4.metric("配额余额", f"{snap['balance_t']:.4f} t")
     if snap["gap_t"] > 0:
         st.error("综合刚才的发票和硬件超标，本期需购买 %.4f 吨碳配额。" % snap["gap_t"])
     else:
         st.success("当前配额充足，无需新增购买。")
 
     breakdown = pd.DataFrame([
-        {"项目": "基准总碳排（毛口径）", "排放量(tCO2e)": snap["base_t"], "财务影响(元)": 0.0},
+        {"项目": "基准总碳排", "排放量(tCO2e)": snap["base_t"], "财务影响(元)": 0.0},
         {"项目": "当前发票新增", "排放量(tCO2e)": snap["invoice_t"],
          "财务影响(元)": snap["invoice_cost_yuan"]},
         {"项目": "硬件超标事件", "排放量(tCO2e)": snap["sensor_t"],
@@ -404,10 +399,7 @@ def _render_ledger_e0() -> None:
     st.caption(
         "财务风险 = 发票新增排放 × 全局碳价 + 硬件突发成本；"
         "硬件超标碳成本不在配额购买成本中重复计提。基准总碳排只读 kpi 结果表，"
-        "结果缺失时才显示静态演示快照。"
-        f"本页总碳排 / 缺口 / 余额均为毛口径：按运单明细行累加（同一趟的多张运单重复计入），"
-        f"是配额情景的保守上界；对外披露口径为 E0 {_e0_disclosure_text()}"
-        "（kpi.json total_kg / 1000），两口径可关联、不可相减。")
+        "结果缺失时才显示静态演示快照。")
 
     if st.button("生成智能披露附注", width="stretch"):
         try:
@@ -434,3 +426,106 @@ def _render_ledger_e0() -> None:
             "sensor_excess_carbon_t": st.session_state["sensor_excess_carbon_t"],
             "snapshot": snap,
         })
+
+
+def _render_transport_records():
+    from src.transport_evidence import read_store, supplement, export_excel, save_run, list_runs, atomic_json, store_digest, replay_run
+    from src.transport_checks import validate_references
+    from src.finance_workflow import finance_dir
+    import pandas as pd
+    import json
+    mode = st.selectbox('证据数据性质', ['simulated', 'real'], key='transport_mode')
+    directory = finance_dir()
+    records = read_store(mode, directory)['records']
+    query = st.text_input('检索票号或车牌', key='transport_search')
+    visible = [r for r in records if query in str(r.get('invoice_no', '')) or query in str(r.get('plate', ''))]
+    st.dataframe([{k: r.get(k) for k in ('record_id', 'invoice_no', 'plate', 'invoice_date', 'missing_fields')} for r in visible])
+    st.download_button('下载证据表及票据明细', export_excel(records), file_name='transport_evidence_'+mode+'.xlsx')
+    if records:
+        rid = st.selectbox('选择待补充记录', [r['record_id'] for r in records], key='transport_selected_'+mode)
+        selected = next(r for r in records if r['record_id'] == rid)
+        path = directory / selected['source_image']
+        if path.is_file():
+            try:
+                st.image(path.read_bytes(), caption=selected.get('invoice_no'))
+            except (ValueError, OSError):
+                st.warning('原图无法预览，请下载原图核查')
+            st.download_button('下载原图', path.read_bytes(), file_name=path.name)
+        st.write('待补充或待核项', selected.get('missing_fields', []))
+        fields = {'invoice_no':'发票号码', 'invoice_date':'开票日期', 'seller_name':'销售方',
+                  'item_name':'商品名称', 'plate':'车牌', 'quantity':'数量', 'unit':'单位',
+                  'unit_price':'票面单价', 'invoice_amount':'价税合计', 'tax_amount':'税额', 'note':'备注'}
+        with st.form('transport_edit_'+rid):
+            values = {key: st.text_input(label, value=str(selected.get(key) if selected.get(key) is not None else ''), key=rid+'_'+key) for key, label in fields.items()}
+            submitted = st.form_submit_button('保存补充信息')
+        if submitted:
+            try:
+                supplement(mode, rid, values, directory, expected_digest=store_digest([selected]))
+                st.success('已保存，已有分析批次将标记为过期')
+                records = read_store(mode, directory)['records']
+            except (ValueError, OSError) as exc:
+                st.error(str(exc))
+        if selected.get('versions'):
+            with st.expander('同票号历史提交与冲突版本'):
+                st.json(selected['versions'])
+    config_path = directory / ('transport_references_'+mode+'.json')
+    refs = json.loads(config_path.read_text(encoding='utf-8')) if config_path.exists() else {}
+    with st.expander('参考数据与计算口径'):
+        st.caption('上传团队参考配置，可包含车型容量、团队理论因子表、同口径油价、补能时间与车辆位置观测。理论因子支持 team_theory_factors 数组，按车型、能源类型、车牌及有效期匹配。')
+        config_upload = st.file_uploader('导入参考配置 JSON', type=['json'], key='transport_references_'+mode)
+        factor_upload = st.file_uploader('直接导入团队理论因子表（CSV / XLSX）', type=['csv','xlsx'], key='transport_factor_table_'+mode)
+        cost = st.selectbox('燃料成本口径', ['', 'invoice_gross'], index=1 if refs.get('cost_basis')=='invoice_gross' else 0,
+                            format_func=lambda v: '待确认' if not v else '票面含税总额按周期里程分配', key='transport_cost_'+mode)
+        if st.button('保存参考配置', key='transport_save_refs_'+mode):
+            try:
+                refs = json.loads(config_upload.getvalue()) if config_upload else refs
+                if factor_upload:
+                    if factor_upload.name.lower().endswith('.csv'):
+                        factor_frame = pd.read_csv(factor_upload)
+                    else:
+                        factor_frame = pd.read_excel(factor_upload)
+                    factor_frame = factor_frame.astype(object).where(pd.notna(factor_frame), None)
+                    refs['team_theory_factors'] = factor_frame.to_dict(orient='records')
+                refs['cost_basis'] = cost or None
+                validate_references(refs)
+                atomic_json(config_path, refs)
+                st.success('参考配置已保存')
+            except (ValueError, OSError) as exc:
+                st.error(str(exc))
+                refs = json.loads(config_path.read_text(encoding='utf-8')) if config_path.exists() else {}
+        st.download_button('下载当前参考配置', json.dumps(refs,ensure_ascii=False,indent=2), file_name='transport_references.json')
+    upload = st.file_uploader('上传行程 CSV 或 Parquet', type=['csv','parquet'], key='transport_trips')
+    col1, col2 = st.columns(2)
+    with col1:
+        period_start = st.date_input('统计期间开始', value=None, key='transport_period_start_'+mode)
+    with col2:
+        period_end = st.date_input('统计期间结束', value=None, key='transport_period_end_'+mode)
+    vehicle_options = sorted({str(r.get('plate')) for r in records if r.get('plate')})
+    selected_vehicles = st.multiselect('统计车辆范围（不选表示全部车辆）', vehicle_options, key='transport_vehicles_'+mode)
+    complete = st.checkbox('已核实上传数据覆盖完整油箱周期', key='transport_complete')
+    if upload and st.button('执行匹配和周期分析'):
+        try:
+            trips = pd.read_parquet(upload) if upload.name.endswith('.parquet') else pd.read_csv(upload, dtype={'trip_id': str, 'waybill_no': str})
+            save_run(mode, trips, directory, references=refs, complete_history=complete, period_start=period_start.isoformat() if period_start else None, period_end=period_end.isoformat() if period_end else None, vehicles=selected_vehicles or None)
+            st.success('分析批次已保存')
+        except (ValueError, OSError) as exc:
+            st.error(str(exc))
+    runs = list_runs(mode, directory)
+    if runs:
+        batch = st.selectbox('查看分析批次', [r['run']['batch_id'] for r in runs], key='transport_batch_'+mode)
+        result = next(r for r in runs if r['run']['batch_id']==batch)
+        stale = result['run']['stale'] or result['run'].get('references',{}) != refs
+        if stale:
+            st.warning('此批次依据的票据或参考配置已更新，请重新计算。下方保留历史结果。')
+        st.write(result['coverage'])
+        for label, key in [('匹配结果','matches'), ('周期分配','allocations'), ('路线指标','routes'), ('检查执行状态','checks'), ('异常','anomalies'), ('数据缺口','gaps')]:
+            st.write(label)
+            st.dataframe(result.get(key, []))
+        result['run']['stale'] = stale
+        st.download_button('下载核验结果', json.dumps(result, ensure_ascii=False, indent=2), file_name='transport_result_'+batch+'.json')
+        if st.button('使用该批次原始快照重新复算', key='transport_replay_'+batch):
+            try:
+                replayed = replay_run(batch, mode, directory)
+                st.success('已基于历史批次快照生成复算批次：'+replayed['run']['batch_id'])
+            except (ValueError, OSError) as exc:
+                st.error(str(exc))

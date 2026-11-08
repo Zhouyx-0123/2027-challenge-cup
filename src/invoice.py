@@ -82,14 +82,18 @@ EXTRACT_PROMPT = (
     "  invoice_date   开票日期（YYYY-MM-DD）\n"
     "  invoice_type   发票标题类型，照票面原文；没有则空字符串\n"
     "  tax_rate       税率/征收率，保留百分号或免税、不征税文字；没有则空字符串，多税率填空\n"
+    "  buyer_name     购买方名称；没有则空字符串\n"
+    "  buyer_tax_id   购买方统一社会信用代码/纳税人识别号\n"
+    "  seller_tax_id  销售方统一社会信用代码/纳税人识别号\n"
+    "  invoice_amount_upper 价税合计大写，照票面原文\n"
+    "  note           备注栏原文，尤其完整保留车牌号及补能/维修说明\n"
+    "  issuer         开票人\n"
+    "  specification  规格型号（单明细票）；多明细时留空\n"
+    "  items          明细行数组，每行包含 item_name、specification、unit、quantity、unit_price、amount、tax_rate、tax_amount；必须逐行抽取，不得合并\n"
     "规则：\n"
     "1. 只认图片中真实印刷的文字和数字，不要推算、不要用常识补全、不要自行分类；\n"
     "2. 只输出一个 JSON 对象，不要任何解释文字、不要 Markdown 代码块；\n"
-    "3. 格式固定为 {\"invoice_code\":\"\",\"invoice_no\":\"\","
-    "\"seller_name\":\"\",\"invoice_amount\":null,\"amount_excluding_tax\":null,"
-    "\"tax_amount\":null,\"item_name\":\"\",\"quantity\":null,\"unit\":\"\","
-    "\"unit_price\":null,\"fuel_liters\":null,\"plate\":\"\","
-    "\"invoice_date\":\"\",\"invoice_type\":\"\",\"tax_rate\":\"\"}；\n"
+    "3. 输出 JSON 对象，字段包括 invoice_code、invoice_no、seller_name、buyer_name、buyer_tax_id、seller_tax_id、invoice_amount、amount_excluding_tax、tax_amount、invoice_amount_upper、item_name、specification、quantity、unit、unit_price、fuel_liters、plate、invoice_date、invoice_type、tax_rate（JSON键名写作 \"tax_rate\"）、note、issuer、items；items 必须为数组；\n"
     "4. 某个字段确实读不出时：数字字段填 null，文本字段填空字符串；\n"
     "5. 多行明细不得合并数量或自行选择一行，quantity 填 null；\n"
     "6. 若整张图都不是发票，输出 {\"error\":\"not_an_invoice\"}。"
@@ -221,7 +225,7 @@ def call_deepseek_vision(data_url: str, api_key: str,
                  "image_url": {"url": data_url, "detail": "high"}},
             ],
         }],
-        "max_tokens": 800,
+        "max_tokens": 1600,
         "stream": False,
     }
     resp = requests.post(
@@ -374,6 +378,35 @@ def parse_invoice(obj: Dict[str, Any]) -> Dict[str, Any]:
             else:
                 tax_amount = None
 
+    raw_items = obj.get("items")
+    items: List[Dict[str, Any]] = []
+    if isinstance(raw_items, list):
+        for raw_item in raw_items:
+            if not isinstance(raw_item, dict):
+                continue
+            items.append({
+                "item_name": _to_text(raw_item.get("item_name") or raw_item.get("name") or raw_item.get("项目名称")),
+                "specification": _to_text(raw_item.get("specification") or raw_item.get("规格型号")),
+                "unit": _to_text(raw_item.get("unit") or raw_item.get("单位")),
+                "quantity": _to_float(raw_item.get("quantity", raw_item.get("数量"))),
+                "unit_price": _to_float(raw_item.get("unit_price", raw_item.get("单价"))),
+                "amount": _to_float(raw_item.get("amount", raw_item.get("金额"))),
+                "tax_rate": _to_text(raw_item.get("tax_rate") or raw_item.get("税率")),
+                "tax_amount": _to_float(raw_item.get("tax_amount", raw_item.get("税额"))),
+            })
+    multiple_items = bool(obj.get("multiple_items")) or len(items) > 1
+    if multiple_items:
+        # Never let one line masquerade as the invoice-wide quantity/unit/price.
+        quantity = None
+        unit_price = None
+        unit = ""
+        liters = None
+    note_text = _to_text(obj.get("note"))
+    plate_text = _to_text(obj.get("plate"))
+    if not plate_text and note_text:
+        plate_match = re.search(r"(?:车牌号|车牌)\s*[:：]\s*([A-Za-z0-9\u4e00-\u9fff]{6,10})", note_text, re.I)
+        if plate_match:
+            plate_text = plate_match.group(1)
     has_activity = liters is not None or quantity is not None
     status = "ok"
     if not has_activity and amount is None:
@@ -392,14 +425,22 @@ def parse_invoice(obj: Dict[str, Any]) -> Dict[str, Any]:
         "tax_amount": tax_amount,
         "invoice_type": _to_text(obj.get("invoice_type")),
         "tax_rate": _to_text(obj.get("tax_rate")),
-        "item_name": _to_text(obj.get("item_name")),
+        "buyer_name": _to_text(obj.get("buyer_name")),
+        "buyer_tax_id": _to_text(obj.get("buyer_tax_id")),
+        "seller_tax_id": _to_text(obj.get("seller_tax_id")),
+        "invoice_amount_upper": _to_text(obj.get("invoice_amount_upper")),
+        "issuer": _to_text(obj.get("issuer")),
+        "specification": _to_text(obj.get("specification")),
+        "items": items,
+        "multiple_items": multiple_items,
+        "item_name": _to_text(obj.get("item_name")) or ("多行明细（见明细表）" if multiple_items else ""),
         "quantity": quantity,
-        "unit": _to_text(obj.get("unit")),
+        "unit": "" if multiple_items else _to_text(obj.get("unit")),
         "unit_price": unit_price,
         "fuel_liters": liters,
-        "plate": _to_text(obj.get("plate")),
+        "plate": plate_text,
         "invoice_date": _to_text(obj.get("invoice_date")),
-        "note": "；".join(notes),
+        "note": "；".join([x for x in [note_text] + notes if x]),
     }
 
 

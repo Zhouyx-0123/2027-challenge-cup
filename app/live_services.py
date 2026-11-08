@@ -66,6 +66,18 @@ def finance_download(mode):
     return read_file(mode)
 
 
+def register_transport_invoice(record, image_bytes, filename):
+    from src.transport_evidence import register
+    from src.finance_workflow import finance_dir
+    return register(record, image_bytes, filename, finance_dir())
+
+
+def transport_evidence_download(mode):
+    from src.transport_evidence import read_store, export_excel
+    from src.finance_workflow import finance_dir
+    return export_excel(read_store(mode, finance_dir())["records"])
+
+
 def invoice_summary(fuel_liters: Optional[float], distance_km: Optional[float],
                     **kwargs: Any) -> Dict[str, Any]:
     from src import invoice

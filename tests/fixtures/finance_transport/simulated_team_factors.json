@@ -1,0 +1,25 @@
+{
+  "cost_basis": "invoice_gross",
+  "capacities": {
+    "苏A12345": 500,
+    "苏A12346": 500,
+    "苏A12347": 500,
+    "苏A12348": 500,
+    "苏A12349": 500,
+    "苏A12350": 500,
+    "苏A12351": 500,
+    "苏A12352": 500
+  },
+  "team_theory_factors": [
+    {
+      "factor_id": "SIM-TRACTOR-DIESEL-001",
+      "vehicle_type": "牵引车",
+      "energy_type": "fuel",
+      "valid_from": "2026-10-01",
+      "valid_to": "2026-12-31",
+      "value": 30,
+      "version": "SIM-FACTOR-v1",
+      "source": "仅供自动化测试的合成因子，不是真实团队因子"
+    }
+  ]
+}

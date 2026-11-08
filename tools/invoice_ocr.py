@@ -72,6 +72,8 @@ LEDGER_COLUMNS: List[str] = [
     "emission_category", "activity_quantity", "activity_unit", "co2e_kg",
     "carbon_scope", "included_in_total", "carbon_note",
     "invoice_type", "tax_rate", "mock",
+    "buyer_name", "buyer_tax_id", "seller_tax_id", "invoice_amount_upper",
+    "specification", "issuer", "items_json", "multiple_items",
 ]
 
 
@@ -171,6 +173,9 @@ def run(input_dir: Path, ledger_path: Path, report_path: Path,
             "fuel_liters": "", "fuel_source": "", "plate": "",
             "invoice_date": "", "source_image": source_image,
             "confidence": "", "status": "", "note": "",
+            "buyer_name": "", "buyer_tax_id": "", "seller_tax_id": "",
+            "invoice_amount_upper": "", "specification": "", "issuer": "",
+            "items_json": "[]", "multiple_items": False,
         }
 
         if offline or not api_key:
@@ -186,8 +191,12 @@ def run(input_dir: Path, ledger_path: Path, report_path: Path,
             image.read_bytes(), api_key, filename=image.name)
 
         for field in ("invoice_code", "invoice_no", "seller_name", "item_name",
-                      "unit", "plate", "invoice_date", "invoice_type", "tax_rate", "mock"):
+                      "unit", "plate", "invoice_date", "invoice_type", "tax_rate", "mock",
+                      "buyer_name", "buyer_tax_id", "seller_tax_id", "invoice_amount_upper",
+                      "specification", "issuer"):
             base[field] = parsed.get(field, "")
+        base["items_json"] = json.dumps(parsed.get("items") or [], ensure_ascii=False)
+        base["multiple_items"] = bool(parsed.get("multiple_items"))
         amount = parsed.get("invoice_amount")
         liters = parsed.get("fuel_liters")
         quantity = parsed.get("quantity")

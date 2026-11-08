@@ -1,0 +1,477 @@
+{
+  "matches": [
+    {
+      "record_id": "001",
+      "invoice_no": "001",
+      "status": "matched",
+      "candidate_waybills": [
+        "w1"
+      ],
+      "candidate_trip_ids": [
+        "t1"
+      ],
+      "reason": [
+        "calendar_date_overlap"
+      ],
+      "source_image": "a.png"
+    },
+    {
+      "record_id": "002",
+      "invoice_no": "002",
+      "status": "unmatched",
+      "candidate_waybills": [],
+      "candidate_trip_ids": [],
+      "reason": [
+        "calendar_date_overlap"
+      ],
+      "source_image": "a.png"
+    },
+    {
+      "record_id": "003",
+      "invoice_no": "003",
+      "status": "unmatched",
+      "candidate_waybills": [],
+      "candidate_trip_ids": [],
+      "reason": [
+        "calendar_date_overlap"
+      ],
+      "source_image": "a.png"
+    }
+  ],
+  "allocations": [
+    {
+      "trip_id": "t1",
+      "waybills": [
+        "w1"
+      ],
+      "plate": "京A1",
+      "od_site": "A|B",
+      "cycle_id": "001:002",
+      "record_id": "001",
+      "end_record_id": "002",
+      "source_image": "a.png",
+      "rule": "docs45-section5",
+      "share": 0.25,
+      "trip_km": 100.0,
+      "allocated_liters": 25.0,
+      "l_per_100km": 25.0,
+      "allocated_cost": 150.0,
+      "yuan_per_km": 1.5,
+      "measurement": "rule_allocated",
+      "cost_basis": "invoice_gross",
+      "theory_liters": 20.0,
+      "deviation": 0.25,
+      "factor": {
+        "value": 20,
+        "version": "simulated-v1",
+        "source": "模拟接口示例"
+      }
+    },
+    {
+      "trip_id": "t2",
+      "waybills": [
+        "w2"
+      ],
+      "plate": "京A1",
+      "od_site": "A|B",
+      "cycle_id": "001:002",
+      "record_id": "001",
+      "end_record_id": "002",
+      "source_image": "a.png",
+      "rule": "docs45-section5",
+      "share": 0.75,
+      "trip_km": 300.0,
+      "allocated_liters": 75.0,
+      "l_per_100km": 25.0,
+      "allocated_cost": 450.0,
+      "yuan_per_km": 1.5,
+      "measurement": "rule_allocated",
+      "cost_basis": "invoice_gross",
+      "theory_liters": 60.0,
+      "deviation": 0.25,
+      "factor": {
+        "value": 20,
+        "version": "simulated-v1",
+        "source": "模拟接口示例"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "od_site": "A|B",
+      "energy_type": "fuel",
+      "total_trips": 2,
+      "sample_trips": 2,
+      "sample_km": 400.0,
+      "total_km": 400.0,
+      "covered_km": 400.0,
+      "coverage_rate": 1.0,
+      "association_km": 100.0,
+      "association_rate": 0.25,
+      "median_l_per_100km": 25.0,
+      "median_yuan_per_km": 1.5,
+      "cost_sample_trips": 2,
+      "rule": "docs45-section5",
+      "cost_basis": "invoice_gross",
+      "record_ids": [
+        "001"
+      ],
+      "cycle_ids": [
+        "001:002"
+      ]
+    }
+  ],
+  "anomalies": [],
+  "gaps": [
+    {
+      "cycle_id": "002:003",
+      "reason": "incomplete_or_invalid_cycle"
+    },
+    {
+      "record_id": "003",
+      "reason": "open_cycle"
+    },
+    {
+      "record_id": "002",
+      "rule": "price_outlier",
+      "reason": "missing_or_unconfirmed_price_reference"
+    },
+    {
+      "record_id": "002",
+      "rule": "theory_comparison",
+      "reason": "missing_factor_or_valid_allocation"
+    },
+    {
+      "record_id": "002",
+      "rule": "cost_calculation",
+      "reason": "missing_cost_basis_or_valid_allocation"
+    },
+    {
+      "record_id": "002",
+      "rule": "time_contradiction",
+      "reason": "missing_precise_time_or_complete_coverage"
+    },
+    {
+      "record_id": "002",
+      "rule": "region_contradiction",
+      "reason": "missing_location_or_vehicle_observation"
+    },
+    {
+      "record_id": "003",
+      "rule": "price_outlier",
+      "reason": "missing_or_unconfirmed_price_reference"
+    },
+    {
+      "record_id": "003",
+      "rule": "theory_comparison",
+      "reason": "missing_factor_or_valid_allocation"
+    },
+    {
+      "record_id": "003",
+      "rule": "cost_calculation",
+      "reason": "missing_cost_basis_or_valid_allocation"
+    },
+    {
+      "record_id": "003",
+      "rule": "time_contradiction",
+      "reason": "missing_precise_time_or_complete_coverage"
+    },
+    {
+      "record_id": "003",
+      "rule": "region_contradiction",
+      "reason": "missing_location_or_vehicle_observation"
+    }
+  ],
+  "waybills": [
+    {
+      "waybill_no": "w1",
+      "trip_id": "t1",
+      "record_ids": [
+        "001"
+      ],
+      "status": "matched"
+    },
+    {
+      "waybill_no": "w2",
+      "trip_id": "t2",
+      "record_ids": [],
+      "status": "unmatched"
+    }
+  ],
+  "run": {
+    "batch_id": "5f925e359f4b4682b2152dbc05675401",
+    "rule": "transport-evidence-v2",
+    "source_mode": "simulated",
+    "complete_history": true,
+    "input_sha256": "00e0c09c98d777bcc58e8178343f1edb4168aa9e7a0dca465a22fc66112187d0",
+    "references": {
+      "cost_basis": "invoice_gross",
+      "capacities": {
+        "京A1": 500
+      },
+      "theory_l_per_100km": {
+        "京A1": {
+          "value": 20,
+          "version": "simulated-v1",
+          "source": "模拟接口示例"
+        }
+      },
+      "price_checks": {
+        "001": {
+          "expected": 6,
+          "relative_threshold": 0.2,
+          "basis_confirmed": true,
+          "source": "模拟同口径油价"
+        }
+      },
+      "time_checks": {
+        "001": {
+          "replenished_at": "2026-01-01 08:30:00",
+          "coverage_start": "2026-01-01 00:00:00",
+          "coverage_end": "2026-01-03 00:00:00",
+          "history_complete": true,
+          "source": "模拟补能事件"
+        }
+      },
+      "location_checks": {
+        "001": {
+          "lat": 40,
+          "lon": 116,
+          "replenished_at": "2026-01-01 08:30:00",
+          "source": "模拟站点坐标",
+          "max_distance_km": 5,
+          "max_time_delta_minutes": 5,
+          "observations": [
+            {
+              "plate": "京A1",
+              "lat": 40.001,
+              "lon": 116.001,
+              "observed_at": "2026-01-01 08:30:00",
+              "source": "模拟GPS"
+            }
+          ]
+        }
+      }
+    },
+    "records_digest": "a8b3866a8f00fc36df1542b899e7ded27c32f01ea8b18e3e20223c048859a5ac",
+    "created_at": "2026-11-08T12:05:48.445992"
+  },
+  "coverage": {
+    "total_km": 400.0,
+    "association_km": 100.0,
+    "allocation_km": 400.0,
+    "association_rate": 0.25,
+    "allocation_rate": 1.0
+  },
+  "checks": [
+    {
+      "record_id": "001",
+      "rule": "price_outlier",
+      "status": "checked",
+      "reason": "同油品地区日期与税费口径比较",
+      "source_image": "a.png",
+      "actual": 6.0,
+      "reference": {
+        "expected": 6,
+        "relative_threshold": 0.2,
+        "basis_confirmed": true,
+        "source": "模拟同口径油价"
+      },
+      "deviation": 0.0
+    },
+    {
+      "record_id": "001",
+      "rule": "tank_capacity",
+      "status": "checked",
+      "reason": "容量比较",
+      "source_image": "a.png",
+      "quantity": 100.0,
+      "threshold": 500.0
+    },
+    {
+      "record_id": "001",
+      "rule": "theory_comparison",
+      "status": "checked",
+      "reason": "同趟粒度比较",
+      "source_image": "a.png",
+      "reference": {
+        "value": 20,
+        "version": "simulated-v1",
+        "source": "模拟接口示例"
+      }
+    },
+    {
+      "record_id": "001",
+      "rule": "cost_calculation",
+      "status": "checked",
+      "reason": "含税总额周期分配",
+      "source_image": "a.png"
+    },
+    {
+      "record_id": "001",
+      "rule": "time_contradiction",
+      "status": "checked",
+      "reason": "补能时刻有对应行程",
+      "source_image": "a.png",
+      "reference": {
+        "replenished_at": "2026-01-01 08:30:00",
+        "coverage_start": "2026-01-01 00:00:00",
+        "coverage_end": "2026-01-03 00:00:00",
+        "history_complete": true,
+        "source": "模拟补能事件"
+      },
+      "trip_ids": [
+        "t1"
+      ]
+    },
+    {
+      "record_id": "001",
+      "rule": "region_contradiction",
+      "status": "checked",
+      "reason": "同车近时点位置距离比较",
+      "source_image": "a.png",
+      "distance_km": 0.14007118049440434,
+      "threshold_km": 5.0,
+      "reference": {
+        "lat": 40,
+        "lon": 116,
+        "replenished_at": "2026-01-01 08:30:00",
+        "source": "模拟站点坐标",
+        "max_distance_km": 5,
+        "max_time_delta_minutes": 5,
+        "observations": [
+          {
+            "plate": "京A1",
+            "lat": 40.001,
+            "lon": 116.001,
+            "observed_at": "2026-01-01 08:30:00",
+            "source": "模拟GPS"
+          }
+        ]
+      },
+      "observation": {
+        "plate": "京A1",
+        "lat": 40.001,
+        "lon": 116.001,
+        "observed_at": "2026-01-01 08:30:00",
+        "source": "模拟GPS"
+      }
+    },
+    {
+      "record_id": "002",
+      "rule": "price_outlier",
+      "status": "unavailable",
+      "reason": "missing_or_unconfirmed_price_reference",
+      "source_image": "a.png",
+      "actual": 6.0,
+      "reference": {},
+      "deviation": null
+    },
+    {
+      "record_id": "002",
+      "rule": "tank_capacity",
+      "status": "checked",
+      "reason": "容量比较",
+      "source_image": "a.png",
+      "quantity": 100.0,
+      "threshold": 500.0
+    },
+    {
+      "record_id": "002",
+      "rule": "theory_comparison",
+      "status": "unavailable",
+      "reason": "missing_factor_or_valid_allocation",
+      "source_image": "a.png",
+      "reference": {
+        "value": 20,
+        "version": "simulated-v1",
+        "source": "模拟接口示例"
+      }
+    },
+    {
+      "record_id": "002",
+      "rule": "cost_calculation",
+      "status": "unavailable",
+      "reason": "missing_cost_basis_or_valid_allocation",
+      "source_image": "a.png"
+    },
+    {
+      "record_id": "002",
+      "rule": "time_contradiction",
+      "status": "unavailable",
+      "reason": "missing_precise_time_or_complete_coverage",
+      "source_image": "a.png",
+      "reference": {},
+      "trip_ids": []
+    },
+    {
+      "record_id": "002",
+      "rule": "region_contradiction",
+      "status": "unavailable",
+      "reason": "missing_location_or_vehicle_observation",
+      "source_image": "a.png",
+      "distance_km": null,
+      "threshold_km": null,
+      "reference": {},
+      "observation": null
+    },
+    {
+      "record_id": "003",
+      "rule": "price_outlier",
+      "status": "unavailable",
+      "reason": "missing_or_unconfirmed_price_reference",
+      "source_image": "a.png",
+      "actual": 6.0,
+      "reference": {},
+      "deviation": null
+    },
+    {
+      "record_id": "003",
+      "rule": "tank_capacity",
+      "status": "checked",
+      "reason": "容量比较",
+      "source_image": "a.png",
+      "quantity": 100.0,
+      "threshold": 500.0
+    },
+    {
+      "record_id": "003",
+      "rule": "theory_comparison",
+      "status": "unavailable",
+      "reason": "missing_factor_or_valid_allocation",
+      "source_image": "a.png",
+      "reference": {
+        "value": 20,
+        "version": "simulated-v1",
+        "source": "模拟接口示例"
+      }
+    },
+    {
+      "record_id": "003",
+      "rule": "cost_calculation",
+      "status": "unavailable",
+      "reason": "missing_cost_basis_or_valid_allocation",
+      "source_image": "a.png"
+    },
+    {
+      "record_id": "003",
+      "rule": "time_contradiction",
+      "status": "unavailable",
+      "reason": "missing_precise_time_or_complete_coverage",
+      "source_image": "a.png",
+      "reference": {},
+      "trip_ids": []
+    },
+    {
+      "record_id": "003",
+      "rule": "region_contradiction",
+      "status": "unavailable",
+      "reason": "missing_location_or_vehicle_observation",
+      "source_image": "a.png",
+      "distance_km": null,
+      "threshold_km": null,
+      "reference": {},
+      "observation": null
+    }
+  ]
+}

@@ -34,4 +34,4 @@ python -m tools.amap_setup --check --online
 | `fuel_price_history.json` | 车辆能效分析使用的历史燃料价格 |
 | `telemetry_contract.json` | 颗粒物遥测命令行链路的数据契约 |
 
-当前 CO2 硬件闭环使用项目根目录的 `sensor_data.csv`，路线采纳记忆使用 `data/route_memory.csv`。这两个文件属于运行时业务数据，不是可随意清空的缓存。
+OBD 原始流使用 `data/raw/obd_gps/obd_stream.csv`（由 `OBD_STREAM_DIR` 可改），路线采纳记忆使用 `data/route_memory.csv`。这两个文件属于运行时业务数据，不是可随意清空的缓存。环境 CO₂ 通道的 `sensor_data.csv` 已于 2026-11-08 随模块删除。

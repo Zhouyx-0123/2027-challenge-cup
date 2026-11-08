@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""五页主应用视图：所有跨页数字均通过 demo_state 共享。"""
+"""六页主应用视图：所有跨页数字均通过 demo_state 共享。"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -11,7 +11,7 @@ import streamlit as st
 import live_services
 import services
 from components import (carbon_ledger_panel, dashboard_home, flags, obd_panel,
-                        qlearning_panel, route_sandbox, slider_kit, theme)
+                        qlearning_panel, route_sandbox, theme)
 from demo_state import carbon_snapshot, fallback_disclosure
 
 
@@ -133,167 +133,32 @@ def render_invoice() -> None:
         st.dataframe(pd.DataFrame(history), width="stretch", hide_index=True)
 
 
-def _sensor_window_chart() -> dict:
-    """监测窗口联动图：CO2 序列 + 1000ppm 预警线 + 可点击定位窗口右端。
-
-    图上的点全部来自真实传感器读数（sensor_data.csv），不造数。
-    """
-    frame = live_services.sensor_data()
-    is_mock = live_services.sensor_is_mock()
-    if frame.empty or "co2" not in frame.columns:
-        return {
-            "title": "监测窗口预览",
-            "subtitle": "CO2 浓度（ppm）· 实时",
-            "empty": "等待传感器数据：请启动 server.py 并发送测试读数。",
-            "series": [],
-            "interact": "none",
-        }
-    tail = frame.tail(500)
-    points = [[i, float(v)] for i, v in enumerate(tail["co2"].tolist())]
-    labels = []
-    if "timestamp" in tail.columns:
-        labels = [ts.strftime("%H:%M:%S") for ts in tail["timestamp"].tolist()]
-    tide = slider_kit.PALETTE["tide"]
-    coral = slider_kit.PALETTE["coral"]
-    subtitle = "CO2 浓度（ppm）· 共 %d 条读数" % len(points)
-    if is_mock:
-        subtitle += " · 演示数据，非真实传感器读数"
-    return {
-        "title": "监测窗口预览",
-        "subtitle": subtitle,
-        "x_name": "时间",
-        "y_name": "ppm",
-        "x_labels": labels,
-        "x_domain": [0, max(1, len(points) - 1)],
-        "y_decimals": 0,
-        "hover_decimals": 0,
-        "hover_suffix": "ppm",
-        "series": [{"name": "CO2", "points": points, "color": tide, "area": True}],
-        "hlines": [{"y": 1000, "label": "CO2 预警 1000 ppm", "color": coral}],
-        "window": {"from": 0, "to": len(points)},
-        "count": len(points),
-        "cursor": {"follow": "window_end", "label": "窗口右端 · {v} 条"},
-        "interact": "set_x",
-        "interact_transform": "reverse_count",
-        "legend": [
-            {"name": "CO2 浓度", "color": tide},
-            {"name": "预警阈值 1000 ppm", "color": coral, "style": "opacity:.7"},
-        ],
-    }
-
-
 def _obd_raw_caption() -> None:
-    """OBD tab 顶部口径提示：图表读 processed（demo 基线），实流只落 data/raw。
-
-    两条通道数字不同源，必须在同一屏里写清楚，避免把 demo 基线当成现场读数。
-    """
+    """硬件页顶部一行实流事实：只读 data/raw，不进 E₀。"""
     raw = services.latest_raw_stream()
-    prefix = ("页面图表读 data/processed（demo 基线）；设备实流落 "
-              "data/raw/obd_gps/obd_stream.csv，")
     if not raw:
-        st.caption(prefix + "当前暂无实流文件（等待设备上报），详见 🔗 数据链总览。")
+        st.caption("设备实流：data/raw/obd_gps/obd_stream.csv 尚无数据 —— 板子上电后 POST /api/upload_obd_gps。")
         return
-    first = str(raw.get("first_ts") or "").replace("T", " ").replace("Z", "")
-    last = str(raw.get("last_ts") or "").replace("T", " ").replace("Z", "")
-    if first and last and first[:10] == last[:10]:
-        window = first[:19] + " → " + last[11:19] + " UTC"
-    elif first and last:
-        window = first[:19] + " → " + last[:19] + " UTC"
-    else:
-        window = "—"
-    st.caption(prefix + "最近 " + str(raw.get("rows") or 0) + " 行 / UTC "
-               + window + "，详见 🔗 数据链总览。")
+    window = int(raw.get("window_s") or 0)
+    st.caption(
+        "设备实流：%s 行 × %d 列，UTC %s → %s（窗口 %dh%02dm），%d 台车；"
+        "文件 %s，%.1f KB。图表读 data/processed 的核算结果，实流本身不进 E₀。"
+        % (raw.get("rows"), raw.get("columns"), raw.get("first_ts"), raw.get("last_ts"),
+           window // 3600, window % 3600 // 60, raw.get("n_vehicles"),
+           raw.get("mtime"), (raw.get("bytes") or 0) / 1024.0))
 
 
 def render_sensor() -> None:
     theme.hero_compact(
         "云边端硬件监控",
-        "ESP32 → Flask → sensor_data.csv → Streamlit；超标事件同步财务状态。",
-        kicker="02 / EDGE MONITOR", badges=["2 秒刷新", "CO2 > 1000 ppm", "黄框预警"])
-    # 两条数据通道：① CO₂ 环境浓度（原有 ESP32 链路）② OBD+GPS 实测油耗（工科测量方向）。
-    # 两者口径完全不同，所以分 tab 呈现，绝不混在一张图里。
-    tab_co2, tab_obd = st.tabs(["🌫️ CO₂ 环境浓度", "🚘 OBD+GPS 实测碳排"])
-    with tab_co2:
-        _render_sensor_co2()
-    with tab_obd:
-        _obd_raw_caption()
-        obd_panel.render_obd_panel()
-
-
-def _render_sensor_co2() -> None:
-    st.caption("实时演示通道：传感器读数与预警成本只驱动当前会话，不回写 E₀ 或结果表。")
-    st.info(
-        "**定位说明（避免误读）**：本页是**仓储 / 办公场所的环境 CO₂ 监测与碳资产管理**"
-        "（浓度超标 → 超标碳排量 → 额外碳配额成本，阈值 1000 ppm，"
-        "按输入的『监测空间体积 (m³)』折算）。"
-        "**它不是运输排放测量**——项目已明确放弃车载 CO₂ 浓度传感器路线，"
-        "运输排放由 **OBD+GPS 实测轨**与 **VSP 模型轨**承担（见 docs/57）。")
-    lab_col, side_col = st.columns([2.1, 1], gap="large")
-    with lab_col:
-        n = slider_kit.render_lab(
-            key="sensor_window_n",
-            label="折线图最近 N 条",
-            min_value=10, max_value=500, step=10, value=100,
-            unit="条",
-            sub="拖动旋钮，右侧监测窗口实时联动",
-            hint="← → 方向键微调 10 条，Home / End 直达端点；在图上点击可直接把窗口右端定位到该读数。",
-            chart=_sensor_window_chart(),
-            height=330,
-        )
-        # 防御：任何异常值都不允许把 frame.tail() 打成崩溃（项目纪律：不阻断启动）
-        n = int(max(10, min(500, round(float(n)))))
-    with side_col:
-        volume = st.number_input("监测空间体积 (m³)", 1.0, 100000.0, 100.0, 10.0)
-        st.caption("体积用于把 CO2 浓度换算成超标排放量（体积 × 浓度差）。")
-
-    @st.fragment(run_every="2s")
-    def live() -> None:
-        frame = live_services.sensor_data()
-        is_mock = live_services.sensor_is_mock()
-        if frame.empty:
-            st.info("等待传感器数据，请先启动 server.py 并发送测试读数。")
-            return
-        if is_mock:
-            st.warning("演示数据：当前为确定性演示序列（未接入真实 ESP32），"
-                       "不代表现场读数。启动 server.py 并发送测试读数后即切换为真实数据。")
-        latest = frame.iloc[-1]
-        co2, temp = float(latest["co2"]), float(latest["temp"])
-        warning = co2 > 1000
-        latest_ledger = live_services.sensor_warning_ledger(
-            frame.tail(1), room_volume_m3=volume,
-            carbon_price_yuan_t=float(st.session_state["carbon_price"]))
-        st.session_state["sensor_co2"] = co2
-        st.session_state["sensor_temp"] = temp
-        st.session_state["sensor_device"] = str(latest["device_id"])
-        st.session_state["sensor_updated_at"] = latest["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
-        st.session_state["sensor_is_warning"] = warning
-        st.session_state["disclosure_note"] = ""
-        if warning and not latest_ledger.empty:
-            row = latest_ledger.iloc[-1]
-            st.session_state["sensor_penalty"] = float(row["额外碳配额成本(元)"])
-            st.session_state["sensor_excess_carbon_t"] = float(row["超标碳排量"]) / 1000.0
-        else:
-            st.session_state["sensor_penalty"] = 0.0
-            st.session_state["sensor_excess_carbon_t"] = 0.0
-
-        if warning:
-            st.error("⚠️ 警告：检测到局部碳排放浓度超标！")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("CO2 浓度", f"{co2:.0f} ppm")
-        c2.metric("温度", f"{temp:.1f} °C")
-        c3.metric("同步突发成本", f"¥{st.session_state['sensor_penalty']:.6f}")
-        st.line_chart(frame.tail(n).set_index("timestamp")[["co2"]],
-                      x_label="时间", y_label="CO2 (ppm)", color="#ef4444")
-        ledger = live_services.sensor_warning_ledger(
-            frame.tail(100), room_volume_m3=volume,
-            carbon_price_yuan_t=float(st.session_state["carbon_price"]))
-        if not ledger.empty:
-            styled = ledger.style.apply(live_services.highlight_sensor_warning, axis=1)
-            st.dataframe(styled, width="stretch", hide_index=True)
-            st.warning("系统已自动计提因物理环境超标产生的额外碳交易成本")
-        st.caption("当前状态取最新一条读数；传感器历史事件不会因 2 秒刷新重复累加。")
-
-    live()
+        "ESP32-C3 → WiFi → Flask → obd_stream.csv → Streamlit；守恒法算碳，实测轨不进 E₀。",
+        kicker="02 / EDGE MONITOR",
+        badges=["OBD+GPS 实测", "守恒法算碳", "实测轨不进 E₀"])
+    st.caption(
+        "本页只保留 OBD+GPS 一条硬件链路：CO₂ 环境浓度传感器通道已于 2026-11-08 删除，"
+        "运输油耗与碳排由车载 OBD 守恒法计算，不用环境 CO₂ 浓度折算。")
+    _obd_raw_caption()
+    obd_panel.render_obd_panel()
 
 
 def render_routes() -> None:
@@ -371,7 +236,7 @@ def _render_ledger_e0() -> None:
     c3.metric("财务罚单/风险", f"¥{snap['financial_risk_yuan']:.2f}")
     c4.metric("配额余额（毛口径）", f"{snap['balance_t']:.4f} t")
     if snap["gap_t"] > 0:
-        st.error("综合刚才的发票和硬件超标，本期需购买 %.4f 吨碳配额。" % snap["gap_t"])
+        st.error("综合发票新增与当期配额，本期需购买 %.4f 吨碳配额。" % snap["gap_t"])
     else:
         st.success("当前配额充足，无需新增购买。")
 
@@ -379,16 +244,13 @@ def _render_ledger_e0() -> None:
         {"项目": "基准总碳排（毛口径）", "排放量(tCO2e)": snap["base_t"], "财务影响(元)": 0.0},
         {"项目": "当前发票新增", "排放量(tCO2e)": snap["invoice_t"],
          "财务影响(元)": snap["invoice_cost_yuan"]},
-        {"项目": "硬件超标事件", "排放量(tCO2e)": snap["sensor_t"],
-         "财务影响(元)": snap["sensor_cost_yuan"]},
         {"项目": "合计", "排放量(tCO2e)": snap["total_t"],
          "财务影响(元)": snap["financial_risk_yuan"]},
     ])
     st.dataframe(breakdown, width="stretch", hide_index=True)
     flags.render_estimate_audit()
     st.caption(
-        "财务风险 = 发票新增排放 × 全局碳价 + 硬件突发成本；"
-        "硬件超标碳成本不在配额购买成本中重复计提。基准总碳排只读 kpi 结果表，"
+        "财务风险 = 发票新增排放 × 全局碳价。基准总碳排只读 kpi 结果表，"
         "结果缺失时才显示静态演示快照。"
         f"本页总碳排 / 缺口 / 余额均为毛口径：按运单明细行累加（同一趟的多张运单重复计入），"
         f"是配额情景的保守上界；对外披露口径为 E0 {_e0_disclosure_text()}"
@@ -415,8 +277,6 @@ def _render_ledger_e0() -> None:
     with st.expander("查看共享 State"):
         st.json({
             "current_invoice_carbon": st.session_state["current_invoice_carbon"],
-            "sensor_penalty": st.session_state["sensor_penalty"],
-            "sensor_excess_carbon_t": st.session_state["sensor_excess_carbon_t"],
             "snapshot": snap,
         })
 

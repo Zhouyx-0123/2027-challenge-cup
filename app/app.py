@@ -33,6 +33,12 @@ from main_views import (
 from views_chain import render_chain
 
 init_state()
+
+# pipeline 重跑后 current_run.json / kpi.json 会变；这里清一次缓存，页面不必重启换版。
+import services  # noqa: E402  (必须在 set_page_config 与样式注入之后)
+
+services.refresh_cache_on_new_run()
+
 PAGES = [
     st.Page(render_dashboard, title="🏠 首页概览", url_path="dashboard", default=True),
     st.Page(render_chain, title="🔗 数据链总览", url_path="chain"),

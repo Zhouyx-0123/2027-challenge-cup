@@ -1,7 +1,7 @@
 ﻿<#
     物流企业碳感知智能决策系统 · Windows 原生部署启动脚本（不依赖 Docker）
 
-    一条命令把「决策台(Streamlit, 8501)」与「传感器网关(Flask, 5000)」拉起来，
+    一条命令把「决策台(Streamlit, 8501)」与「边缘网关(Flask, 5000)」拉起来，
     并做健康检查、打印局域网访问地址、记录 PID 便于 stop-native.ps1 停止。
 
     用法：
@@ -12,8 +12,8 @@
 
     参数：
         -AppPort      决策台端口（默认 8501）
-        -SensorPort   传感器网关端口（默认 5000）
-        -NoSensor     不启动传感器网关（只起决策台）
+        -SensorPort   边缘网关端口（默认 5000）
+        -NoSensor     不启动边缘网关（只起决策台）
         -Foreground   前台运行决策台（Ctrl+C 停止），用于排障
 
     纪律：
@@ -208,7 +208,7 @@ function Get-SensorLauncherPath {
     param([int]$Port)
     $lines = @(
         '# -*- coding: utf-8 -*-',
-        '"""由 start-native.ps1 生成：把 stdout/stderr 接到日志文件后启动传感器网关。"""',
+        '"""由 start-native.ps1 生成：把 stdout/stderr 接到日志文件后启动边缘网关。"""',
         'import os, runpy, sys',
         'out = open(os.environ["CARBONTIDE_SENSOR_OUT"], "a", encoding="utf-8", errors="replace", buffering=1)',
         'err = open(os.environ["CARBONTIDE_SENSOR_ERR"], "a", encoding="utf-8", errors="replace", buffering=1)',
@@ -353,7 +353,7 @@ if (-not $NoSensor -and $sensorState.State -eq 'foreign') {
     exit 1
 }
 if (-not $NoSensor -and $sensorState.State -eq 'ours') {
-    Write-Ok ("传感器网关已在运行（PID " + $sensorState.Pid + "，端口 " + $SensorPort + "）")
+    Write-Ok ("边缘网关已在运行（PID " + $sensorState.Pid + "，端口 " + $SensorPort + "）")
 }
 
 $lanIp = Get-LanIPv4
@@ -362,7 +362,7 @@ if ($appState.State -eq 'ours' -and (-not $NoSensor) -and $sensorState.State -eq
     Write-Ok '两个服务都已在运行，脚本不做任何改动。'
     Write-Host ''
     Write-Info ("决策台访问地址：    http://" + $lanIp + ":" + $AppPort)
-    Write-Info ("传感器接入点(ESP32)：http://" + $lanIp + ":" + $SensorPort + "/api/upload_sensor")
+    Write-Info ("接入点(ESP32)：http://" + $lanIp + ":" + $SensorPort + "/api/upload_obd_gps")
     Write-Info ("本机健康检查：      http://127.0.0.1:" + $AppPort + "/_stcore/health")
     exit 0
 }
@@ -383,14 +383,14 @@ if ($appState.State -eq 'none' -and -not $Foreground) {
 }
 
 if ($NoSensor) {
-    Write-Info '按要求跳过传感器网关（-NoSensor）。'
+    Write-Info '按要求跳过边缘网关（-NoSensor）。'
 } elseif ($sensorState.State -eq 'none') {
     $env:CARBONTIDE_SENSOR_OUT = Join-Path $script:LogDir 'sensor.out.log'
     $env:CARBONTIDE_SENSOR_ERR = Join-Path $script:LogDir 'sensor.err.log'
     $env:CARBONTIDE_SENSOR_PORT = "$SensorPort"
     $launcher = Get-SensorLauncherPath -Port $SensorPort
     $startedSensorPid = Start-NativeService -LauncherPath $launcher -WorkingDirectory $script:RepoRoot
-    Write-Ok ("传感器网关进程已拉起（PID " + $startedSensorPid + "，端口 " + $SensorPort + "）")
+    Write-Ok ("边缘网关进程已拉起（PID " + $startedSensorPid + "，端口 " + $SensorPort + "）")
 }
 
 # ---------------------------------------------------------------- 前台模式
@@ -399,13 +399,13 @@ if ($Foreground) {
     Write-Info '前台模式：决策台日志直接打屏，按 Ctrl+C 停止。'
     Write-Info ("决策台地址：http://" + $lanIp + ":" + $AppPort)
     if (-not $NoSensor) {
-        Write-Info ("传感器地址：http://" + $lanIp + ":" + $SensorPort + "/api/upload_sensor")
+        Write-Info ("接入地址：http://" + $lanIp + ":" + $SensorPort + "/api/upload_obd_gps")
     }
     try {
         & $pythonExe @pythonPre -m streamlit run app/app.py --server.port $AppPort --server.address 0.0.0.0 --server.headless true
     } finally {
         if ($startedSensorPid -gt 0) {
-            Write-Info '前台模式结束，停止后台的传感器网关…'
+            Write-Info '前台模式结束，停止后台的边缘网关…'
             Stop-Process -Id $startedSensorPid -Force -ErrorAction SilentlyContinue
         }
     }
@@ -434,13 +434,13 @@ if ($startedAppPid -gt 0) {
 if ($startedSensorPid -gt 0) {
     if (Wait-PortOwnedBy -Port $SensorPort -ProcessId $startedSensorPid -TimeoutSec 45) {
         $sensorOwned = $true
-        Write-Ok ("传感器网关已在端口 " + $SensorPort + " 上监听（PID " + $startedSensorPid + "）")
+        Write-Ok ("边缘网关已在端口 " + $SensorPort + " 上监听（PID " + $startedSensorPid + "）")
     } else {
         $now = Get-PortState -Port $SensorPort -RecordedPid 0
         if ($now.State -eq 'foreign') {
             Write-Fail ("端口 " + $SensorPort + " 被别的进程抢占了（PID " + $now.Pid + "），本进程已退出。")
         } else {
-            Write-Fail ("传感器网关启动后没能监听端口 " + $SensorPort + "，详见 logs\sensor.err.log")
+            Write-Fail ("边缘网关启动后没能监听端口 " + $SensorPort + "，详见 logs\sensor.err.log")
         }
         Stop-Process -Id $startedSensorPid -Force -ErrorAction SilentlyContinue
         $failed++
@@ -462,8 +462,8 @@ $sensorHealthy = $false
 if (-not $NoSensor) {
     if ($sensorOwned) {
         $sensorHealthy = Wait-HttpHealthy -Url ("http://127.0.0.1:" + $SensorPort + "/api/health") -TimeoutSec 60
-        if ($sensorHealthy) { Write-Ok '传感器网关健康检查通过（/api/health = 200）' }
-        else { Write-Fail '传感器网关健康检查超时，详见 logs\sensor.err.log'; $failed++ }
+        if ($sensorHealthy) { Write-Ok '边缘网关健康检查通过（/api/health = 200）' }
+        else { Write-Fail '边缘网关健康检查超时，详见 logs\sensor.err.log'; $failed++ }
     } else {
         $failed++
     }
@@ -490,7 +490,7 @@ if (-not $NoSensor) {
         port   = $SensorPort
         url    = ("http://127.0.0.1:" + $SensorPort)
         health = ("http://127.0.0.1:" + $SensorPort + "/api/health")
-        esp32  = ("http://" + $lanIp + ":" + $SensorPort + "/api/upload_sensor")
+        esp32  = ("http://" + $lanIp + ":" + $SensorPort + "/api/upload_obd_gps")
     }
 }
 if ($failed -eq 0) {
@@ -509,7 +509,7 @@ Write-Host '  访问地址' -ForegroundColor Cyan
 Write-Host '------------------------------------------------------------' -ForegroundColor DarkCyan
 Write-Host ("  决策台(Streamlit)   ：http://" + $lanIp + ":" + $AppPort)
 if (-not $NoSensor) {
-    Write-Host ("  传感器接入点(ESP32) ：http://" + $lanIp + ":" + $SensorPort + "/api/upload_sensor")
+    Write-Host ("  接入点(ESP32) ：http://" + $lanIp + ":" + $SensorPort + "/api/upload_obd_gps")
 }
 Write-Host ("  本机健康检查        ：http://127.0.0.1:" + $AppPort + "/_stcore/health")
 Write-Host ("  日志目录            ：" + $script:LogDir)

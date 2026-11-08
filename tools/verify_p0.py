@@ -133,15 +133,14 @@ def check_compose() -> None:
     problems = []
     if str(env.get("SENSOR_AUTH", "")).strip() != "${SENSOR_AUTH:-1}":
         problems.append("sensor 的 SENSOR_AUTH 不是默认开启")
-    if not str(env.get("SENSOR_DATA_FILE", "")).strip():
-        problems.append("sensor 缺 SENSOR_DATA_FILE")
-    app_env = (services.get("app") or {}).get("environment") or {}
-    if not str(app_env.get("SENSOR_DATA_FILE", "")).strip():
-        problems.append("app 缺 SENSOR_DATA_FILE（读不到传感器写的文件）")
+    for name in ("app", "sensor"):
+        volumes = (services.get(name) or {}).get("volumes") or []
+        if not any(str(item).startswith("./data:/app/data") for item in volumes):
+            problems.append("%s 缺 ./data:/app/data 挂载（OBD 实流与结果表读不到）" % name)
     if problems:
         _fail("compose 可解析", "；".join(problems))
     else:
-        _ok("compose 可解析", "服务 %s｜鉴权默认开｜读数路径已挂卷"
+        _ok("compose 可解析", "服务 %s｜鉴权默认开｜data 卷已挂"
             % ", ".join(sorted(services)))
 
 
@@ -279,16 +278,16 @@ def check_backup_roundtrip() -> None:
 def check_device_auth() -> None:
     from src import device_auth
 
-    with tempfile.TemporaryDirectory(prefix="wb_verify_p0_sensor_") as tmp:
+    with tempfile.TemporaryDirectory(prefix="wb_verify_p0_gateway_") as tmp:
         base = Path(tmp)
         os_env_backup = {
             key: __import__("os").environ.get(key)
-            for key in ("SENSOR_DATA_FILE", "SENSOR_AUDIT_FILE", "SENSOR_AUTH",
+            for key in ("OBD_STREAM_DIR", "SENSOR_AUDIT_FILE", "SENSOR_AUTH",
                         "SENSOR_DEVICES_FILE", "SENSOR_RATE_LIMIT_PER_MIN")
         }
         import os
 
-        os.environ["SENSOR_DATA_FILE"] = str(base / "sensor_data.csv")
+        os.environ["OBD_STREAM_DIR"] = str(base / "obd_gps")
         os.environ["SENSOR_AUDIT_FILE"] = str(base / "audit.jsonl")
         os.environ["SENSOR_AUTH"] = "1"
         os.environ["SENSOR_RATE_LIMIT_PER_MIN"] = "60"
@@ -301,16 +300,19 @@ def check_device_auth() -> None:
 
             server_module = importlib.reload(server_module)
             token = "verify-" + "x" * 24
-            device_auth.upsert_device("PDM-VERIFY-001", device_auth.token_digest(token),
+            device_auth.upsert_device("TRK-VERIFY-001", device_auth.token_digest(token),
                                        path=registry)
             with server_module.app.test_client() as client:
-                body = {"device_id": "PDM-VERIFY-001", "co2": 800.0, "temp": 24.0}
-                no_token = client.post("/api/upload_sensor", json=body)
+                body = {"vehicle_id": "TRK-VERIFY-001",
+                        "ts": "2026-11-08T10:00:00+08:00",
+                        "instant_fuel_lph": 20.0,
+                        "vehicle_speed_kmh": 50.0}
+                no_token = client.post("/api/upload_obd_gps", json=body)
                 bad_token = client.post(
-                    "/api/upload_sensor", json=body,
+                    "/api/upload_obd_gps", json=body,
                     headers={device_auth.TOKEN_HEADER: "wrong"})
                 good = client.post(
-                    "/api/upload_sensor", json=body,
+                    "/api/upload_obd_gps", json=body,
                     headers={device_auth.TOKEN_HEADER: token})
             if no_token.status_code != 401:
                 _fail("未注册设备被拒", "缺令牌返回了 %d" % no_token.status_code)

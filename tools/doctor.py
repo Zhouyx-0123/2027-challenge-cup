@@ -15,7 +15,7 @@
 2    密钥就绪                    地图/发票识别能不能用（**只报来源不报值**）
 3    数据层与发布状态            页面读的是哪一版数据、闸门过没过
 4    容器与部署形态              Docker 能不能用；不能用时给替代路径
-5    传感器接入                  设备能不能连上、令牌对不对、读数进没进
+5    边缘网关接入                设备能不能连上、令牌对不对、OBD 实流进没进
 6    备份与恢复                  原始证据有没有备份、能不能恢复
 7    硬件与固件                  ESP32 固件在不在、串口接没接、令牌配没配
 ===  ==========================  ============================================
@@ -54,7 +54,7 @@ REQUIRED_PACKAGES = (
     ("numpy", "数据层"),
     ("pyarrow", "Parquet 结果表"),
     ("plotly", "图表"),
-    ("flask", "传感器接入服务"),
+    ("flask", "边缘网关（OBD 接收）"),
     ("requests", "高德 / DeepSeek 联网"),
     ("pymoo", "NSGA-II 路线进化"),
     ("yaml", "compose 配置校验"),
@@ -62,7 +62,7 @@ REQUIRED_PACKAGES = (
 
 #: 可选依赖（缺了只影响某一块，要提示但不致命）
 OPTIONAL_PACKAGES = (
-    ("flask_cors", "浏览器跨域访问传感器接口（ESP32 直连不需要）"),
+    ("flask_cors", "浏览器跨域访问网关接口（ESP32 直连不需要）"),
     ("cryptography", "证书相关"),
 )
 
@@ -296,52 +296,53 @@ def check_container(report: Report) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 5) 传感器接入
+# 5) 边缘网关接入（OBD+GPS 实流）
 # ---------------------------------------------------------------------------
 
-def check_sensor(report: Report, quick: bool) -> None:
-    from src import device_auth
+def check_gateway(report: Report, quick: bool) -> None:
+    from src import device_auth, obd_gps
 
     registry = device_auth.load_registry()
     devices = device_auth.list_devices(registry)
-    report.add("传感器", "设备注册表", "OK" if devices else "WARN",
-               "%d 台设备（%s）" % (len(devices),
-                                device_auth.registry_path())
+    report.add("网关", "设备注册表", "OK" if devices else "WARN",
+               "%d 台设备（%s）" % (len(devices), device_auth.registry_path())
                if devices else "还没有登记设备 → python -m tools.device_tokens add --device-id X")
 
     if quick:
-        report.add("传感器", "接口连通", "SKIP", "--quick 模式跳过")
+        report.add("网关", "接口连通", "SKIP", "--quick 模式跳过")
         return
 
     for base in ("http://127.0.0.1:5000", "http://127.0.0.1:8501"):
         code, text = _http(base + ("/api/health" if "5000" in base else "/_stcore/health"))
         if code == 200:
-            report.add("传感器", "服务 %s" % base, "OK", "健康检查通过")
+            report.add("网关", "服务 %s" % base, "OK", "健康检查通过")
             if "5000" in base:
                 try:
                     payload = json.loads(text)
                     auth = payload.get("auth") or {}
-                    report.add("传感器", "鉴权模式", "OK" if auth.get("enabled") else "WARN",
+                    report.add("网关", "鉴权模式", "OK" if auth.get("enabled") else "WARN",
                                "开启（%s）" % auth.get("header") if auth.get("enabled")
                                else "已关闭（SENSOR_AUTH=0）——仅限演示")
                 except ValueError:
                     pass
         else:
-            report.add("传感器", "服务 %s" % base, "WARN",
+            report.add("网关", "服务 %s" % base, "WARN",
                        "没起来（%s）→ deploy\\windows\\start-native.ps1" % (text[:60] or code))
 
-    from src import sensor as sensor_kernel
-
-    path = sensor_kernel.sensor_data_path()
+    path = obd_gps.stream_path()
     if path.exists():
-        report.add("传感器", "读数文件", "OK", "%s（%.1f KB）"
-                   % (path.name, path.stat().st_size / 1024))
+        try:
+            rows = max(0, sum(1 for _ in path.open("r", encoding="utf-8", errors="replace")) - 1)
+        except OSError:
+            rows = 0
+        report.add("网关", "OBD 实流", "OK", "%s（%d 行，%.1f KB）"
+                   % (path.name, rows, path.stat().st_size / 1024))
     else:
-        report.add("传感器", "读数文件", "WARN",
-                   "%s 还没有数据 → 先跑 tools/sensor_probe.py --register" % path.name)
+        report.add("网关", "OBD 实流", "WARN",
+                   "%s 还没有数据 → 板子上电后 POST /api/upload_obd_gps" % path.name)
 
-    report.add("传感器", "设备接入地址", "OK",
-               "http://%s:5000/api/upload_sensor（ESP32 用这个）" % _local_ip())
+    report.add("网关", "设备接入地址", "OK",
+               "http://%s:5000/api/upload_obd_gps（ESP32-C3 用这个）" % _local_ip())
 
 
 # ---------------------------------------------------------------------------
@@ -418,20 +419,52 @@ def _looks_like_esp32(name: str, devid: str) -> bool:
     return devid.upper().startswith("USB\\")
 
 
-def check_hardware(report: Report) -> None:
-    firmware = ROOT / "hardware" / "esp32" / "esp32_sensor_client.ino"
-    micropython = ROOT / "hardware" / "esp32" / "micropython_sensor_client.py"
-    probe = ROOT / "tools" / "sensor_probe.py"
-    for path in (firmware, micropython, probe):
-        report.add("硬件", path.name, "OK" if path.exists() else "WARN",
-                   "有" if path.exists() else "缺失")
+def _firmware_constants(path: Path) -> Dict[str, str]:
+    """从 .ino 里抠出 const char* / #define 形式的联调常量（只读，不执行）。"""
+    constants: Dict[str, str] = {}
+    if not path.exists():
+        return constants
+    keys = ("WIFI_SSID", "SERVER_URL", "DEVICE_TOKEN", "VEHICLE_ID")
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        text = line.strip()
+        if not text or text.startswith("//"):
+            continue
+        for key in keys:
+            if key + " " not in text and (key + "=") not in text.replace(" ", ""):
+                continue
+            _prefix, _sep, value = text.partition("=")
+            if key not in _prefix:
+                continue
+            constants[key] = value.split(";")[0].strip().strip('"')
+    return constants
 
-    config_h = ROOT / "hardware" / "esp32" / "config.h"
-    if config_h.exists():
-        report.add("硬件", "固件令牌配置", "OK", "config.h 已就位（不入库）")
+
+def check_hardware(report: Report) -> None:
+    """硬件接入自检：OBD 固件 + 串口 + 联调参数单。
+
+    CO₂ 传感器通道 2026-11-08 删除，这里不再检查已删除的 sensor 客户端。
+    """
+    firmware = ROOT / "firmware_obd_sim" / "firmware_obd_sim.ino"
+    report.add("硬件", "OBD 固件", "OK" if firmware.exists() else "WARN",
+               "firmware_obd_sim/firmware_obd_sim.ino" if firmware.exists()
+               else "缺 firmware_obd_sim/firmware_obd_sim.ino")
+
+    constants = _firmware_constants(firmware)
+    token = constants.get("DEVICE_TOKEN", "")
+    if token:
+        report.add("硬件", "固件令牌", "OK", "已填（明文不入库）")
     else:
-        report.add("硬件", "固件令牌配置", "WARN",
-                   "缺 config.h → 复制 config.example.h 并填入令牌")
+        report.add("硬件", "固件令牌", "WARN",
+                   "DEVICE_TOKEN 为空 → SENSOR_AUTH=1 时板子会被 401（SENSOR_AUTH=0 仅限台架）")
+
+    url = constants.get("SERVER_URL", "")
+    local_ip = _local_ip()
+    if url:
+        same = (":" in url and url.split("//")[-1].split(":")[0] == local_ip)
+        report.add("硬件", "固件上报地址", "OK" if same else "WARN",
+                   url if same else "%s（本机内网 IP 是 %s → 换网络后改这一行）" % (url, local_ip))
+    else:
+        report.add("硬件", "固件上报地址", "WARN", "固件里没读到 SERVER_URL")
 
     ports = _serial_ports()
     esp32_like = [(name, devid) for name, devid in ports if _looks_like_esp32(name, devid)]
@@ -453,11 +486,11 @@ def check_hardware(report: Report) -> None:
     else:
         report.add("硬件", "串口设备", "WARN", "未发现 COM 口（ESP32 未接入或驱动未装）")
 
-    readme = ROOT / "hardware" / "README.md"
-    if readme.exists():
-        report.add("硬件", "接入手册", "OK", "hardware/README.md")
+    manual = ROOT / "docs" / "67_联调参数单.md"
+    if manual.exists():
+        report.add("硬件", "联调参数单", "OK", "docs/67_联调参数单.md")
     else:
-        report.add("硬件", "接入手册", "WARN", "缺 hardware/README.md")
+        report.add("硬件", "联调参数单", "WARN", "缺 docs/67_联调参数单.md")
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +509,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     check_secrets(report)
     check_data_layer(report)
     check_container(report)
-    check_sensor(report, args.quick)
+    check_gateway(report, args.quick)
     check_backup(report, args.quick)
     check_hardware(report)
 

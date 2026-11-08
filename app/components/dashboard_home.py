@@ -18,6 +18,7 @@ from typing import Any, Dict
 
 import streamlit as st
 
+import services
 from components import main_nav
 
 # 首页四张 KPI 卡与四个流程步骤的跳转目标（对应 app.py 的 st.Page url_path）
@@ -209,7 +210,7 @@ div[class*="st-key-dh_cta_1"] [data-testid="stPageLink-NavLink"]:hover{
   font-variant-numeric:tabular-nums;
 }
 /* 悬浮徽章：只允许压住实时卡底部的留白，不能盖住卡片里的任何内容。
-   （旧版 bottom:-26px 时徽章会压住「传感器」小卡，实测重叠 88×49px） */
+   （旧版 bottom:-26px 时徽章会压住右下角小卡，实测重叠 88×49px） */
 .dh-float{
   position:absolute; z-index:3; right:-18px; bottom:-38px; padding:14px 18px;
   border-radius:18px; background:rgba(12,16,22,.86);
@@ -438,17 +439,22 @@ def _trust_strip() -> None:
 
 
 def render_dashboard_home(snap: Dict[str, float]) -> None:
-    co2 = st.session_state.get("sensor_co2")
-    sensor_warning = bool(st.session_state.get("sensor_is_warning"))
     invoice_count = int(st.session_state.get("today_invoice_count", 0))
     has_invoice = invoice_count > 0
     invoice_status = ("估算待核" if st.session_state.get("current_invoice_estimated")
                       else ("已同步" if has_invoice else "等待识别"))
-    sensor_text = "超标预警" if sensor_warning else ("运行正常" if co2 is not None else "等待数据")
+    raw = services.latest_raw_stream()
+    obd_rows = int(raw.get("rows") or 0)
+    obd_text = "{:,} 行".format(obd_rows) if raw else "等待上报"
+    if raw:
+        obd_note = "%d 台 · %s" % (int(raw.get("n_vehicles") or 0),
+                                   str(raw.get("last_ts") or "")[:16].replace("T", " "))
+    else:
+        obd_note = "等待 ESP32-C3 上报"
 
     # ---- 口径分离（收口⑦）------------------------------------------------
     # 主数字 = E0 基线（kpi.json total_kg / 1000，对外披露口径）；
-    # 毛口径 total_t = 基准 gross_t + 会话内发票/传感器增量，只作明细核对。
+    # 毛口径 total_t = 基准 gross_t + 会话内发票增量，只作明细核对。
     e0_t, e0_ok = _e0_t()
     gross_t = float(snap.get("total_t") or 0.0)
     headline_t = e0_t if e0_ok else gross_t
@@ -471,7 +477,7 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
             "<div class='dh-copy'>"
             "<div class='dh-eyebrow'><i></i>CARBON INTELLIGENCE · LIVE</div>"
             "<h1>让每一吨碳，<br><span>都有据可查。</span></h1>"
-            "<p>发票、传感器、路线与碳账在同一会话中联动。不是静态报表，"
+            "<p>发票、OBD 实测、路线与碳账在同一会话中联动。不是静态报表，"
             "而是一套从物理感知到财务决策的实时碳操作系统。</p>"
             "<div class='dh-badges'><span>多模态感知</span><span>云边端协同</span>"
             "<span>四维路线进化</span><span>智能披露</span></div>"
@@ -511,10 +517,10 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
             "<circle cx='420' cy='14' r='5' fill='#8BF3E6'/></svg>"
             "<div class='dh-mini-grid'>"
             "<div class='dh-mini'><label>今日发票</label><b>%d 张</b></div>"
-            "<div class='dh-mini'><label>传感器</label><b>%s</b></div></div></div>"
+            "<div class='dh-mini'><label>OBD 实流</label><b>%s</b></div></div></div>"
             "<div class='dh-float'><label>碳配额余额（毛口径）</label><b>%.4f t</b></div></div>"
             % (_e(headline_label), headline_t, gross_line, invoice_count,
-               _e(sensor_text), snap["balance_t"]),
+               _e(obd_text), snap["balance_t"]),
             unsafe_allow_html=True)
 
     # ---------------------------------------------------- 信任信号（生效版本）
@@ -527,14 +533,12 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
         unsafe_allow_html=True)
     kpis = [
         (headline_label, "%.4f t" % headline_t,
-         "新增 %.4f t · 未计入 E0" % (snap["invoice_t"] + snap["sensor_t"]), "#46B7FF",
+         "新增 %.4f t · 未计入 E0" % snap["invoice_t"], "#46B7FF",
          ROUTE_LEDGER, "查看台账 →"),
         ("今日发票识别", "%d 张" % invoice_count,
          "当前 %.1f L" % float(st.session_state.get("current_invoice_fuel") or 0), "#8BF3E6",
          ROUTE_INVOICE, "上传发票 →"),
-        ("传感器实时状态", sensor_text,
-         ("%.0f ppm" % co2) if co2 is not None else "等待 ESP32 数据",
-         "#FF8A5B" if sensor_warning else "#8BF3E6", ROUTE_SENSOR, "看监控 →"),
+        ("OBD 实测状态", obd_text, obd_note, "#8BF3E6", ROUTE_SENSOR, "看监控 →"),
         ("碳配额余额（毛口径）", "%.4f t" % snap["balance_t"],
          ("缺口 %.4f t（毛口径）" % snap["gap_t"]) if snap["gap_t"] else "毛口径配额充足",
          "#FFC46B", ROUTE_LEDGER, "算缺口 →"),
@@ -565,7 +569,7 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
         ("基准碳账（毛口径）", "%.4f tCO2e" % snap["base_t"],
          "结果表载入" if snap.get("base_source") == "result" else "静态演示快照"),
         ("发票数据感知", "新增 %.6f tCO2e" % snap["invoice_t"], invoice_status),
-        ("云边端硬件监控", "突发成本 ¥%.4f" % snap["sensor_cost_yuan"], sensor_text),
+        ("OBD 实测链路", ("%s 行实流" % format(obd_rows, ",")) if raw else "等待上报", obd_note),
         ("财务风险", "¥%.2f" % snap["financial_risk_yuan"],
          "需购买 %.4f t 配额（毛口径缺口）" % snap["gap_t"]
          if snap["gap_t"] else "无配额缺口（毛口径）"),
@@ -582,7 +586,7 @@ def render_dashboard_home(snap: Dict[str, float]) -> None:
     # ---------------------------------------------------------------- 步骤流
     steps = [
         ("01", "发票识别", "DeepSeek 提取油量，碳排同步入账", ROUTE_INVOICE, "去发票识别 →"),
-        ("02", "硬件预警", "ESP32 超标事件联动突发成本", ROUTE_SENSOR, "去硬件监控 →"),
+        ("02", "OBD 实测", "边端采集 → 守恒法算碳 → 实流可核", ROUTE_SENSOR, "去硬件监控 →"),
         ("03", "路线进化", "NSGA-II 与 Q-learning 协同寻优", ROUTE_ROUTES, "去路线沙盘 →"),
         ("04", "台账披露", "配额缺口与披露附注实时生成", ROUTE_LEDGER, "去碳台账 →"),
     ]

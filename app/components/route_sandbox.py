@@ -247,21 +247,20 @@ def _carbon_price_chart(current: int) -> Dict[str, Any]:
       · 当期全额碳成本 = 当期总碳排(t) × 碳价   —— 情景口径：假设全部碳排都按碳价计价
       · 配额抵扣额度   = 当期配额(t)   × 碳价   —— 配额覆盖部分不计成本
       · 配额缺口采购成本 = 配额缺口(t) × 碳价   —— 需要自己掏钱的部分
-    另外把当期财务风险（发票新增 + 硬件突发）写进副标题，避免与上面三条混淆。
+    另外把当期财务风险（发票新增）写进副标题，避免与上面三条混淆。
     """
     snap = carbon_snapshot()
     total_t = float(snap["total_t"])
     quota_t = float(snap["quota_t"])
     gap_t = float(snap["gap_t"])
     invoice_t = float(snap["invoice_t"])
-    sensor_cost = float(snap["sensor_cost_yuan"])
     prices = list(range(80, 201, 5))
     gross = [[p, total_t * p] for p in prices]
     covered = [[p, quota_t * p] for p in prices]
     gap_cost = [[p, gap_t * p] for p in prices]
     palette = slider_kit.PALETTE
-    subtitle = ("毛口径 总碳排 %.2f t · 配额 %.2f t · 缺口 %.2f t · 发票新增 %.4f t · 硬件成本 ¥%.2f"
-                % (total_t, quota_t, gap_t, invoice_t, sensor_cost))
+    subtitle = ("毛口径 总碳排 %.2f t · 配额 %.2f t · 缺口 %.2f t · 发票新增 %.4f t"
+                % (total_t, quota_t, gap_t, invoice_t))
     return {
         "title": "碳价敏感度",
         "subtitle": subtitle,

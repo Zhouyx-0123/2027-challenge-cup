@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""设备令牌管理：登记 / 轮换 / 吊销 / 查看（企业级 P0 · 传感器接入鉴权）。
+"""设备令牌管理：登记 / 轮换 / 吊销 / 查看（企业级 P0 · 边缘网关鉴权）。
 
 用法
 ----
 ::
 
     python -m tools.device_tokens list
-    python -m tools.device_tokens add    --device-id PDM-GZ-001 --note "1 号冷链车"
-    python -m tools.device_tokens rotate --device-id PDM-GZ-001
-    python -m tools.device_tokens remove --device-id PDM-GZ-001
-    python -m tools.device_tokens batch  --prefix PDM-GZ --count 5 --out outputs/device_tokens.csv
+    python -m tools.device_tokens add    --device-id TRK-GZ-001 --note "1 号车机"
+    python -m tools.device_tokens rotate --device-id TRK-GZ-001
+    python -m tools.device_tokens remove --device-id TRK-GZ-001
+    python -m tools.device_tokens batch  --prefix TRK-GZ --count 5 --out outputs/device_tokens.csv
 
 明文令牌**只在 add / rotate 时打印一次**——注册表里只存 sha256 摘要。
 丢了就 ``rotate``（旧令牌立即失效）。
@@ -17,8 +17,10 @@
 设备端怎么带这个令牌（ESP32 / MicroPython）::
 
     import requests
-    requests.post("http://<主机>:5000/api/upload_sensor",
-                  json={"device_id": "PDM-GZ-001", "co2": 812.3, "temp": 24.1},
+    requests.post("http://<主机>:5000/api/upload_obd_gps",
+                  json={"records": [{"vehicle_id": "TRK-GZ-001",
+                                     "ts": "2026-11-08T10:00:00+08:00",
+                                     "instant_fuel_lph": 20.0}]},
                   headers={"X-Device-Token": "<你打印出来的那串明文>"})
 
 纪律
@@ -177,7 +179,7 @@ def _batch(args: argparse.Namespace) -> int:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="传感器设备令牌管理（注册表 + 摘要）")
+    parser = argparse.ArgumentParser(description="设备令牌管理（注册表 + 摘要）")
     parser.add_argument("--file", default=None,
                         help="注册表路径（默认 config/devices.json）")
     sub = parser.add_subparsers(dest="action")

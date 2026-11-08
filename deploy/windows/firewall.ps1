@@ -1,7 +1,7 @@
 ﻿<#
     物流企业碳感知智能决策系统 · Windows 防火墙放行（内网限定）
 
-    用 Windows 自带的 New-NetFirewallRule 放行 8501（决策台）与 5000（传感器网关），
+    用 Windows 自带的 New-NetFirewallRule 放行 8501（决策台）与 5000（边缘网关），
     **只放行 LocalSubnet（同一网段）**，不向公网开放。
 
     用法：

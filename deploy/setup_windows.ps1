@@ -85,7 +85,7 @@ function Invoke-NativeRoute {
     Write-Host '   · 放行内网防火墙（需管理员）：powershell -ExecutionPolicy Bypass -File deploy\windows\firewall.ps1'
     Write-Host '   · 开机自启（需管理员）    ：powershell -ExecutionPolicy Bypass -File deploy\windows\install-services.ps1'
     Write-Host '   · 停止服务                ：powershell -ExecutionPolicy Bypass -File deploy\windows\stop-native.ps1'
-    Write-Host ('   · 决策台：http://' + $lanIp + ':' + $AppPort + '    传感器：http://' + $lanIp + ':' + $SensorPort + '/api/upload_sensor') -ForegroundColor DarkGray
+    Write-Host ('   · 决策台：http://' + $lanIp + ':' + $AppPort + '    网关：http://' + $lanIp + ':' + $SensorPort + '/api/upload_obd_gps') -ForegroundColor DarkGray
     return $code
 }
 
@@ -155,7 +155,7 @@ function Invoke-DockerFinish {
     $appOk = Wait-HttpHealthy -Url 'http://127.0.0.1:8501/_stcore/health' -TimeoutSec 120
     if ($appOk) { Write-Ok '决策台健康（/_stcore/health = 200）' } else { Write-Fail '决策台健康检查超时：docker compose logs app' }
     $sensorOk = Wait-HttpHealthy -Url 'http://127.0.0.1:5000/api/health' -TimeoutSec 120
-    if ($sensorOk) { Write-Ok '传感器网关健康（/api/health = 200）' } else { Write-Fail '传感器网关健康检查超时：docker compose logs sensor' }
+    if ($sensorOk) { Write-Ok '边缘网关健康（/api/health = 200）' } else { Write-Fail '边缘网关健康检查超时：docker compose logs sensor' }
 
     # ⑥ 冒烟脚本
     if ($SkipSmoke) {
@@ -190,7 +190,7 @@ function Invoke-DockerFinish {
     Write-Host '------------------------------------------------------------' -ForegroundColor DarkCyan
     Write-Host ("  决策台（HTTP）  ：http://" + $lanIp + ":8501")
     Write-Host ("  决策台（HTTPS） ：https://" + $lanIp + ":8443")
-    Write-Host ("  ESP32 接入点    ：https://" + $lanIp + ":8443/api/upload_sensor")
+    Write-Host ("  ESP32 接入点    ：https://" + $lanIp + ":8443/api/upload_obd_gps")
     Write-Host ("  自动跳转 HTTP   ：http://" + $lanIp + ":8080  →  8443")
     Write-Host '------------------------------------------------------------' -ForegroundColor DarkCyan
     Write-Warn '8443/8080 用的是 Caddy **内网自签 CA**：首次访问浏览器会报证书不受信任。'

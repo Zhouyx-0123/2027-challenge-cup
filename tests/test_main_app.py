@@ -75,35 +75,12 @@ def test_failed_invoice_does_not_create_carbon(monkeypatch):
     assert "未识别出发票内容" in at.session_state["invoice_error"]
 
 
-def test_sensor_warning_writes_penalty_state(monkeypatch):
-    import main_views
-
-    frame = pd.DataFrame({
-        "timestamp": pd.to_datetime(["2026-10-26 16:00:00"]),
-        "device_id": ["env_01"], "co2": [1200.0], "temp": [26.5],
-    })
-    monkeypatch.setattr(main_views.live_services, "sensor_data", lambda: frame)
-
-    def script():
-        from demo_state import init_state
-        from main_views import render_sensor
-        init_state()
-        render_sensor()
-
-    at = _run(script)
-    assert at.session_state["sensor_is_warning"] is True
-    assert at.session_state["sensor_penalty"] > 0
-    assert at.session_state["sensor_excess_carbon_t"] > 0
-
-
 def test_shared_snapshot_updates_gap_and_financial_risk():
     def script():
         import streamlit as st
         from demo_state import carbon_snapshot, init_state
         init_state()
         st.session_state["current_invoice_carbon"] = 2000.0  # 2t
-        st.session_state["sensor_excess_carbon_t"] = 1.0
-        st.session_state["sensor_penalty"] = 80.0
         st.session_state["carbon_price"] = 100.0
         snap = carbon_snapshot()
         st.session_state["test_snapshot"] = snap
@@ -111,10 +88,11 @@ def test_shared_snapshot_updates_gap_and_financial_risk():
     at = _run(script)
     snap = at.session_state["test_snapshot"]
     assert snap["base_source"] == "result"
-    assert snap["total_t"] == 4505.04
-    assert snap["gap_t"] == 3.0
-    assert snap["balance_t"] == -3.0
-    assert snap["financial_risk_yuan"] == 280.0
+    # CO₂ 传感器通道已删除：快照只累加发票新增，不再有硬件突发成本。
+    assert snap["total_t"] == 4504.04
+    assert snap["gap_t"] == 2.0
+    assert snap["balance_t"] == -2.0
+    assert snap["financial_risk_yuan"] == 200.0
 
 
 def test_all_five_views_render_without_exceptions():
@@ -191,3 +169,23 @@ def test_dashboard_uses_light_narrative_home():
     assert "让每一吨碳" in content
     assert "REAL-TIME CARBON PULSE" in content
     assert "prefers-reduced-motion" in content
+
+
+def test_page_cache_is_cleared_when_a_new_run_lands(monkeypatch):
+    """pipeline 发新 run 后页面必须换版：读取层是永久缓存，只能靠 run 指纹清一次。"""
+    import types
+    import services
+
+    cleared = []
+    monkeypatch.setattr(services.st, "cache_data",
+                        types.SimpleNamespace(clear=lambda: cleared.append(1)))
+    monkeypatch.setattr(services, "_RUN_TOKEN", [0.0])
+    monkeypatch.setattr(services, "mtime_token",
+                        lambda name: 100.0 if name == "current_run.json" else 200.0)
+    assert services.refresh_cache_on_new_run() is False   # 进程刚起：只记指纹
+    assert cleared == []
+
+    monkeypatch.setattr(services, "mtime_token",
+                        lambda name: 100.0 if name == "current_run.json" else 900.0)
+    assert services.refresh_cache_on_new_run() is True    # 新 run：清一次
+    assert cleared == [1]

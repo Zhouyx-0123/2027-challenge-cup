@@ -435,6 +435,26 @@ def test_upload_endpoint_requires_device_token_when_auth_enabled(tmp_path, monke
     assert response.status_code == 401
 
 
+def test_upload_endpoint_rejects_identity_less_batch_when_auth_enabled(tmp_path, monkeypatch):
+    """整批没有 vehicle_id / device_id 时也必须 401。
+
+    否则鉴权循环与限流循环都会「空转」，未授权批次仍能把 reject 行写进
+    obd_rejects.csv —— 既绕过鉴权，也能无限追加文件。
+    """
+    monkeypatch.setenv("OBD_STREAM_DIR", str(tmp_path))
+    monkeypatch.setenv("SENSOR_AUTH", "1")
+    import server
+    server.app.config.update(TESTING=True)
+    client = server.app.test_client()
+    response = client.post("/api/upload_obd_gps", json={
+        "records": [{"timestamp": "2026-10-29T10:00:00+08:00",
+                     "instant_fuel_lph": 24.0}]})
+    assert response.status_code == 401
+    assert "vehicle_id" in response.get_json()["message"]
+    assert not (tmp_path / "obd_rejects.csv").exists()
+    assert not (tmp_path / "obd_stream.csv").exists()
+
+
 def test_upload_endpoint_rejects_empty_and_oversized_batches(client):
     empty = client.post("/api/upload_obd_gps", json={"records": []})
     assert empty.status_code == 400

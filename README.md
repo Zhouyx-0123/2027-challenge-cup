@@ -1,6 +1,6 @@
 # 碳感知智算 · 物流企业碳感知智能决策系统
 
-面向物流企业碳核算与运营决策的竞赛演示系统。当前版本以六个页面统一串联数据链、发票、传感器、路线优化和碳台账，不再注册旧版多页面入口。
+面向物流企业碳核算与运营决策的竞赛演示系统。当前版本以六个页面统一串联数据链、发票、OBD 实测、路线优化和碳台账，不再注册旧版多页面入口。
 
 ## 六个页面
 
@@ -9,7 +9,7 @@
 | 首页概览 | 展示总排放、配额缺口、财务风险和实时碳脉动 |
 | 🔗 数据链总览 `/chain` | 六条链各自走到哪一步（已闭环 / 未批准 / 联调中 / 数据空 / 演示）；G2 三源对账（运单/E₀ × 发票 × OBD 实测，当前共同覆盖期=空集，只写「暂不可比」、不生成偏差百分比）；最近一次设备接收；口径红线四条。只读落盘文件，页面内不重算 |
 | 发票数据感知 | DeepSeek 多模态识别、缺失油量 50 L 容错、统一碳核算 |
-| 云边端硬件监控 | ESP32 → Flask → CSV → Streamlit，2 秒刷新与 CO2 超标预警；监测窗口滑条联动实时窗口预览图；**第二个 tab 是 OBD+GPS 实测碳排**（守恒法，每车碳排）。⚠️ 第一个 tab 是**仓储/办公场所环境 CO₂ 监测与碳资产管理**，**不是运输排放测量**（运输排放由 OBD+GPS 实测轨与 VSP 模型轨承担，见 `docs/57`） |
+| 云边端硬件监控 | ESP32-C3 → Flask → `obd_stream.csv` → Streamlit；OBD+GPS 实测碳排（守恒法，每车 / 每趟 / 逐点）。环境 CO₂ 浓度传感器通道已于 2026-11-08 删除，本页只展示运输油耗与碳排 |
 | 减碳路线沙盘 | 高德 JS API 2.0 精细地图、四维 NSGA-II、3×3 Q-learning 自适应变异与路线记忆；碳价滑条联动碳价敏感度图 |
 | 碳核算与台账 | 碳价和配额设置、动态配额缺口、披露附注与 CSV 下载；**第二个 tab 是碳会计 A0–A6 审计轨**（只读判定链） |
 
@@ -24,9 +24,9 @@
 | 测量 | OBD（转速 / 负荷 / 车速 / 瞬时油耗 / 累计油耗）+ GPS（位置 / 速度 / 航向） |
 | 守恒法 | `CO₂(kg) = 油耗(L) × ρ × w_C × (44.01/12.011)`；出账系数取自 `config/calc_factors.json`（唯一真源），守恒推导值作对拍校验（柴油偏差 0.628%） |
 | 契约 | `config/obd_gps_contract.json` —— 字段、别名、质控标记、接入方式，设备端与后端共用一份 |
-| 接收 | `POST /api/upload_obd_gps` —— 与传感器通道同一套令牌鉴权 / 限流 / 审计，默认 fail-closed |
+| 接收 | `POST /api/upload_obd_gps` —— 网关唯一入口，令牌鉴权 / 限流 / 审计，默认 fail-closed |
 | 落地 | `src/obd_gps.py`（校验+算碳+分车聚合）、`src/obd_pipeline.py`（原始流→结果表）、`src/obd_vsp_crosscheck.py`（**模型 vs 实测 对照验证**） |
-| 前端 | 云边端监控页第二个 tab：累计碳排、工况三联图、碳强度、GPS 轨迹、每车碳排聚合表 |
+| 前端 | 云边端监控页：累计碳排、工况三联图、碳强度、GPS 轨迹、每车碳排聚合表 |
 
 > **边界**：本通道是独立轨道 —— **不写入 E₀ 主口径、不参与主闸门对拍**，
 > 主账口径与 28 条判据保持冻结。设计细节见 `docs/52_OBD_GPS_实测碳排方向.md`。
@@ -124,7 +124,7 @@ data/raw 原始脏表
 - 车型找不到、里程缺失、时间戳异常、发票匹配不上等情况不抛异常，统一使用车型额定值、同线历史均值、行业均速或行业绕行系数填补，并写入 `flag_estimated` 与 `estimate_note`。
 - 宽表已包含 `factor_gkm / kg_co2 / kg_co2_phys / delta_pct / factor_version`，算法层不再重复套因子。
 - `app/services.py` 只读结果表，不导入 pymoo、OCR、路线或披露算法。
-- 用户主动触发的发票识别、传感器和路线场景放在 `app/live_services.py`，属于“实时演示通道”，结果不进入 E₀、KPI 或闸门；重型依赖按调用延迟导入。
+- 用户主动触发的发票识别与路线场景放在 `app/live_services.py`，属于“实时演示通道”，结果不进入 E₀、KPI 或闸门；重型依赖按调用延迟导入。
 - 结果表缺失时，首页和估算审计使用静态快照兜底；估算行在页面上以黄框和原因清单展示。
 
 ## 当前目录
@@ -142,13 +142,12 @@ app/
     dashboard_home.py          # 暗色叙事首页 + 首页↔四页跳转联动
     route_sandbox.py           # 路线进化可视化
     slider_kit.py              # 高级滑条 + 联动可操作图（自绘，值由原生滑条承载）
-    obd_panel.py               # OBD+GPS 实测碳排面板（监控页第二个 tab）
+    obd_panel.py               # OBD+GPS 实测碳排面板（监控页主体）
     carbon_ledger_panel.py     # 碳会计 A0–A6 审计轨面板（台账页第二个 tab）
     theme.py                   # 当前全局样式与紧凑页头（令牌唯一真源）
   static/                      # 极光底图 / 碳网络纹理 / 品牌标志
 src/
   invoice.py                   # DeepSeek 识别与统一 calc_carbon
-  sensor.py                    # 传感器读取、超标判断与预警台账
   disclosure.py                # 智能披露附注
   obd_gps.py                   # OBD+GPS 契约校验、守恒法算碳、分车聚合
   obd_pipeline.py              # OBD 实测碳排流水线（独立轨道，不动主闸门）
@@ -156,7 +155,7 @@ src/
   routing/                     # 高德、路线碳核算与四维进化
   rl/                          # Q-learning 动态路径决策（独立模块，demo 路网）
   ...                          # 数据复算与底层模型
-server.py                      # Flask 传感器接收服务 + OBD/GPS 接收端点
+server.py                      # Flask 边缘网关（只收 OBD/GPS，不算碳）
 config/                        # 因子表、本地密钥、OBD 契约与 Q-learning 策略配置
 data/                          # 业务数据、结果表与路线记忆
 carbon_ledger/                 # 碳账交付工作区（碳会计 A0–A6 阶段交付物）
@@ -179,7 +178,7 @@ python -m streamlit run app/app.py --client.showSidebarNavigation false
 python server.py
 ```
 
-传感器服务提供 `POST /api/upload_sensor`，数据追加到 `sensor_data.csv`。路线采纳记录保存在 `data/route_memory.csv`，两者都是运行时业务数据，不应作为缓存清理。
+网关提供 `POST /api/upload_obd_gps`，原始流追加到 `data/raw/obd_gps/obd_stream.csv`（26 列，时间统一 UTC）。路线采纳记录保存在 `data/route_memory.csv`，两者都是运行时业务数据，不应作为缓存清理。
 
 ## 密钥配置
 

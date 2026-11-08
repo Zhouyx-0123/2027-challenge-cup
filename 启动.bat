@@ -77,7 +77,7 @@ REM ---------- 传感器接入服务（ESP32 直连入口，默认不开，需�
 if /i "%~1"=="-Sensor" (
     echo     启动传感器接入服务（端口 5000）...
     start "CarbonTide Sensor" /min %PY% server.py
-    echo     设备接入地址：http://localhost:5000/api/upload_sensor
+    echo     设备接入地址：http://localhost:5000/api/upload_obd_gps
     echo.
 )
 

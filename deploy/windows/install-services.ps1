@@ -1,7 +1,7 @@
 ﻿<#
     物流企业碳感知智能决策系统 · Windows 开机自启（任务计划程序）
 
-    把「启动原生部署」注册成计划任务：登录时（或开机时）自动拉起决策台 + 传感器网关。
+    把「启动原生部署」注册成计划任务：登录时（或开机时）自动拉起决策台 + 边缘网关。
 
     用法：
         powershell -ExecutionPolicy Bypass -File deploy\windows\install-services.ps1
@@ -12,7 +12,7 @@
         -Uninstall   反注册（删除计划任务）
         -AtStartup   用「系统启动时 + SYSTEM 账户」而不是「用户登录时」
         -AppPort     决策台端口（默认 8501）
-        -SensorPort  传感器网关端口（默认 5000）
+        -SensorPort  边缘网关端口（默认 5000）
 
     纪律：
         · **需要管理员权限**（脚本自己会 Start-Process -Verb RunAs 弹 UAC 提权重跑）。
@@ -115,7 +115,7 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
     -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
     -ExecutionTimeLimit ([TimeSpan]::Zero)
 
-$description = '物流企业碳感知智能决策系统：自动启动原生部署（Streamlit 决策台 + Flask 传感器网关）。由 deploy\windows\install-services.ps1 注册。'
+$description = '物流企业碳感知智能决策系统：自动启动原生部署（Streamlit 决策台 + Flask 边缘网关）。由 deploy\windows\install-services.ps1 注册。'
 
 try {
     Register-ScheduledTask -TaskName $script:TaskName -Action $action -Trigger $trigger `

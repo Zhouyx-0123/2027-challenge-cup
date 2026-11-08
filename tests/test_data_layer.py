@@ -53,7 +53,7 @@ def test_services_is_read_only_and_live_imports_are_lazy():
     services_src = (APP_DIR / "services.py").read_text(encoding="utf-8")
     live_src = (APP_DIR / "live_services.py").read_text(encoding="utf-8")
     assert "import pymoo" not in services_src
-    for name in ("invoice", "sensor", "disclosure", "route_carbon", "evolve_routes"):
+    for name in ("invoice", "obd_gps", "disclosure", "route_carbon", "evolve_routes"):
         assert "from src import " + name not in services_src
     assert services_src.count("from src import schema") == 1
     # 实时通道的重依赖必须缩进在函数体内，不能在模块导入时加载。

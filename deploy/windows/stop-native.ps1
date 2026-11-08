@@ -112,7 +112,7 @@ if ($null -ne $pidData) {
         if (Stop-ProcessTree -ProcessId ([int]$pidData.app.pid) -Label ('决策台(端口 ' + $pidData.app.port + ')')) { $stopped++ }
     }
     if ($null -ne $pidData.sensor) {
-        if (Stop-ProcessTree -ProcessId ([int]$pidData.sensor.pid) -Label ('传感器网关(端口 ' + $pidData.sensor.port + ')')) { $stopped++ }
+        if (Stop-ProcessTree -ProcessId ([int]$pidData.sensor.pid) -Label ('边缘网关(端口 ' + $pidData.sensor.port + ')')) { $stopped++ }
     }
     Remove-Item -Path $script:PidFile -Force -ErrorAction SilentlyContinue
     Write-Ok 'PID 文件已清理。'

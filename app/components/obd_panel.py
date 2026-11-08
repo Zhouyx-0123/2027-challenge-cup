@@ -541,8 +541,9 @@ def render_obd_panel() -> None:
 
     _status_strip(summary)
     if summary.get("is_demo"):
-        st.warning("演示数据：当前结果由确定性演示序列生成（未接入真实 OBD 设备），"
-                   "不代表现场读数。")
+        st.warning("演示数据：图表读 data/processed 的演示基线（%s 台 / %s 点），不是设备实流；"
+                   "设备实流需先跑 python -m src.obd_pipeline 生成结果表，且仍不进 E₀。"
+                   % (_f(summary.get("n_vehicles"), 0), _f(summary.get("n_records"), 0)))
     _kpi_row(summary, vehicles)
 
     st.markdown(
@@ -679,7 +680,7 @@ def _render_quality(summary: Dict[str, Any], vehicles: pd.DataFrame) -> None:
 def _render_contract() -> None:
     """接口契约与接入说明（前端只展示，不做计算）。"""
     st.markdown(
-        "**设备上报端点**：`POST /api/upload_obd_gps`（与传感器通道同一套令牌鉴权、"
+        "**设备上报端点**：`POST /api/upload_obd_gps`（与网关同一套令牌鉴权、"
         "限流与审计；默认 fail-closed）\n\n"
         "**请求体**：单条记录对象，或 `{\"records\": [ ... ]}` 批量；"
         "字段名用契约的规范名或任一别名（如 `rpm` / `engine_rpm`、`fuel_rate` / "

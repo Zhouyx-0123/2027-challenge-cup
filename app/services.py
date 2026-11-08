@@ -4,7 +4,7 @@
 1. 只读 data/processed/ 的宽表与结果表，只从 src/schema.py 取契约常量；
 2. 不导入、不调用任何核心算法或联网模型，页面不在请求线程里做数据准备；
 3. 文件缺失/损坏返回空表或静态快照，不向用户抛业务异常；
-4. 用户触发的 OCR、传感器和路线场景走独立的 ``live_services``，
+4. 用户触发的 OCR 与路线场景走独立的 ``live_services``，
    且结果不进入 E₀、KPI 或闸门。
 """
 
@@ -84,6 +84,34 @@ def mtime_token(name: str) -> float:
         return (PROCESSED / RESULT_FILES.get(name, name)).stat().st_mtime
     except OSError:
         return 0.0
+
+
+_RUN_TOKEN: List[float] = [0.0]
+
+
+def run_token() -> float:
+    """当前生效 run 的指纹：current_run.json 与 kpi.json 的 mtime 之和。
+
+    两个文件都由 pipeline 在发布时改写；单取一个都可能被别的流程单独 touch。
+    """
+    return mtime_token("current_run.json") + mtime_token("kpi.json")
+
+
+def refresh_cache_on_new_run() -> bool:
+    """新 run 落地后清一次页面缓存，让页面不重启就换版。
+
+    读取层是**永久缓存**（口径冻结的主表依赖它），所以 pipeline 重跑后旧对象
+    仍会被命中 —— 实测容器 18:05 起、19:29 发新 run，19:46 页面顶栏还是上一版。
+    这里只在 run 指纹变化时清一次；进程刚起时只记录指纹，不做无效清理。
+    """
+    token = run_token()
+    if not token or token == _RUN_TOKEN[0]:
+        return False
+    changed = _RUN_TOKEN[0] != 0.0
+    _RUN_TOKEN[0] = token
+    if changed:
+        st.cache_data.clear()
+    return changed
 
 
 @st.cache_data(show_spinner=False)

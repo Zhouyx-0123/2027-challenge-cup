@@ -1,6 +1,6 @@
 # Windows 原生部署手册（不依赖 Docker）
 
-> 适用仓库：物流企业碳感知智能决策系统（Streamlit 决策台 + Flask 传感器网关）
+> 适用仓库：物流企业碳感知智能决策系统（Streamlit 决策台 + Flask 边缘网关）
 > 适用场景：**Docker 装不上 / 跑不起来**的 Windows 机器（典型：本机跑在 Hyper-V 虚拟机里，
 > 宿主没透传嵌套虚拟化，WSL2 与 Docker Desktop 会报 `0x80370102`）。
 
@@ -58,7 +58,7 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\start-native.ps1
 常用变体：
 
 ```powershell
-# 只起决策台（不跑传感器网关）
+# 只起决策台（不起边缘网关）
 powershell -ExecutionPolicy Bypass -File deploy\windows\start-native.ps1 -NoSensor
 
 # 换端口（8501 被占用时）
@@ -90,30 +90,29 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\start-native.ps1 -Foregr
 ```powershell
 # 决策台
 curl http://127.0.0.1:8501/_stcore/health          # 期望：ok
-# 传感器网关
+# 边缘网关
 curl http://127.0.0.1:5000/api/health              # 期望：{"status":"success",...}
 # 页面级冒烟（需要 Node 18+）
 node tools/verify_pages.js http://localhost:8501 _shots
 ```
 
-### 2.4 设备接入地址（ESP32）
+### 2.4 设备接入地址（ESP32-C3）
 
-启动脚本打印的「传感器接入点」就是 ESP32 要 POST 的地址：
+启动脚本打印的「接入点」就是 ESP32-C3 要 POST 的地址：
 
 ```
-http://<本机局域网 IP>:5000/api/upload_sensor
+http://<本机局域网 IP>:5000/api/upload_obd_gps
 ```
 
-例如本机是 `10.104.105.152`，则 ESP32 里写：
+例如本机是 `10.104.107.47`，则 `firmware_obd_sim/firmware_obd_sim.ino` 里写：
 
 ```cpp
-const char* SERVER = "http://10.104.105.152";
-// POST /api/upload_sensor
+const char* SERVER_URL = "http://10.104.107.47:5000/api/upload_obd_gps";
 ```
 
 注意：
 
-- 传感器接口默认**开启鉴权**（`SENSOR_AUTH=1`，fail-closed）：请求头必须带
+- 网关接口默认**开启鉴权**（`SENSOR_AUTH=1`，fail-closed）：请求头必须带
   `X-Device-Token`，且设备要先登记到 `config/devices.json`（用
   `tools/device_tokens.py` 生成令牌）。
 - 局域网 IP 会变（DHCP）。**推荐在路由器上给本机做 IP 绑定（静态 DHCP）**，否则重启后
@@ -239,8 +238,8 @@ Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole, IIS-WebSer
 ```powershell
 Get-Content logs\app.err.log     -Tail 50   # 决策台错误
 Get-Content logs\app.out.log    -Tail 50   # 决策台输出
-Get-Content logs\sensor.err.log  -Tail 50   # 传感器错误
-Get-Content logs\sensor.out.log -Tail 50   # 传感器访问日志
+Get-Content logs\sensor.err.log  -Tail 50   # 网关错误（文件名沿用 sensor）
+Get-Content logs\sensor.out.log -Tail 50   # 网关访问日志
 Get-Content logs\native.pids.json           # 当前记录的 PID / 端口
 ```
 
@@ -253,7 +252,7 @@ Get-Content logs\native.pids.json           # 当前记录的 PID / 端口
 
 | 脚本 | 需要管理员 | 职责 |
 | --- | --- | --- |
-| `start-native.ps1` | 否 | 起决策台 + 传感器；环境自检、端口占用判断、健康检查、记 PID、打印访问地址 |
+| `start-native.ps1` | 否 | 起决策台 + 边缘网关；环境自检、端口占用判断、健康检查、记 PID、打印访问地址 |
 | `stop-native.ps1` | 否 | 按 PID 文件停服务；没有 PID 文件时按端口找占用者（**默认不杀**，`-Force` 才杀） |
 | `install-services.ps1` | **是**（自提权） | 注册 / 反注册计划任务 `CarbonTide Native`（开机自启） |
 | `firewall.ps1` | **是**（自提权） | 放行 8501 / 5000 入站（限 `LocalSubnet`）；`-Remove` 撤销 |

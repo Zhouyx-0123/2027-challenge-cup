@@ -93,7 +93,7 @@ def test_carbon_price_chart_matches_snapshot(monkeypatch):
 
     snap = {
         "total_t": 100.0, "quota_t": 90.0, "gap_t": 10.0,
-        "invoice_t": 2.0, "sensor_cost_yuan": 5.0, "base_t": 98.0,
+        "invoice_t": 2.0, "base_t": 98.0,
     }
     monkeypatch.setattr(route_sandbox, "carbon_snapshot", lambda: snap)
     chart = route_sandbox._carbon_price_chart(100)
@@ -106,39 +106,3 @@ def test_carbon_price_chart_matches_snapshot(monkeypatch):
     assert gross[-1][0] == 200
     assert chart["cursor"]["series"] == 1
     assert chart["interact"] == "set_x"
-
-
-def test_sensor_window_chart_shape(monkeypatch):
-    """监测窗口图：条数、预警线与可点击定位都要齐。"""
-    import pandas as pd
-    import main_views
-
-    frame = pd.DataFrame({
-        "timestamp": pd.date_range("2026-01-01 10:00:00", periods=30, freq="1min"),
-        "device_id": ["ESP32-01"] * 30,
-        "co2": [400.0 + i for i in range(30)],
-        "temp": [22.0] * 30,
-    })
-    monkeypatch.setattr(main_views.live_services, "sensor_data", lambda: frame)
-    monkeypatch.setattr(main_views.live_services, "sensor_is_mock", lambda: False)
-    chart = main_views._sensor_window_chart()
-    assert len(chart["series"][0]["points"]) == 30
-    assert chart["hlines"][0]["y"] == 1000
-    assert chart["interact"] == "set_x"
-    assert chart["interact_transform"] == "reverse_count"
-    assert chart["count"] == 30
-    assert len(chart["x_labels"]) == 30
-
-
-def test_sensor_window_chart_empty_state(monkeypatch):
-    """没有传感器数据时必须给空态，不能让图崩。"""
-    import pandas as pd
-    import main_views
-
-    empty = pd.DataFrame(columns=["timestamp", "device_id", "co2", "temp"])
-    monkeypatch.setattr(main_views.live_services, "sensor_data", lambda: empty)
-    monkeypatch.setattr(main_views.live_services, "sensor_is_mock", lambda: False)
-    chart = main_views._sensor_window_chart()
-    assert chart["series"] == []
-    assert chart["interact"] == "none"
-    assert "等待" in chart["empty"]

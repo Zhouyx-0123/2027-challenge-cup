@@ -3,7 +3,7 @@
 本文面向**部署与运维人员**，说明如何用 Docker + docker compose + Caddy 把本系统交付到一台内网服务器上，
 并在局域网内以 HTTPS 暴露给评审人员与 ESP32 设备。
 
-- 应用代码与判定口径：本仓库 `app/`（Streamlit 决策台）、`src/`（计算层）、`server.py`（传感器网关）。
+- 应用代码与判定口径：本仓库 `app/`（Streamlit 决策台）、`src/`（计算层）、`server.py`（边缘网关）。
 - 交付物：`Dockerfile`（镜像）、`docker-compose.yml`（编排）、`deploy/caddy/Caddyfile`（内网 TLS 网关）、`deploy/env.example`（变量样例）。
 
 ---
@@ -102,7 +102,7 @@ docker compose down -v         # 连 Caddy 的证书卷一起删（会导致 CA 
 | 地址 | 说明 |
 | --- | --- |
 | `https://<SITE_ADDRESS>:8443` | 统一入口（推荐，评审人员走这个）；证书 SAN 取 deploy/env 的 SITE_ADDRESS |
-| `https://<主机IP>:8443/api/upload_sensor` | ESP32 数据上报入口 |
+| `https://<主机IP>:8443/api/upload_obd_gps` | ESP32-C3 的 OBD/GPS 数据上报入口 |
 | `http://<主机IP>:8080` | 明文入口，会 308 跳到 8443 |
 | `http://<主机IP>:8501` | Streamlit 直连（绕过 TLS，排障用） |
 
@@ -226,7 +226,7 @@ docker compose ps
 # 期望：app / sensor / caddy 三个服务都是 Up (healthy)
 ```
 
-### 7.2 传感器网关健康检查
+### 7.2 边缘网关健康检查
 
 ```bash
 curl -s http://127.0.0.1:5000/api/health
@@ -269,19 +269,20 @@ CHROME_PATH=/usr/bin/google-chrome node tools/verify_pages.js http://localhost:8
 > Node 20 需要 `--experimental-websocket` 才有全局 `WebSocket`（脚本用内置 WebSocket 直连 CDP，不装 puppeteer）：
 > `NODE_OPTIONS=--experimental-websocket CHROME_PATH=/usr/bin/google-chrome node tools/verify_pages.js ...`
 
-### 7.5 ESP32 上报
+### 7.5 ESP32-C3 上报
 
 ```bash
-# 先用 python -m tools.device_tokens add 登记设备，并保存只打印一次的令牌。
-curl -sk -X POST https://<主机IP>:8443/api/upload_sensor \
+# 先用 python -m tools.device_tokens add --device-id TRK-LOOP-001 登记车机，并保存只打印一次的令牌。
+curl -sk -X POST https://<主机IP>:8443/api/upload_obd_gps \
   -H 'Content-Type: application/json' \
   -H 'X-Device-Token: <设备明文令牌>' \
-  -d '{"device_id":"ESP32-01","co2":520.5,"temp":26.3}'
-# 期望：{"status":"success"}；缺令牌或设备未登记时返回 401。
+  -d '{"records":[{"vehicle_id":"TRK-LOOP-001","ts":"2026-11-08T10:00:00+08:00","instant_fuel_lph":20.0,"vehicle_speed_kmh":50.0}]}'
+# 期望：{"status":"success","accepted":1,"rejected":0}；缺令牌 / 未登记 / 整批无 vehicle_id 都返回 401。
 ```
 
-上报后数据落在**传感器容器内**的 `/app/data/sensor_data.csv`，
-该文件位于 `./data:/app/data` 挂载卷，刷新「硬件监控」页可见读数。
+上报后数据落在**网关容器内**的 `/app/data/raw/obd_gps/obd_stream.csv`（26 列，时间统一 UTC），
+该文件位于 `./data:/app/data` 挂载卷。页面读的是 `data/processed` 的核算结果，
+要让实流进页面需再跑 `python -m src.obd_pipeline`（或用 `--no-write` 只做核对）。
 
 ---
 
@@ -349,11 +350,11 @@ docker compose logs caddy
 - `TLSV1_ALERT_INTERNAL_ERROR` 或 `/data/caddy/certificates` 没有 leaf 证书 → 站点没有可签发的主机名；确认 `SITE_ADDRESS` 已传入容器，然后 `docker compose up -d --no-build --force-recreate --no-deps caddy`；证书日志应出现 `certificate obtained successfully`；
 - Windows `curl` 报 `schannel: the revocation status is unknown` → 加 `--ssl-no-revoke`（内网 CA 没有 OCSP/CRL，浏览器不受影响）。
 
-### 8.8 传感器数据重启后没了
+### 8.8 OBD 实流重启后没了
 
-`server.py` 默认在容器内写 `/app/data/sensor_data.csv`，由 compose 的
+`server.py` 默认在容器内写 `/app/data/raw/obd_gps/obd_stream.csv`，由 compose 的
 `./data:/app/data` 挂载持久化。若仍报“重启后丢失”，先检查是否手动改过
-`SENSOR_DATA_FILE`，以及 `./data` 是否为空目录覆盖了镜像结果。
+`OBD_STREAM_DIR`，以及 `./data` 是否为空目录覆盖了镜像结果。
 
 ---
 

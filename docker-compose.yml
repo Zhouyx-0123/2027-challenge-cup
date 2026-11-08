@@ -2,7 +2,7 @@
 # 物流企业碳感知智能决策系统 · 容器编排
 #
 #   app     ：Streamlit 决策台（8501）
-#   sensor  ：Flask 传感器网关（5000），ESP32 直连入口
+#   sensor  ：Flask 边缘网关（5000），ESP32-C3 / OBD 直连入口
 #   caddy   ：内网 TLS 网关（8443 HTTPS / 8080 HTTP→HTTPS）
 #
 # 用法：
@@ -19,7 +19,7 @@ name: carbontide
 
 services:
   # ---------------------------------------------------------------------
-  # 决策台：Streamlit 六页（首页 / 数据链总览 / 发票 / 传感器 / 路线沙盘 / 碳台账）
+  # 决策台：Streamlit 六页（首页 / 数据链总览 / 发票 / 硬件监控 / 路线沙盘 / 碳台账）
   # ---------------------------------------------------------------------
   app:
     image: ${IMAGE_NAME:-carbontide:latest}
@@ -50,15 +50,12 @@ services:
       AMAP_JS_SECURITY_CODE: ${AMAP_JS_SECURITY_CODE:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       # --- 演示 / 离线开关 ---
-      SENSOR_MOCK: ${SENSOR_MOCK:-1}
       INVOICE_OCR_MOCK: ${INVOICE_OCR_MOCK:-0}
-      # --- 传感器网关参数（鉴权 fail-closed：默认开启，未登记设备一律 401）---
+      # --- 边缘网关参数（鉴权 fail-closed：默认开启，未登记设备一律 401）---
       SENSOR_AUTH: ${SENSOR_AUTH:-1}
       SENSOR_ALLOWED_ORIGINS: ${SENSOR_ALLOWED_ORIGINS:-}
       SENSOR_DEVICES_FILE: ${SENSOR_DEVICES_FILE:-/app/config/devices.json}
       SENSOR_RATE_LIMIT_PER_MIN: ${SENSOR_RATE_LIMIT_PER_MIN:-60}
-      # 读数落盘到挂载卷（app 与 sensor 共用同一个文件，否则容器重建即丢）
-      SENSOR_DATA_FILE: ${SENSOR_DATA_FILE:-/app/data/sensor_data.csv}
       # --- Streamlit 运行参数 ---
       STREAMLIT_SERVER_PORT: "8501"
       STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
@@ -82,7 +79,7 @@ services:
       start_period: 45s
 
   # ---------------------------------------------------------------------
-  # 传感器网关：ESP32 → POST /api/upload_sensor → sensor_data.csv
+  # OBD 网关：ESP32-C3 → POST /api/upload_obd_gps → data/raw/obd_gps/obd_stream.csv
   # 与 app 共用同一镜像（同一份 server.py 与依赖）
   # ---------------------------------------------------------------------
   sensor:
@@ -100,7 +97,6 @@ services:
       SENSOR_ALLOWED_ORIGINS: ${SENSOR_ALLOWED_ORIGINS:-}
       SENSOR_DEVICES_FILE: ${SENSOR_DEVICES_FILE:-/app/config/devices.json}
       SENSOR_RATE_LIMIT_PER_MIN: ${SENSOR_RATE_LIMIT_PER_MIN:-60}
-      SENSOR_DATA_FILE: ${SENSOR_DATA_FILE:-/app/data/sensor_data.csv}
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
       - ./data:/app/data
@@ -115,7 +111,7 @@ services:
       start_period: 20s
 
   # ---------------------------------------------------------------------
-  # 内网 TLS 网关：统一入口，ESP32 只需打 https://<主机>:8443/api/upload_sensor
+  # 内网 TLS 网关：统一入口，ESP32 只需打 https://<主机>:8443/api/upload_obd_gps
   # ---------------------------------------------------------------------
   caddy:
     image: caddy:2-alpine

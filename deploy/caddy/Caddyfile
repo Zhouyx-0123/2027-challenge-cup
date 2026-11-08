@@ -3,7 +3,7 @@
 #
 #   https://<SITE_ADDRESS>:8443  HTTPS 统一入口（内网自签 CA：tls internal）
 #   :8080  明文入口，只做 308 跳转到 HTTPS
-#   /api/* → sensor:5000   ESP32 只需打 https://<主机>:8443/api/upload_sensor
+#   /api/* → sensor:5000   ESP32 只需打 https://<主机>:8443/api/upload_obd_gps
 #   其它   → app:8501      Streamlit 决策台（websocket 由 Caddy 默认透传）
 #
 # 环境变量：

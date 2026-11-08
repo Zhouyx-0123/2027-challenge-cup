@@ -34,6 +34,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const ROUTES = [
   ['dashboard', '/'],
+  ['chain', '/chain'],
   ['invoice', '/invoice'],
   ['sensor', '/sensor'],
   ['routes', '/routes'],

@@ -1,0 +1,4 @@
+# 本目录的合成 fixture 需要随分支交付；根 .gitignore 全局忽略 *.xlsx / *.csv。
+!invoice_simulated_truth.xlsx
+!invoice_template.xlsx
+!simulated_trips.csv

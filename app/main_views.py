@@ -77,60 +77,14 @@ def _run_invoice(uploaded) -> None:
 
 
 def _render_finance_register():
-    _render_transport_records()
     from finance_panel import render
     render()
-    raw = st.session_state.get('finance_invoice_raw')
-    image = st.session_state.get('finance_invoice_image')
-    if not raw or not image:
-        return
-    st.subheader('发票费用登记')
-    if raw.get('mock'):
-        st.warning('模拟识别数据，仅写入模拟主表。')
-    st.write({'商品或服务': raw.get('item_name'), '不含税金额': raw.get('amount_excluding_tax'),
-              '发票税额': raw.get('tax_amount'), '税率/征收率': raw.get('tax_rate'),
-              '价税合计': raw.get('invoice_amount')})
-    st.caption('按票面信息登记；税额、税率直接保存，抵扣资格另行判断。')
-    multiple_items = bool(raw.get('multiple_items') or len(raw.get('items') or []) > 1)
-    if multiple_items:
-        st.info('本票包含多条明细，已保留逐行项目；暂不直接写入单行财务主表，请先登记到运输成本证据表。')
-    if st.button('记录到财务主表', key='finance_register_save', disabled=multiple_items):
-        try:
-            report = live_services.register_finance_invoice(raw, image[0], image[1])
-            if report['rejected']:
-                st.error(report['rejected'][0]['reason'])
-            elif report['duplicates']:
-                st.info('这张发票已登记，本次未重复新增。')
-            else:
-                st.success('已记录到财务主表。')
-            if not report['rejected']:
-                st.session_state['finance_download_mode'] = report['source_mode']
-        except (ValueError, OSError) as exc:
-            st.error('登记未完成：%s' % exc)
-    if st.button('记录到运输成本证据表', key='transport_register_save'):
-        try:
-            report = live_services.register_transport_invoice(raw, image[0], image[1])
-            if report.get('rejected'):
-                st.error(report['rejected'][0]['reason'])
-            elif report.get('conflicts'):
-                st.warning('同票号提交存在冲突，已保留版本并标记待核。')
-            elif report.get('duplicates'):
-                st.info('这张发票已登记到运输成本证据表，本次未重复新增。')
-            else:
-                st.success('已记录到运输成本证据表。')
-            if not report.get('rejected'):
-                st.session_state['transport_download_mode'] = report['source_mode']
-        except (ValueError, OSError) as exc:
-            st.error('运输成本证据登记未完成：%s' % exc)
-    mode = st.session_state.get('finance_download_mode')
-    if mode:
-        try:
-            st.download_button('下载财务主表', live_services.finance_download(mode),
-                               file_name='finance_master_'+mode+'.xlsx',
-                               mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                               key='finance_register_download')
-        except (ValueError,OSError):
-            pass
+    with st.expander('运输成本证据（票面原始记录，15 列证据表）'):
+        st.caption(
+            '本表只登记票面原始记录（15 列证据表），供运输成本核验与导出；'
+            '财务主表负责人工确认、抵扣判断与跨趟分摊。两者用途不同，'
+            '请勿把证据表当作财务主表使用。')
+        _render_transport_records()
 
 
 def render_invoice() -> None:
@@ -227,6 +181,29 @@ def _sensor_window_chart() -> dict:
     }
 
 
+def _obd_raw_caption() -> None:
+    """OBD tab 顶部口径提示：图表读 processed（demo 基线），实流只落 data/raw。
+
+    两条通道数字不同源，必须在同一屏里写清楚，避免把 demo 基线当成现场读数。
+    """
+    raw = services.latest_raw_stream()
+    prefix = ("页面图表读 data/processed（demo 基线）；设备实流落 "
+              "data/raw/obd_gps/obd_stream.csv，")
+    if not raw:
+        st.caption(prefix + "当前暂无实流文件（等待设备上报），详见 🔗 数据链总览。")
+        return
+    first = str(raw.get("first_ts") or "").replace("T", " ").replace("Z", "")
+    last = str(raw.get("last_ts") or "").replace("T", " ").replace("Z", "")
+    if first and last and first[:10] == last[:10]:
+        window = first[:19] + " → " + last[11:19] + " UTC"
+    elif first and last:
+        window = first[:19] + " → " + last[:19] + " UTC"
+    else:
+        window = "—"
+    st.caption(prefix + "最近 " + str(raw.get("rows") or 0) + " 行 / UTC "
+               + window + "，详见 🔗 数据链总览。")
+
+
 def render_sensor() -> None:
     theme.hero_compact(
         "云边端硬件监控",
@@ -238,6 +215,7 @@ def render_sensor() -> None:
     with tab_co2:
         _render_sensor_co2()
     with tab_obd:
+        _obd_raw_caption()
         obd_panel.render_obd_panel()
 
 
@@ -361,6 +339,17 @@ def render_ledger() -> None:
         carbon_ledger_panel.render_carbon_ledger_panel()
 
 
+def _e0_disclosure_text() -> str:
+    """对外披露口径 E0 的显示文本：只读 kpi.json（total_kg / 1000），不改任何算术。
+
+    读不到就明说“暂不可读”，不拿 0 或毛口径数字冒充 E0。
+    """
+    e0_t = float(services.kpis().get("total_kg") or 0.0) / 1000.0
+    if e0_t <= 0:
+        return "E0（kpi.json 暂不可读）"
+    return f"{e0_t:,.4f} t"
+
+
 def _render_ledger_e0() -> None:
     with st.expander("碳账参数设置", expanded=True):
         param_a, param_b = st.columns(2)
@@ -376,17 +365,17 @@ def _render_ledger_e0() -> None:
                 key="ledger_carbon_quota_input", on_change=_sync_ledger_carbon_params)
     snap = carbon_snapshot()
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("当期总碳排", f"{snap['total_t']:.4f} t")
-    c2.metric("碳配额缺口", f"{snap['gap_t']:.4f} t")
+    c1.metric("当期总碳排（毛口径）", f"{snap['total_t']:.4f} t")
+    c2.metric("碳配额缺口（毛口径）", f"{snap['gap_t']:.4f} t")
     c3.metric("财务罚单/风险", f"¥{snap['financial_risk_yuan']:.2f}")
-    c4.metric("配额余额", f"{snap['balance_t']:.4f} t")
+    c4.metric("配额余额（毛口径）", f"{snap['balance_t']:.4f} t")
     if snap["gap_t"] > 0:
         st.error("综合刚才的发票和硬件超标，本期需购买 %.4f 吨碳配额。" % snap["gap_t"])
     else:
         st.success("当前配额充足，无需新增购买。")
 
     breakdown = pd.DataFrame([
-        {"项目": "基准总碳排", "排放量(tCO2e)": snap["base_t"], "财务影响(元)": 0.0},
+        {"项目": "基准总碳排（毛口径）", "排放量(tCO2e)": snap["base_t"], "财务影响(元)": 0.0},
         {"项目": "当前发票新增", "排放量(tCO2e)": snap["invoice_t"],
          "财务影响(元)": snap["invoice_cost_yuan"]},
         {"项目": "硬件超标事件", "排放量(tCO2e)": snap["sensor_t"],
@@ -399,7 +388,10 @@ def _render_ledger_e0() -> None:
     st.caption(
         "财务风险 = 发票新增排放 × 全局碳价 + 硬件突发成本；"
         "硬件超标碳成本不在配额购买成本中重复计提。基准总碳排只读 kpi 结果表，"
-        "结果缺失时才显示静态演示快照。")
+        "结果缺失时才显示静态演示快照。"
+        f"本页总碳排 / 缺口 / 余额均为毛口径：按运单明细行累加（同一趟的多张运单重复计入），"
+        f"是配额情景的保守上界；对外披露口径为 E0 {_e0_disclosure_text()}"
+        "（kpi.json total_kg / 1000），两口径可关联、不可相减。")
 
     if st.button("生成智能披露附注", width="stretch"):
         try:

@@ -151,6 +151,10 @@ outputs/invoice_report.json
 outputs/invoice_*.csv
 outputs/invoice_*.json
 
+# ===== 运输成本证据：批次运行目录与分析产物（含车牌 / 票号 / 金额），永不入库 =====
+outputs/runs/
+outputs/transport_*.json
+
 # ===== 车辆·路段油耗审计产物：含车牌 / 发票号 / 偏差结论，永不入库 =====
 # 依据 docs/45 §8；CSV 已被上面的 *.csv 挡住，这里补 JSON。
 outputs/fleet_*.json

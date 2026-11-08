@@ -97,11 +97,19 @@ def finish_report(result, records, trips, refs, capacities, complete_history):
         timing = refs.get('time_checks', {}).get(rid, {})
         when = timestamp(timing.get('replenished_at'))
         start, end = timestamp(timing.get('coverage_start')), timestamp(timing.get('coverage_end'))
-        vehicle_trips = [t for t in trips if t['plate'] == vehicle]
+        comparable_trips = ([t for t in trips if t['plate'] == vehicle and t['end'] >= start and t['start'] <= end]
+                            if not pd.isna(start) and not pd.isna(end) else [])
         ready = bool(timing.get('source') and timing.get('history_complete') is True and not pd.isna(when) and not pd.isna(start) and not pd.isna(end) and start <= when <= end)
-        overlaps = [t['trip_id'] for t in vehicle_trips if t['start'] <= when <= t['end']] if ready else []
-        check(r, 'time_contradiction', ready, ready and not overlaps,
-              reason='完整时间范围内无对应行程，仅作核查线索' if ready and not overlaps else '补能时刻有对应行程' if ready else 'missing_precise_time_or_complete_coverage', reference=timing, trip_ids=overlaps)
+        overlaps = [t['trip_id'] for t in comparable_trips if t['start'] <= when <= t['end']] if ready else []
+        if not ready:
+            check(r, 'time_contradiction', False, reason='missing_precise_time_or_complete_coverage', reference=timing, trip_ids=[])
+        elif not comparable_trips:
+            # No trip can be compared with this replenishment: report a lead, not a contradiction.
+            check(r, 'time_contradiction', False, reason='no_trip_to_compare', reference=timing, trip_ids=[])
+        else:
+            check(r, 'time_contradiction', True, anomaly=bool(overlaps),
+                  reason='补能时刻落在行程内，与站内补能场景矛盾' if overlaps else '补能时刻位于行程间隙，无时间冲突',
+                  reference=timing, trip_ids=overlaps)
         location = refs.get('location_checks', {}).get(rid, {})
         invoice_point = coordinates(location)
         limit, window = numeric(location.get('max_distance_km')), numeric(location.get('max_time_delta_minutes'))

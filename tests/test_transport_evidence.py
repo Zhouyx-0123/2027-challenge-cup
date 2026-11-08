@@ -95,13 +95,37 @@ def test_v2_checks_and_route_coverage():
                                    'observations':[{'plate':'京A1','observed_at':'2026-01-01 20:01','lat':41,'lon':117,'source':'GPS'}]}}}
     r=analyze([invoice(),invoice('002','2026-01-03')],trips(),source_mode='simulated',complete_history=True,references=refs)
     checks={c['rule']:c for c in r['checks'] if c['record_id']=='001'}
-    assert checks['time_contradiction']['status']=='anomaly'
+    assert checks['time_contradiction']['status']=='checked'
+    assert '间隙' in checks['time_contradiction']['reason']
     assert checks['region_contradiction']['status']=='anomaly'
     assert checks['price_outlier']['status']=='checked'
     assert checks['theory_comparison']['status']=='checked'
     assert r['routes'][0]['coverage_rate']==1
     assert r['routes'][0]['median_yuan_per_km']==pytest.approx(1.5)
     assert not any(g.get('reason')=='missing_price_reference' for g in r['gaps'])
+
+
+def test_time_contradiction_flags_replenishment_inside_trip():
+    refs={'time_checks':{'001':{'replenished_at':'2026-01-01 09:00','coverage_start':'2026-01-01',
+          'coverage_end':'2026-01-03','history_complete':True,'source':'fixture'}}}
+    r=analyze([invoice(),invoice('002','2026-01-03')],trips(),source_mode='simulated',
+              complete_history=True,references=refs)
+    check=next(c for c in r['checks'] if c['rule']=='time_contradiction' and c['record_id']=='001')
+    assert check['status']=='anomaly'
+    assert check['trip_ids']==['t1']
+    assert '行程内' in check['reason']
+
+
+def test_time_contradiction_unavailable_without_trip_to_compare():
+    refs={'time_checks':{'001':{'replenished_at':'2026-01-01 20:00','coverage_start':'2026-01-01',
+          'coverage_end':'2026-01-03','history_complete':True,'source':'fixture'}}}
+    data=trips().assign(plate='京B1')
+    r=analyze([invoice()],data,source_mode='simulated',complete_history=True,references=refs)
+    check=next(c for c in r['checks'] if c['rule']=='time_contradiction' and c['record_id']=='001')
+    assert check['status']=='unavailable'
+    assert check['reason']=='no_trip_to_compare'
+    assert any(g.get('rule')=='time_contradiction' and g.get('reason')=='no_trip_to_compare'
+               for g in r['gaps'])
 
 
 def test_v2_persistent_batches_stale_after_edit(tmp_path):

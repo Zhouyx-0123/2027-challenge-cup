@@ -258,9 +258,38 @@ def _normalize_theory_factors(references):
     return normalized
 
 
+def _vehicle_type_of(vehicle):
+    return str(vehicle.get('vehicle_type') or vehicle.get('vehicle_model') or vehicle.get('车型') or '').strip()
+
+
+def _missing_vehicle_type(vehicle, energy_type, at, factor_rows):
+    """True when a vehicle-type factor applies but the trip carries no vehicle_type.
+
+    Plate-only factors stay usable without vehicle_type; only factors that require
+    a vehicle type turn the missing column into an explicit gap instead of a silent
+    unmatched comparison.
+    """
+    if _vehicle_type_of(vehicle):
+        return False
+    day = str(at)[:10]
+    for row in factor_rows:
+        if not row.get('vehicle_type'):
+            continue
+        if row.get('plate') and row['plate'] != plate(vehicle.get('plate')):
+            continue
+        if row.get('energy_type') not in (energy_type, 'all', '*'):
+            continue
+        if row.get('valid_from') and day < row['valid_from']:
+            continue
+        if row.get('valid_to') and day > row['valid_to']:
+            continue
+        return True
+    return False
+
+
 def _select_theory_factor(vehicle, energy_type, at, references):
     rows = _normalize_theory_factors(references)
-    vehicle_type = str(vehicle.get('vehicle_type') or vehicle.get('vehicle_model') or vehicle.get('车型') or '').strip()
+    vehicle_type = _vehicle_type_of(vehicle)
     day = str(at)[:10]
     candidates = []
     for row in rows:
@@ -286,15 +315,22 @@ def _select_theory_factor(vehicle, energy_type, at, references):
 
 
 def _scope_inputs(records, trips, period_start=None, period_end=None, vehicles=None):
-    """Apply one shared reporting scope; keep the last pre-period invoice per vehicle as cycle anchor."""
+    """Apply one shared reporting scope; keep the last pre-period invoice per vehicle as cycle anchor.
+
+    history_trips is the vehicle-filtered, date-unfiltered history: the cycle
+    denominator needs it so pre-period kilometres are not silently dropped from an
+    anchor invoice's cycle. scoped_trips stays the period-only view used for
+    coverage, routes and matches.
+    """
     start = str(period_start)[:10] if period_start else None
     end = str(period_end)[:10] if period_end else None
     selected_vehicles = {plate(x) for x in vehicles or [] if plate(x)}
     if start and end and start > end:
         raise ValueError('统计期间开始日期不能晚于结束日期')
-    scoped_trips = trips.copy()
+    history_trips = trips.copy()
     if selected_vehicles:
-        scoped_trips = scoped_trips[scoped_trips['plate'].map(plate).isin(selected_vehicles)]
+        history_trips = history_trips[history_trips['plate'].map(plate).isin(selected_vehicles)]
+    scoped_trips = history_trips.copy()
     dates = pd.to_datetime(scoped_trips['depart_ts'], errors='coerce').dt.strftime('%Y-%m-%d')
     if start:
         scoped_trips = scoped_trips[dates >= start]
@@ -327,7 +363,7 @@ def _scope_inputs(records, trips, period_start=None, period_end=None, vehicles=N
     scope = {'period_start': start, 'period_end': end,
              'vehicles': sorted(selected_vehicles) if selected_vehicles else None,
              'trip_count': len(scoped_trips), 'invoice_count': len(eligible)}
-    return eligible, scoped_trips, scope
+    return eligible, scoped_trips, history_trips, scope
 
 
 def analyze(records, trips, *, source_mode, complete_history=False, capacities=None, references=None, period_start=None, period_end=None, vehicles=None):
@@ -342,7 +378,7 @@ def analyze(records, trips, *, source_mode, complete_history=False, capacities=N
     trips = canonical_trips(trips)
     raw_records = list(records)
     raw_trips = trips.copy()
-    records, trips, scope = _scope_inputs(records, trips, period_start, period_end, vehicles)
+    records, trips, history_trips, scope = _scope_inputs(records, trips, period_start, period_end, vehicles)
     required = {'trip_id', 'waybill_no', 'plate', 'depart_ts', 'arrive_ts', 'trip_km', 'od_site'}
     if required - set(trips.columns):
         raise ValueError('行程缺少字段: ' + ','.join(sorted(required - set(trips.columns))))
@@ -352,12 +388,13 @@ def analyze(records, trips, *, source_mode, complete_history=False, capacities=N
                      'input_sha256': hashlib.sha256((json.dumps(raw_records, sort_keys=True, ensure_ascii=False) + raw_trips.to_json(orient='records') + json.dumps(scope, sort_keys=True, ensure_ascii=False)).encode()).hexdigest()}
     from src.transport_checks import validate_references
     references = validate_references(references or {})
+    factor_rows = _normalize_theory_factors(references)
     capacities = capacities or references.get('capacities', {})
     validate_references({'capacities': capacities})
     capacities = {plate(k): float(v) for k, v in capacities.items()}
-    valid = []
+    all_valid = []
     invalid_plates = set()
-    for tid, group in trips.groupby('trip_id', dropna=False):
+    for tid, group in history_trips.groupby('trip_id', dropna=False):
         fields = ['plate', 'depart_ts', 'arrive_ts', 'trip_km', 'od_site']
         row = group.iloc[0].to_dict()
         start, end = timestamp(row['depart_ts']), timestamp(row['arrive_ts'])
@@ -368,7 +405,15 @@ def analyze(records, trips, *, source_mode, complete_history=False, capacities=N
             continue
         row.update(trip_id=str(tid), plate=plate(row['plate']), start=start, end=end, trip_km=km,
                    waybills=sorted(set(str(w) for w in group.waybill_no.dropna())))
-        valid.append(row)
+        all_valid.append(row)
+    period_start_day, period_end_day = scope['period_start'], scope['period_end']
+
+    def in_period(trip):
+        day = trip['start'].strftime('%Y-%m-%d')
+        return bool((not period_start_day or day >= period_start_day) and (not period_end_day or day <= period_end_day))
+
+    valid = [t for t in all_valid if in_period(t)]
+    period_start_ts = timestamp(scope['period_start']) if scope['period_start'] else None
     counts = {}
     for r in records:
         if r.get('invoice_no'):
@@ -408,13 +453,22 @@ def analyze(records, trips, *, source_mode, complete_history=False, capacities=N
         for left, right in zip(invoices, invoices[1:]):
             start, end = timestamp(left['invoice_date']), timestamp(right['invoice_date'])
             cycle = left['record_id'] + ':' + right['record_id']
-            selected = [t for t in valid if t['plate'] == vehicle and start <= t['start'] < end]
-            boundary = any(t['end'] > end for t in selected)
+            # The denominator spans the whole invoice-to-invoice cycle, including
+            # trips before period_start; only output rows stay period-scoped.
+            cycle_trips = [t for t in all_valid if t['plate'] == vehicle and start <= t['start'] < end]
+            selected = [t for t in cycle_trips if in_period(t)]
+            boundary = any(t['end'] > end for t in cycle_trips)
             repeated_date = sum(r['invoice_date'] == left['invoice_date'] for r in invoices) > 1 or sum(r['invoice_date'] == right['invoice_date'] for r in invoices) > 1
             if not complete_history or vehicle in invalid_plates or repeated_date or end <= start or not selected or boundary:
                 result['gaps'].append({'cycle_id': cycle, 'reason': 'incomplete_or_invalid_cycle'})
                 continue
-            total = sum(t['trip_km'] for t in selected)
+            if period_start_ts and start < period_start_ts and not any(start <= t['start'] < period_start_ts for t in cycle_trips):
+                # The anchor invoice starts before the reporting period, but no
+                # uploaded trip covers the pre-period leg of its cycle, so the
+                # invoice quantity cannot be allocated honestly.
+                result['gaps'].append({'cycle_id': cycle, 'reason': 'missing_pre_period_trips'})
+                continue
+            total = sum(t['trip_km'] for t in cycle_trips)
             for t in selected:
                 share = t['trip_km'] / total
                 liters = numeric(left['quantity']) * share
@@ -441,6 +495,10 @@ def analyze(records, trips, *, source_mode, complete_history=False, capacities=N
             item['theory_liters'] = float(theory['value']) * item['trip_km'] / 100
             item['deviation'] = item['allocated_liters'] / item['theory_liters'] - 1
             item['factor'] = theory
+        elif _missing_vehicle_type(source_trip, 'fuel', source_trip.get('start'), factor_rows):
+            selected['reason'] = 'missing_vehicle_type'
+            result['gaps'].append({'record_id': item['record_id'], 'trip_id': item['trip_id'],
+                                   'rule': 'theory_comparison', 'reason': 'missing_vehicle_type'})
     allocated = {a['trip_id'] for a in result['allocations']}
     linked = {tid for m in result['matches'] if m['status'] == 'matched' for tid in m['candidate_trip_ids']}
     total = sum(t['trip_km'] for t in valid)

@@ -31,7 +31,7 @@ def test_deepseek_vision_official_request(monkeypatch):
     assert result == '{"fuel_liters":65.5}'
     assert captured["url"] == "https://api.deepseek.com/chat/completions"
     assert captured["payload"]["model"] == "deepseek-flash"
-    assert captured["payload"]["max_tokens"] == 800
+    assert captured["payload"]["max_tokens"] == 1600
     assert "thinking" not in captured["payload"]
     image = captured["payload"]["messages"][0]["content"][1]
     assert image["image_url"]["url"] == "data:image/jpeg;base64,abc"

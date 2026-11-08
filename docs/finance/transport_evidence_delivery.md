@@ -1,6 +1,6 @@
 # 运输成本证据模块 v2
 
-本模块已合并到 2027-challenge-cup-main-3，保留主项目原有路线、仪表盘、财务主表等功能。
+本模块基于 `origin/main` 的分支交付，合并状态以 git 为准；保留主项目原有路线、仪表盘、财务主表等功能。
 
 ## 本轮原八项与本次三项补齐
 
@@ -19,13 +19,13 @@
 
 ## 操作入口
 
-发票页保留原有财务主表登记/下载，并新增独立的运输成本证据登记、补充、检索、原图查看、证据表下载、参考配置导入、行程CSV/Parquet上传、分析和历史批次复算入口。多明细票保留逐行明细，暂不允许误写入单行财务主表。CLI示例：
+发票页保留财务主表登记/下载；运输成本证据登记收在同页「运输成本证据（票面原始记录，15 列证据表）」expander 内，先主表、后证据表，不再有两个并列入口。证据表负责票面原始记录、补充、检索、原图查看、证据表下载、参考配置导入、行程CSV/Parquet上传、分析和历史批次复算；财务主表负责人工确认、抵扣判断与跨趟分摊。多明细票保留逐行明细，暂不允许误写入单行财务主表。CLI示例：
 
 ```bash
-python -m tools.transport_evidence_report --invoices examples/finance/transport_invoices.json --trips examples/finance/transport_trips.csv --source-mode simulated --output outputs/transport_result.json --references examples/finance/transport_references.json --complete-history --image-dir data/raw/发票
+python -m tools.transport_evidence_report --invoices outputs/transport_simulated_invoices.json --trips tests/fixtures/finance_transport/simulated_trips.csv --source-mode simulated --output outputs/transport_result.json --references tests/fixtures/finance_transport/simulated_team_factors.json --complete-history --image-dir tests/fixtures/finance_transport
 ```
 
-CLI可增加 `--period-start YYYY-MM-DD --period-end YYYY-MM-DD --vehicles 京A1,京A2` 控制统计范围。complete-history由调用方确认行程完整性，周期采用docs/45前票油量、相邻日期半开区间和物理里程比例。时间核验的完整范围另由time_checks指定。位置检查使用同车、时间差在窗口内的最近观测点，阈值须覆盖定位误差与时间差影响。
+CLI可增加 `--period-start YYYY-MM-DD --period-end YYYY-MM-DD --vehicles 京A1,京A2` 控制统计范围。complete-history由调用方确认行程完整性，周期采用docs/45前票油量、相邻日期半开区间和物理里程比例；统计期间开始前的锚点票，分母取完整发票周期的行程，不把整张票硬摊到期间内，若缺期间前行程则标 `missing_pre_period_trips`。时间核验的完整范围另由time_checks指定：补能时刻落在某行程内才记 `time_contradiction` 异常；落在行程间隙为 `checked` 无冲突；无相交行程则 `unavailable` + `no_trip_to_compare`，不伪造 checked。位置检查使用同车、时间差在窗口内的最近观测点，阈值须覆盖定位误差与时间差影响。
 
 参考配置示例位于 examples/finance/transport_references.json，全部为模拟接口样例。替换票据record_id、车牌、阈值、来源和时间后可由页面导入。理论因子优先从团队因子表匹配车型、能源类型、车牌（可选）、有效期和适用条件，并保留因子ID、来源、版本及候选选择依据；旧版车牌映射仍兼容。成本口径为invoice_gross时按票面含税总额分配，否则保持待确认。
 
@@ -74,7 +74,7 @@ python -m tools.invoice_workbook --input tests/fixtures/finance_transport/invoic
 
 注意：该工具导入的是已抽取的结构化字段，不执行图片 OCR，也不会伪造缺失的原始图片。`src/invoice.py` 的图片识别提示词及解析器已扩展为保留 `items` 多行明细、购买方/销售方税号、价税合计大写、备注与开票人；备注中的车牌号可回填到规范车牌字段。
 
-`tests/fixtures/finance_transport/` 内的工作簿和两张图片均为用户提供的模拟样张，仅供自动化测试，不是真实发票。
+`tests/fixtures/finance_transport/` 内的工作簿、行程与参考因子均为仓库内合成测试数据（由 `tools/make_finance_sim_fixture.py` 生成），仅供自动化测试，不是用户原始凭证或真实发票。原始 45 票真值工作簿未随该分支提交；目录内仅保留两张既有测试图片，其余 43 个文件名故意缺失。
 
 
 ## 本轮模拟数据复现命令
@@ -86,5 +86,21 @@ python -m tools.invoice_workbook --input tests/fixtures/finance_transport/invoic
 
 python -m tools.transport_evidence_report --invoices outputs/transport_simulated_invoices.json --trips tests/fixtures/finance_transport/simulated_trips.csv --source-mode simulated --output outputs/transport_simulated_result.json --references tests/fixtures/finance_transport/simulated_team_factors.json --complete-history --period-start 2026-10-31 --period-end 2026-11-04 --image-dir tests/fixtures/finance_transport
 ```
+
+`tools.transport_evidence_report` 成功时退出码为 0 且无控制台输出，结果写入 `outputs/transport_simulated_result.json`；`tools.invoice_workbook` 会在标准输出打印 `records`、`multi_line`、`missing_source_images` 等摘要。
+
+### 本轮实测输出（2026-11-08）
+
+以下命令在项目根目录依次执行，`source_mode=simulated`、`complete_history=true`；批次 ID 由工具按运行生成（本次复跑为 `2ef595f05f0547cfaeb31d8553931bc3`，每次运行可能不同，不影响计数与覆盖率）：
+
+- 工作簿导入：45 条票据记录（39 张柴油票、6 张维修/服务票、2 张多明细票、8 个车牌），43 个原图文件名缺失。
+- 统计范围：45 票中 44 票进入分析范围（2025-06-01 维修票在期间外且非能源票）、39 趟行程。
+- 匹配：44 条票级匹配记录，其中 39 条 `matched`（全部柴油票）、5 条期间内维修票无对应行程；39 张运单全部 `matched`。
+- 分配：31 条分配、31 个 closed cycles、8 个车牌、1 条路线（A|B），规则 `docs45-section5`，理论因子 31/31 全部 `matched`。
+- 覆盖率：总里程 4,641 km；关联里程 4,641 km（100.00%）；分配里程 3,565 km（76.82%）。
+- 分配量：1,069.5 L；分配成本 8,622.25 元（`invoice_gross`）。
+- 检查：264 条（101 `checked` / 163 `unavailable`）；缺口 184 条；异常 0 条。
+
+45 票验收摘要（计数与关键数字，不含原图 Base64）见 `docs/finance/transport_simulated_acceptance_45.json`。
 
 工作簿导入器会报告原图缺失数量。本轮模拟包只有 2 张原图，其余 43 个文件名仅在真值表中存在；缺图不会被伪造。历史批次快照仍会保存已提供的两张原图及完整结构化票据/行程输入。

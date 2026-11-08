@@ -1,0 +1,204 @@
+{
+  "schema": "transport_simulated_acceptance_summary/v1",
+  "generated_at": "2026-11-08",
+  "source_mode": "simulated",
+  "complete_history": true,
+  "fixtures": {
+    "workbook": "tests/fixtures/finance_transport/invoice_simulated_truth.xlsx",
+    "template": "tests/fixtures/finance_transport/invoice_template.xlsx",
+    "trips": "tests/fixtures/finance_transport/simulated_trips.csv",
+    "references": "tests/fixtures/finance_transport/simulated_team_factors.json",
+    "ticket_rows": 45,
+    "detail_rows": 48,
+    "diesel_tickets": 39,
+    "repair_tickets": 6,
+    "multi_line_tickets": 2,
+    "plates": 8,
+    "source_images_present": [
+      "FP-REPAIR-003.png",
+      "FP-REPAIR-001.png"
+    ],
+    "missing_source_images": 43
+  },
+  "run": {
+    "batch_id": "2ef595f05f0547cfaeb31d8553931bc3",
+    "batch_id_note": "每次 analyze 运行生成新批次 ID，不影响计数与覆盖率",
+    "rule": "transport-evidence-v2",
+    "source_mode": "simulated",
+    "complete_history": true,
+    "period": {
+      "start": "2026-10-31",
+      "end": "2026-11-04"
+    },
+    "scope": {
+      "invoice_count": 44,
+      "trip_count": 39,
+      "vehicles": null
+    },
+    "input_sha256": "fb65b4f96c40db732a9fcd274b71350ee1fb18be6b710e921ad43e3b059ca330"
+  },
+  "matches": {
+    "total": 44,
+    "matched": 39,
+    "unmatched_without_trip": 5,
+    "waybills_total": 39,
+    "waybills_matched": 39
+  },
+  "allocations": {
+    "count": 31,
+    "cycles": 31,
+    "vehicles": 8,
+    "rule": "docs45-section5",
+    "cost_basis": "invoice_gross",
+    "measurement": "rule_allocated",
+    "allocated_liters": 1069.5,
+    "allocated_cost": 8622.25,
+    "trip_km": 3565.0,
+    "theory_factor_status": {
+      "matched": 31
+    }
+  },
+  "routes": {
+    "count": 1,
+    "items": [
+      {
+        "od_site": "A|B",
+        "energy_type": "fuel",
+        "total_trips": 39,
+        "sample_trips": 31,
+        "total_km": 4641.0,
+        "sample_km": 3565.0,
+        "covered_km": 3565.0,
+        "coverage_rate": 0.7681534152122388,
+        "association_km": 4641.0,
+        "association_rate": 1.0,
+        "median_l_per_100km": 30.0,
+        "median_yuan_per_km": 2.4204273504273504,
+        "cost_sample_trips": 31,
+        "rule": "docs45-section5",
+        "cost_basis": "invoice_gross"
+      }
+    ]
+  },
+  "coverage": {
+    "total_km": 4641.0,
+    "association_km": 4641.0,
+    "allocation_km": 3565.0,
+    "association_rate": 1.0,
+    "allocation_rate": 0.7681534152122388
+  },
+  "checks": {
+    "total": 264,
+    "checked": 101,
+    "unavailable": 163,
+    "by_rule": {
+      "price_outlier": {
+        "checked": 0,
+        "unavailable": 44,
+        "total": 44
+      },
+      "tank_capacity": {
+        "checked": 39,
+        "unavailable": 5,
+        "total": 44
+      },
+      "theory_comparison": {
+        "checked": 31,
+        "unavailable": 13,
+        "total": 44
+      },
+      "cost_calculation": {
+        "checked": 31,
+        "unavailable": 13,
+        "total": 44
+      },
+      "time_contradiction": {
+        "checked": 0,
+        "unavailable": 44,
+        "total": 44
+      },
+      "region_contradiction": {
+        "checked": 0,
+        "unavailable": 44,
+        "total": 44
+      }
+    }
+  },
+  "gaps": {
+    "total": 184,
+    "by_reason": {
+      "open_cycle": 8,
+      "no_valid_cycle_cover": 8,
+      "missing_or_unconfirmed_price_reference": 44,
+      "missing_precise_time_or_complete_coverage": 44,
+      "missing_location_or_vehicle_observation": 44,
+      "theory_factor_unmatched": 13,
+      "missing_cost_basis_or_valid_allocation": 13,
+      "missing_or_inapplicable_capacity": 5
+    },
+    "reason_list_records": 5,
+    "multi_reason_records": 1
+  },
+  "anomalies": 0,
+  "contract": {
+    "max_amount_check_error": 0.0,
+    "diesel_quantity_unit_price_invoice_amount_numeric": true,
+    "multi_line_samples": [
+      {
+        "invoice_no": "25946248797655020504",
+        "invoice_date": "2026-11-02",
+        "plate": "苏A12348",
+        "amount_excluding_tax": 2450.0,
+        "tax_amount": 318.5,
+        "invoice_amount": 2768.5,
+        "multiple_items": true,
+        "quantity": null,
+        "unit": "",
+        "unit_price": null,
+        "items": [
+          {
+            "item_name": "*劳务*更换轮胎",
+            "amount": 1980.0
+          },
+          {
+            "item_name": "*货物*轮胎",
+            "amount": 470.0
+          }
+        ],
+        "source_image": "FP-REPAIR-003.png"
+      },
+      {
+        "invoice_no": "25245078884927233714",
+        "invoice_date": "2025-06-01",
+        "plate": "苏A12345",
+        "amount_excluding_tax": 2000.0,
+        "tax_amount": 260.0,
+        "invoice_amount": 2260.0,
+        "multiple_items": true,
+        "quantity": null,
+        "unit": "",
+        "unit_price": null,
+        "items": [
+          {
+            "item_name": "*劳务*维修工时",
+            "amount": 800.0
+          },
+          {
+            "item_name": "*货物*机油",
+            "amount": 480.0
+          },
+          {
+            "item_name": "*货物*滤芯",
+            "amount": 720.0
+          }
+        ],
+        "source_image": "FP-REPAIR-001.png"
+      }
+    ]
+  },
+  "reproduce": [
+    "python -m tools.invoice_workbook --input tests/fixtures/finance_transport/invoice_simulated_truth.xlsx --output outputs/transport_simulated_invoices.json --source-mode simulated --image-dir tests/fixtures/finance_transport",
+    "python -m tools.transport_evidence_report --invoices outputs/transport_simulated_invoices.json --trips tests/fixtures/finance_transport/simulated_trips.csv --source-mode simulated --output outputs/transport_simulated_result.json --references tests/fixtures/finance_transport/simulated_team_factors.json --complete-history --period-start 2026-10-31 --period-end 2026-11-04 --image-dir tests/fixtures/finance_transport"
+  ],
+  "source_note": "仓库内合成测试数据；原始 45 票真值工作簿未随分支提交，本摘要由合成替代数据生成，不内嵌任何原图二进制数据。"
+}

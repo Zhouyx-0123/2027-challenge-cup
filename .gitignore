@@ -185,6 +185,21 @@ env/
 .vscode/
 .DS_Store
 
+# 披露碳账：只提交随项目提供的模拟样例；真实导入与备份存放在本机。
+node_modules/
+.pytest_cache/
+carbon_disclosure/data/
+!carbon_disclosure/dist/sample.csv
+local_data/
+
+# main 源码包已附带的模板和预计算快照：首次建仓也应保留。
+!templates/数据输入模板.xlsx
+!docs/finance/项目财务主表_费用明细版.xlsx
+!data/processed/our_carbon_model.json
+!data/processed/vsp_audit.json
+!data/processed/vsp_physical_trips.parquet
+!data/processed/vsp_vehicle_groups.parquet
+
 # ===== 交付包（含车牌/发票/大数据）：只在本地与网盘流转，不入库 =====
 交付_*/
 _pack*/

@@ -1,18 +1,18 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "date": "2026-11-11",
   "baseline_zip": "2027-challenge-cup-main (1).zip",
   "baseline_zip_sha256": "9d8e02a3525c1f920d509a1b56501fab6dc0dc9b79cd246eab97db762b4ceb6b",
   "original_files": 435,
-  "unchanged_original_files": 430,
+  "unchanged_original_files": 427,
   "added": [
     {
       "path": ".gitattributes",
-      "sha256": "d5d6c7f4e63273050f5ff7b17308ecd8762da8a84a167acc3efb5b98e6573af9"
+      "sha256": "8ec552f416429e7e3fe26c49cf99077cb9c1e8d32e845878717e48aba874cd4d"
     },
     {
       "path": ".github/workflows/carbon-disclosure.yml",
-      "sha256": "0f6c46831f8c03a4d38031e66a0448677ee1b195b7e332b88d3b57ffe27f51d5"
+      "sha256": "4ad2bd5e640cd77a81b988c065bf0d0d489cbbc5cc80f4f4963b8910f4058723"
     },
     {
       "path": "app/components/carbon_disclosure_panel.py",
@@ -24,11 +24,11 @@
     },
     {
       "path": "carbon_disclosure/README.md",
-      "sha256": "0e2547dd53d4dc2ca639c9f11ad91e68ef475e4855912beae0b743eeedbbd5b3"
+      "sha256": "4736103ff0bd4f75a92d9aded2894976ac7cf26a6c4644c3051c8076ee16bacf"
     },
     {
       "path": "carbon_disclosure/__init__.py",
-      "sha256": "262a6f14b55566469f3dcabfafbf50f565c5cddb292c6a0a395869a310b60c1c"
+      "sha256": "ed458810ecfeab0cf0d37e8c676738d724bc0680ab09048881ca598d9a297770"
     },
     {
       "path": "carbon_disclosure/__main__.py",
@@ -60,7 +60,7 @@
     },
     {
       "path": "carbon_disclosure/dist/index.html",
-      "sha256": "1320efea37dbed47cd0e4d179272fa0b21fbaa4bb2abe99ab24c0f43dac8540b"
+      "sha256": "bf245557059e45a54b086b75914c51cb0b317ad34574613bcb5e6e95a2acccf6"
     },
     {
       "path": "carbon_disclosure/dist/manual-pdf.js",
@@ -88,7 +88,7 @@
     },
     {
       "path": "carbon_disclosure/package.json",
-      "sha256": "766cf07d09b2ea8e2e3b142df26c5183888315b356bc56c4ce7dc200da8a7f1a"
+      "sha256": "611d3e154faedadf44a85ab44693252580d39db249ddb48a1e18e44f0fac70b6"
     },
     {
       "path": "carbon_disclosure/server.cjs",
@@ -116,7 +116,7 @@
     },
     {
       "path": "carbon_disclosure/tests/server.test.cjs",
-      "sha256": "a17d43785bbb511f846e8e0566bf3ff3cccf8ddef54c67bac6a7fa4fb6ee879b"
+      "sha256": "bfdda14c947a306c3adab932c8188a3a9a858ba33a2c64934c9295728b534071"
     },
     {
       "path": "carbon_disclosure/tests/test_runtime.py",
@@ -132,35 +132,35 @@
     },
     {
       "path": "carbon_disclosure/验收记录.md",
-      "sha256": "cd96f6a01edf0a306f98d961776d07d0eb34e1bc717fb64db65d1c47f8e30844"
+      "sha256": "1569db2264eb5ec697b7f1c30d6dbf07cb7255613ada131cf5673a54885490b0"
     },
     {
       "path": "docs/碳账接入与交付说明.md",
-      "sha256": "a3fb8c9cc89fe3c0f13a684c55a0431ee1c103c1c663a8a64ab614199bc8db39"
+      "sha256": "36a540a0b1351ce5e02cbca1a937cbbe4f7efb82d699ee9eb9989117023f3c64"
     },
     {
       "path": "tests/test_carbon_disclosure_integration.py",
       "sha256": "332d633b107f178c649d29e7e9d40b8df35a70a77d283222c0208354ffc8a847"
     },
     {
-      "path": "启动碳账.bat",
-      "sha256": "4f4a263838db43c3f8fb9effd51fe049f13b12fb1d88e47538b2f4fd620aee4d"
-    },
-    {
-      "path": "启动碳账.command",
-      "sha256": "821b5c5ed60badbdb0e34f18d50582d908aec0d2cd05b8ac1fbeefc7793d12f1"
+      "path": "tests/test_unified_launcher.py",
+      "sha256": "c8dfe760d8dabddb3a674809201c22dcecb561029c254b3d863d8334225df138"
     },
     {
       "path": "打开碳账.html",
-      "sha256": "b287eb1454fbf3d36fb763719c0515444be943c411a1be78d77c8a7fd2a03ba0"
+      "sha256": "af0ab3be75a9b7812aeca5af570a1fe86bb9a00401be8d2e9b8e1826b4e8a602"
     },
     {
       "path": "碳账交付验收.md",
-      "sha256": "a4444413bbc0e2abeebee2a6fa6275a5cffbb6bca941448edcb9cbc415df0312"
+      "sha256": "f535a4edb8ab1260920baf7a02cf30cb429b8bc7c13e266aa8637910564e9d0f"
     },
     {
       "path": "碳账快速开始.md",
-      "sha256": "c8d3e297c881eebf0bfe771f5e4e190c1b19a9c3d170152b716e368cfcf813d1"
+      "sha256": "9bb04f09c1966e1a81605289d52fbbbcf72e706223123eb3fed8516ef6b2621f"
+    },
+    {
+      "path": "统一启动更新说明.md",
+      "sha256": "a1d86e9baed15c030f6aabce6cc48c54a106118e8f8189b456847888dc34c165"
     }
   ],
   "modified": [
@@ -182,14 +182,33 @@
     {
       "path": "README.md",
       "before_sha256": "b186cc67d11bf87ee2a29e149a564cf794139c780324feb0b6d13d272d9e0eda",
-      "after_sha256": "02b030609a6df468edbf553e5631725f21642d7cfaf0a54d3c8964cb3ea88240"
+      "after_sha256": "fd2016f35e6c9039f685a12b3e41ae54809c9ccafb24177c54298b48b771dcb4"
     },
     {
       "path": "app/main_views.py",
       "before_sha256": "fcaac5363d23a631c660cb08ceb4276d366f21fe4f3a70fdab3611e89079796f",
       "after_sha256": "8a0ec633857939d8e41bf63047bd26c8f4c006ac626dfbcce63a8804e7e7f3b4"
+    },
+    {
+      "path": "tools/launch.py",
+      "before_sha256": "aa79931767c92851933eed3e45138d41dd46d28fcb3a03c672b1e1ccb4d9a631",
+      "after_sha256": "3b052d81637e5a92b2a67a60245f358b19310317dbf8fb0aa2a053ba5b9b2e41"
+    },
+    {
+      "path": "启动.bat",
+      "before_sha256": "04d484dc463be7ef091ba46ceff73c1277859ba417c2aaa13f2dc3e9e369f5fe",
+      "after_sha256": "49b69024a2d55f18f6ac108f1462706578b0b2fe407bfb70bea45414cc282b03"
+    },
+    {
+      "path": "启动.command",
+      "before_sha256": "f5fe177e724dd55b5f52ef0bbd6bc15b7c00ae47b646f40e0afe60aea3f2e314",
+      "after_sha256": "f4ddd7f52e27f9b7036c9abb2390f5bcb93de096342c47b55e62347f04c56460"
     }
   ],
   "removed": [],
+  "remove_when_updating_from_v04": [
+    "启动碳账.bat",
+    "启动碳账.command"
+  ],
   "manifest_note": "Hashes cover project files other than this manifest. Runtime caches, local dependencies and Git history are excluded."
 }

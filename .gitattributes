@@ -6,5 +6,5 @@ carbon_disclosure/**/*.pdf binary
 # Preserve the provided CSV byte-for-byte (also embedded in sample.js).
 carbon_disclosure/dist/sample.csv -text
 打开碳账.html text eol=lf
-启动碳账.bat text eol=crlf
-启动碳账.command text eol=lf
+启动.bat text eol=crlf
+启动.command text eol=lf

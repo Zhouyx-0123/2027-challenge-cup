@@ -56,6 +56,7 @@ RUN set -eux; \
 # ---- 源码与只读配置 ---------------------------------------------------
 # config/ 只取因子 JSON 与说明文档；*.txt 密钥文件不进镜像
 COPY app/ ./app/
+COPY carbon_disclosure/ ./carbon_disclosure/
 COPY src/ ./src/
 COPY tools/ ./tools/
 COPY config/*.json ./config/

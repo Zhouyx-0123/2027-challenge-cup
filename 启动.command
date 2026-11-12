@@ -22,6 +22,8 @@ if [ -z "$CARBONTIDE_PYTHON" ]; then
     exit 1
 fi
 
+"$CARBONTIDE_PYTHON" -c "import pathlib,sys; r=pathlib.Path.cwd(); needed=['carbon_disclosure/dist/core.js','carbon_disclosure/dist/platform.css','app/components/carbon_disclosure_panel.py','app/main_views.py']; missing=[n for n in needed if not (r/n).is_file()]; v=r/'app/main_views.py'; connected=v.is_file() and 'carbon_disclosure_panel.render_carbon_disclosure_panel()' in v.read_text(encoding='utf-8-sig'); ok=not missing and connected; print('[X] Incomplete project: update app/, tools/ and carbon_disclosure/ folders, not only root files.') if not ok else None; sys.exit(0 if ok else 1)" || exit 1
+
 printf '%s\n' '主系统统一启动，包含披露碳账。' '碳账入口：碳核算与台账 - 披露碳账（范围一二三）'
 "$CARBONTIDE_PYTHON" -m tools.launch --open --no-recalc "$@"
 CARBONTIDE_EXIT=$?

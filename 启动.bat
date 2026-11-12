@@ -34,6 +34,12 @@ if not defined CARBONTIDE_PYTHON (
     exit /b 1
 )
 
+"%CARBONTIDE_PYTHON%" %CARBONTIDE_PY_ARGS% -c "import pathlib,sys; r=pathlib.Path.cwd(); needed=['carbon_disclosure/dist/core.js','carbon_disclosure/dist/platform.css','app/components/carbon_disclosure_panel.py','app/main_views.py']; missing=[n for n in needed if not (r/n).is_file()]; v=r/'app/main_views.py'; connected=v.is_file() and 'carbon_disclosure_panel.render_carbon_disclosure_panel()' in v.read_text(encoding='utf-8-sig'); ok=not missing and connected; print('[X] Incomplete project: update app/, tools/ and carbon_disclosure/ folders, not only root files.') if not ok else None; sys.exit(0 if ok else 1)"
+if errorlevel 1 (
+    if "%~1"=="" pause
+    exit /b 1
+)
+
 echo CarbonTide main system - includes the disclosure ledger.
 echo.
 REM Keep the original Windows launcher's raw-data recalculation policy.

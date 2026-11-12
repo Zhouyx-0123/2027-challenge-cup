@@ -1,8 +1,7 @@
 {
-  "version": "0.7.0",
+  "version": "0.7.1",
   "date": "2026-11-13",
   "baseline_zip_sha256": "8be060288b7c2ce694fa3d03dbb69b1b8181a85830a332023af6f438d3d481db",
-  "baseline_files": 448,
   "added": [
     {
       "path": ".github/workflows/carbon-disclosure.yml",
@@ -10,7 +9,7 @@
     },
     {
       "path": "app/components/carbon_disclosure_panel.py",
-      "sha256": "db8f045b9c64bb0acb8792741f1544ec1e305a82c5bb2f310001b09ecb00a6cf"
+      "sha256": "ff7de5f2b6d62dbb0a09ba04b0f55f0fd4f01ee2043868db76821736cc47e622"
     },
     {
       "path": "carbon_disclosure/.gitignore",
@@ -22,7 +21,7 @@
     },
     {
       "path": "carbon_disclosure/__init__.py",
-      "sha256": "08a3b4a6632237d113a86d1fd276e5010426293381b8d2d87f21c98ff55bca8b"
+      "sha256": "b3c993edcbab1916e7df06b4c3a8dd033e7064138722e885ef0088849565d45c"
     },
     {
       "path": "carbon_disclosure/__main__.py",
@@ -54,7 +53,7 @@
     },
     {
       "path": "carbon_disclosure/dist/index.html",
-      "sha256": "b2fbda9d73efe51be208f120b0d988734ddde1dddf6d2528b1133a5621d07d90"
+      "sha256": "0642853bff3882b1a4b1f5edfa0a3f0f1780352699210a1e94fb24c9b65a353f"
     },
     {
       "path": "carbon_disclosure/dist/manual-pdf.js",
@@ -86,7 +85,7 @@
     },
     {
       "path": "carbon_disclosure/package.json",
-      "sha256": "aae13ef6fc7203fc89653dd583fc84d50cf5f2b4f758e5cefcd49fc0095dd6ac"
+      "sha256": "e6ec6cf8b959bb58e9c6634794273710b21fd4088c75ca70c390af6ade8841d3"
     },
     {
       "path": "carbon_disclosure/server.cjs",
@@ -134,11 +133,11 @@
     },
     {
       "path": "tests/test_carbon_disclosure_integration.py",
-      "sha256": "d24c698996193bf587bde8b11fb1ae4df69fdf2d3e30a28d1a1a0b356e03e336"
+      "sha256": "42b9762fe6368e6d41202367f3b8866bd9adc5f6184d3d54aad47578468e24de"
     },
     {
       "path": "tests/test_unified_launcher.py",
-      "sha256": "c8dfe760d8dabddb3a674809201c22dcecb561029c254b3d863d8334225df138"
+      "sha256": "019d9643c9c1d2e753040ace549c8c9a0a60a51e1374501cc1823533f5c0c110"
     },
     {
       "path": "从主前端进入碳账_v0.7.md",
@@ -154,7 +153,12 @@
     {
       "path": "README.md",
       "before_sha256": "e262603132c661e8abcaaa6e1bef5d31bd7539eaaadf367d7273eca9d77f757e",
-      "after_sha256": "d265545d4733b77fab82a2f95844b75005bcb6445c97f22fd08f91988f18fbcf"
+      "after_sha256": "2b36e7e8f89aea5a7f360ba2025bb90c516655d1da47b0daf2cd13464076cbf4"
+    },
+    {
+      "path": "app/components/main_nav.py",
+      "before_sha256": "ec82abc24dfffb70bd6eeb43b26d85a5dc7c7009da14bd403822c6e7671d6760",
+      "after_sha256": "c3717c6c9f38d913187966faaea3ddb5cc52ad3086741f6f772bf43552ba3da6"
     },
     {
       "path": "app/main_views.py",
@@ -164,32 +168,1964 @@
     {
       "path": "tools/launch.py",
       "before_sha256": "aa79931767c92851933eed3e45138d41dd46d28fcb3a03c672b1e1ccb4d9a631",
-      "after_sha256": "3b052d81637e5a92b2a67a60245f358b19310317dbf8fb0aa2a053ba5b9b2e41"
+      "after_sha256": "91f0c86ea307aaf8d61c89f9d1a5014106f8d79f3cd2b76b88cb16e636374b58"
+    },
+    {
+      "path": "启动.bat",
+      "before_sha256": "49b69024a2d55f18f6ac108f1462706578b0b2fe407bfb70bea45414cc282b03",
+      "after_sha256": "678101aec2dd44bf7f3f6f81ac82d8cb588085c9e217cc37309780a603777a58"
+    },
+    {
+      "path": "启动.command",
+      "before_sha256": "f4ddd7f52e27f9b7036c9abb2390f5bcb93de096342c47b55e62347f04c56460",
+      "after_sha256": "9555c1ee078c48b3d6d331218b1425cf41acb627ba2acfe5d424d94e890338d3"
     },
     {
       "path": "打开碳账.html",
       "before_sha256": "1d3cd78681ee0280310f6a1860876b6f78d38ce24c814298e95d833049c0b715",
-      "after_sha256": "0c4bd557c01322d4948812a4d7f630fa642931067e2820190e72a4736d7ffb72"
+      "after_sha256": "da283a1abd464ff1a5aedcb9b3e4e808d28933ab10cffe94bc376247aeca7506"
     },
     {
       "path": "碳账交付验收.md",
       "before_sha256": "eb89b68e699b6c761a1c8f146aa9d2c05e98c5241de2746994c97e8250d129c9",
-      "after_sha256": "820c2ef6025125abe69320ff3df86db877f2a4e681908b353a0be0940cd37d0e"
+      "after_sha256": "bf791a6b580240470607d96b1bf9dc1d8e8a078d52d05c914f52d5d109903006"
     },
     {
       "path": "碳账快速开始.md",
       "before_sha256": "458b3f44c5ea3a3c2d09c1b1dfdf9b96ab49be6253e01483db2d203281271094",
-      "after_sha256": "a4c757afe205c6b92ad524bbe6b81f24a8166de880d8aa88cc4102504f30384c"
+      "after_sha256": "0c57d75a35772dbfd2cccd2e9c0d349294b5de338efae7795ba0a03a591ea94a"
     },
     {
       "path": "碳账接入与交付说明.md",
       "before_sha256": "618393b6eadbead7c4378dd1e568efa2f628b48688f9ec9f3ed447fb2554cff9",
-      "after_sha256": "a4c757afe205c6b92ad524bbe6b81f24a8166de880d8aa88cc4102504f30384c"
+      "after_sha256": "0c57d75a35772dbfd2cccd2e9c0d349294b5de338efae7795ba0a03a591ea94a"
     }
   ],
   "removed": [
     "启动碳账.bat",
     "启动碳账.command"
   ],
-  "note": "Complete project based on the latest user ZIP. Real CSV, browser exports, runtime dependencies and QA files are excluded. Original calculation data and main frontend theme retained."
+  "delivery_files": [
+    {
+      "path": ".dockerignore",
+      "sha256": "27a89d0270850f8d2d4cbbf08d4551dfb25f0162056be93dc5f3b0b0332543f6"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "8ec552f416429e7e3fe26c49cf99077cb9c1e8d32e845878717e48aba874cd4d"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "sha256": "29dafcc4d9b3169848789edcaaa62ebb1349c2f535009f743c0f07ec2761f841"
+    },
+    {
+      "path": ".github/workflows/carbon-disclosure.yml",
+      "sha256": "4ad2bd5e640cd77a81b988c065bf0d0d489cbbc5cc80f4f4963b8910f4058723"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "9feae47ed927106a96ab1f7644c092c364c02a2acdbb2d25f46da1d47df64679"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "b3c55b138a4091d85a11cdc243e196e79f1ae5ba35312edd3ed49341effaf422"
+    },
+    {
+      "path": ".streamlit/config.toml",
+      "sha256": "7d5e25992705a49aca38d59b1e33f4cfde3458909ba6f944ea6998b0188b992f"
+    },
+    {
+      "path": "Dockerfile",
+      "sha256": "ebd03bd60de5bbe0034e1932df799c813b3e01fc529ed1368585ddbe8c1a644e"
+    },
+    {
+      "path": "GIT_COMMIT_GUIDE.md",
+      "sha256": "39c761c8fde4eab332ee3e992034573374f1b202d998b21e428d49e036e40251"
+    },
+    {
+      "path": "README.md",
+      "sha256": "2b36e7e8f89aea5a7f360ba2025bb90c516655d1da47b0daf2cd13464076cbf4"
+    },
+    {
+      "path": "__init__.py",
+      "sha256": "eeb9c8d96c3444bf7d3d7bc37dfab67e5908298d6efd6cde9afda80ae2ffc1db"
+    },
+    {
+      "path": "app/app.py",
+      "sha256": "fab17599e7634252a05c627b9f7cc3859c8055977481855139fc62f80cc4d069"
+    },
+    {
+      "path": "app/components/__init__.py",
+      "sha256": "f66d0be7a3827aba631a9a08231d5efa34835cd4b5d98551b743f7122b287d56"
+    },
+    {
+      "path": "app/components/carbon_disclosure_panel.py",
+      "sha256": "ff7de5f2b6d62dbb0a09ba04b0f55f0fd4f01ee2043868db76821736cc47e622"
+    },
+    {
+      "path": "app/components/carbon_ledger_panel.py",
+      "sha256": "ac91ad1c1045120590d7586023393f1fa749b12ec1e7a8cd69a8b142ae1fa9aa"
+    },
+    {
+      "path": "app/components/dashboard_home.py",
+      "sha256": "f6d6d96b60ce91230a667629f41b4a97619dbc768c58fc586eae18706fad3d44"
+    },
+    {
+      "path": "app/components/flags.py",
+      "sha256": "f6621d2b2c8a5305d1165d1f529970df85cd97477c38975b1c2267c40275cdd2"
+    },
+    {
+      "path": "app/components/main_nav.py",
+      "sha256": "c3717c6c9f38d913187966faaea3ddb5cc52ad3086741f6f772bf43552ba3da6"
+    },
+    {
+      "path": "app/components/obd_panel.py",
+      "sha256": "0f46542986b12fe6ca28c44614b915cea92f2b9d5548e83282be3f92d578754c"
+    },
+    {
+      "path": "app/components/qlearning_panel.py",
+      "sha256": "507dfac990677ce1d6dedffd12a8d9084dde7bff65d669bbe676282d8eafa9eb"
+    },
+    {
+      "path": "app/components/route_map.py",
+      "sha256": "f4c1a3037730c58578c9dfb41755d5e74f12f7a4821c6012e9f3e44df252ca8c"
+    },
+    {
+      "path": "app/components/route_sandbox.py",
+      "sha256": "f31d631f1c976d0ab1cfffa23e5693d65df7c6ffcaa2615524255f0c9fc33ffe"
+    },
+    {
+      "path": "app/components/slider_kit.py",
+      "sha256": "5dcd98b07a56b9dfd11d6465241e69aeaa9209e2da1a92c88ae78ceda812c23d"
+    },
+    {
+      "path": "app/components/theme.py",
+      "sha256": "983d16f57ef4c2d845e4677ffc94b62befa6bd37ed383054fe2460de1f8d6440"
+    },
+    {
+      "path": "app/demo_state.py",
+      "sha256": "6d018c756a7864dcb1dfde3e17168a7f381713fd431c10fcab397b079a54bd87"
+    },
+    {
+      "path": "app/finance_panel.py",
+      "sha256": "22c1f700b78d6e7296973ae47ee9966505335810ff52f83a605770812ca1678b"
+    },
+    {
+      "path": "app/live_services.py",
+      "sha256": "dd81751583577e13d54fa0c4cb0e495e2467bfa101f8dadaeb0c7db63c309b33"
+    },
+    {
+      "path": "app/main_views.py",
+      "sha256": "fa625b15c8e95a4eca93540a72d36bf2b3e8a0d1f4ac35683e880bdeab1be115"
+    },
+    {
+      "path": "app/services.py",
+      "sha256": "9b394dff83e335247066a508751106282c585c07420c5af087a35c370b34627e"
+    },
+    {
+      "path": "app/static/bg_tide_glow.jpg",
+      "sha256": "3f53cd96014648b5465892f7d1e32454c12e0b026ebe435121446fd3950748d6"
+    },
+    {
+      "path": "app/static/brand_mark.png",
+      "sha256": "4c51307ff239ad2ee0a38ec32ba834d8dc73a39df76bda23f4d8330feabb4239"
+    },
+    {
+      "path": "app/static/carbon_palette_mesh.jpg",
+      "sha256": "316f6d5e9d1b62b12883e8733839f9d645a0209bf0d91132fb4613bf4dc83b65"
+    },
+    {
+      "path": "app/static/demo_quality.json",
+      "sha256": "e78693c08013457f9d1984f61161767d86ebb186970dce9e610e3e28c11daf1f"
+    },
+    {
+      "path": "app/static/hero_carbon_mesh.jpg",
+      "sha256": "869bd889a08e98e5074e820b731cbaa40e50d389adb8bbd1ab5f078c952604a3"
+    },
+    {
+      "path": "app/views_chain.py",
+      "sha256": "6e5bcd70b22e7c44fc30292101b9ef92ac18923794acc3bd658ca755e49b3525"
+    },
+    {
+      "path": "carbon_disclosure/.gitignore",
+      "sha256": "a3a03ba85166f77aa1bc0c78fb6eb7a16aacd05f6d80bac361c57278bf975d98"
+    },
+    {
+      "path": "carbon_disclosure/README.md",
+      "sha256": "ed507857896f51c27b0556eb459b36e80617437ba7dbac9f3e6e6ed1da4cb86f"
+    },
+    {
+      "path": "carbon_disclosure/__init__.py",
+      "sha256": "b3c993edcbab1916e7df06b4c3a8dd033e7064138722e885ef0088849565d45c"
+    },
+    {
+      "path": "carbon_disclosure/__main__.py",
+      "sha256": "3cfbec5991d7004ef0be6803feb832ab59f0b9d6bc99b247c49cac774b942008"
+    },
+    {
+      "path": "carbon_disclosure/dist/app.js",
+      "sha256": "f331cd6c2e3b00b9fccd6209780b4a13a7c09a80b5c9a33af41db8407d67dcc2"
+    },
+    {
+      "path": "carbon_disclosure/dist/appendix-ui.js",
+      "sha256": "93eb512e781815087fecce4840e1bc85d2b4bba69ecdd4a37dbecae6739f77a9"
+    },
+    {
+      "path": "carbon_disclosure/dist/appendix.js",
+      "sha256": "35e1dc471088fb7cd2569bb2a85744f4ffe4fe54498999463999bcb3d89f4086"
+    },
+    {
+      "path": "carbon_disclosure/dist/core.js",
+      "sha256": "36ed23d1307cf08a166e32fac0091afbd07f01b0f30e8cb32cbcfc3d49524c9b"
+    },
+    {
+      "path": "carbon_disclosure/dist/disclosure.js",
+      "sha256": "67c1a0f9fb16eb2875774f345ccf2cc10af185e9cd84b7ea0ba271996ebb9a7f"
+    },
+    {
+      "path": "carbon_disclosure/dist/downloads.js",
+      "sha256": "81e970baf352ce0b92eee5b74ca1073faff051bd8ced1f7529832998c0929aec"
+    },
+    {
+      "path": "carbon_disclosure/dist/index.html",
+      "sha256": "0642853bff3882b1a4b1f5edfa0a3f0f1780352699210a1e94fb24c9b65a353f"
+    },
+    {
+      "path": "carbon_disclosure/dist/manual-pdf.js",
+      "sha256": "160e8d228cafb70baf2883b51601e1ea1d6a0e1986ea10307e09e8b9ec410968"
+    },
+    {
+      "path": "carbon_disclosure/dist/methodology.pdf",
+      "sha256": "d3e9bb62317e4659a3bf19bed3b760e047d98545ad40399b5f01cfcde409f677"
+    },
+    {
+      "path": "carbon_disclosure/dist/platform.css",
+      "sha256": "7ef0a04331a8069b9546a07f8eaa8d637aad8e5083131d18f2a94b62e46a47ff"
+    },
+    {
+      "path": "carbon_disclosure/dist/sample.csv",
+      "sha256": "cb4475dc36bbe328c7af95b0799085ea13e890fdcd9c32592f71de71b4e88bb2"
+    },
+    {
+      "path": "carbon_disclosure/dist/sample.js",
+      "sha256": "01f90d0295f4a9c7623a437e84d80a850b9a9d0465981cac9cdfb24145e76eec"
+    },
+    {
+      "path": "carbon_disclosure/dist/styles.css",
+      "sha256": "b6458b4fa0d028b70bd4a68247ad1ff25de0378b399d9c56f5c636bc558f75d5"
+    },
+    {
+      "path": "carbon_disclosure/dist/xlsx.js",
+      "sha256": "1ee3c6db5c41265166ea5ea7b8fe3458c711a4fb2eb715fc4df9f166aaba0002"
+    },
+    {
+      "path": "carbon_disclosure/package.json",
+      "sha256": "e6ec6cf8b959bb58e9c6634794273710b21fd4088c75ca70c390af6ade8841d3"
+    },
+    {
+      "path": "carbon_disclosure/server.cjs",
+      "sha256": "5db50b317e6df39b564fe77901f147c8078df88819d750f53ae014e7c86b5fc4"
+    },
+    {
+      "path": "carbon_disclosure/server.py",
+      "sha256": "8266d1febfa2ac4614ec6f47a5c22ad73db0d0ef75fdde72fef28a6b7763715b"
+    },
+    {
+      "path": "carbon_disclosure/tests/appendix.test.cjs",
+      "sha256": "b031d805ba71452807d1be36f46015a96497b4909b5e237c83384c03e4b0c6de"
+    },
+    {
+      "path": "carbon_disclosure/tests/core.test.cjs",
+      "sha256": "0fa49358aebdc96f4295469ef824499b59f7064f284cc577c90c5afa216e9f49"
+    },
+    {
+      "path": "carbon_disclosure/tests/disclosure.test.cjs",
+      "sha256": "b39ccdf1c90f5c0827435e19b07b6081e89f548fecebce8a6a6c25b7623182a3"
+    },
+    {
+      "path": "carbon_disclosure/tests/downloads.test.cjs",
+      "sha256": "18e284e1adf4421083ad136b7db863a8d8b299067df2ab638aac9cf5f914203b"
+    },
+    {
+      "path": "carbon_disclosure/tests/server.test.cjs",
+      "sha256": "6e2bf12076255720a5229d592472205cd269ca71ebb1cfe67ac7c9c3d546a4f9"
+    },
+    {
+      "path": "carbon_disclosure/tests/test_runtime.py",
+      "sha256": "d3c137acb99baa28271a9f2e8f4800f2e6bdf8b6e7a44fba5e13bc419f024491"
+    },
+    {
+      "path": "carbon_disclosure/范围一二三划分依据.md",
+      "sha256": "7ac9d31a2b7f59b58c9bb843462ad031bcffac8d27e0d5f3df4162b16e267410"
+    },
+    {
+      "path": "carbon_disclosure/附录怎么填.md",
+      "sha256": "b39da08c0377497c69bdb4d9800197b71e413dda322a8b233996d22edcada7c8"
+    },
+    {
+      "path": "carbon_disclosure/验收记录.md",
+      "sha256": "1569db2264eb5ec697b7f1c30d6dbf07cb7255613ada131cf5673a54885490b0"
+    },
+    {
+      "path": "carbon_ledger/README.md",
+      "sha256": "40f97c56a01321d47e3de2bc5921376ecf87c1a07ab2576ce92745053fffe9c1"
+    },
+    {
+      "path": "carbon_ledger/a0_input/input_inventory.md",
+      "sha256": "3d0cd712464a28030adf7c5e546acc261ab33b44e7f500e0dedc2c9ad819360d"
+    },
+    {
+      "path": "carbon_ledger/a0_input/source_register.xlsx",
+      "sha256": "a067d6965a13e0be5854746f442f1931e0cb6b9a8592549e24eab8f1c8060554"
+    },
+    {
+      "path": "carbon_ledger/a1_rules/carbon_accounting_rule_card_v2.md",
+      "sha256": "ad3712fe6b79b3122ebf28176ce0e76a19f79e4de1e51a01691993eb756bf5d7"
+    },
+    {
+      "path": "carbon_ledger/a1_rules/carbon_accounting_rule_card_v2.xlsx",
+      "sha256": "aa1ddc4ca349a304363ad37895a88dde65e9b94071892dd9aff12f054e73d1f3"
+    },
+    {
+      "path": "carbon_ledger/a2_activity_data/activity_data_field_dictionary.xlsx",
+      "sha256": "14dede1306bc511369deab10d187c0f416de2ac7af68bc5abeac1a700252ac3f"
+    },
+    {
+      "path": "carbon_ledger/a2_activity_data/activity_data_template.xlsx",
+      "sha256": "98f2c215fb13775c7aeef857115b4b55847b1566807f4a5a6c3aa60498ee04ef"
+    },
+    {
+      "path": "carbon_ledger/a2_activity_data/field_dictionary_review_note.md",
+      "sha256": "3fbc84a66364c976209a4c6bb280031bbc30724238254418cfa2aa73a324686d"
+    },
+    {
+      "path": "carbon_ledger/a3_scope/emission_source_list.xlsx",
+      "sha256": "12ded1fbeceabc55f1f0bd850cfa35c15f77725123f0c8aea3400b0d3ef9e675"
+    },
+    {
+      "path": "carbon_ledger/a3_scope/scope_division_note.md",
+      "sha256": "a2130666176931e3aac266a60600d55d14ae1f680971c6865e2935cd6d5fda71"
+    },
+    {
+      "path": "carbon_ledger/a4_ledger/A4_status.md",
+      "sha256": "6cc5d70116dfbd2fe71722708aa08a40206cab806ed60bed6b76908240da550b"
+    },
+    {
+      "path": "carbon_ledger/a4_ledger/carbon_ledger_main.xlsx",
+      "sha256": "bb372f82a83ca63fcad0ef32deb8a247f6994d033f7b9bc1e4a689b4a592da50"
+    },
+    {
+      "path": "carbon_ledger/a4_ledger/carbon_ledger_notes.md",
+      "sha256": "bb7f1a7cc76f46b7fe299acea4ced73c9e0b3761403a9d765bfa8873fac1481a"
+    },
+    {
+      "path": "carbon_ledger/a4_ledger/quota_ledger.xlsx",
+      "sha256": "41d0bcd15f6157ed9f3ef7c06a541b64425aa087363779752d38b6dd60020d38"
+    },
+    {
+      "path": "carbon_ledger/a4_ledger/simulated_test_data.csv",
+      "sha256": "6a62ec37d48e514c6957393bcc4329f5ffa11075085db601346a38e319b45c2c"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/evidence_index.xlsx",
+      "sha256": "129751d6af63e4915ffc809c460162de0ba7b6fdd67b8b6c361c103eac5d7284"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-001.txt",
+      "sha256": "c3795bd1c402394f02217d569184a5a5663ad706b17ccc39a9e817d405810307"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-002.txt",
+      "sha256": "fee15904b9d0097983e06cb10de1b4b0405eb1b7437dba51be2c1f4c910544d3"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-003.txt",
+      "sha256": "c269bdf9a226bda9985949854ad91340cfc355416f11db5027f63922f250c57b"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-004.txt",
+      "sha256": "a0384867390408ad87335b2ea82b01bb854a050ccf08d2c814362bb3c4356c3f"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-005.txt",
+      "sha256": "476c2098bbefd458bb2e0a49ce1830f2a47b7e33e0e004ca591ac27bcd2f07f1"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-006.txt",
+      "sha256": "02d02a7b5d9c6f5e583bb807300bcbd64edca08f23c174998646279c3e9efe7a"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-007.txt",
+      "sha256": "0e5f66f98c4701f4457464d8e3513d4e1a52baf018f5138d4e005d6d55568e10"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-008.txt",
+      "sha256": "5e6e629b37912cf0f57b6fab20d38333c45f4568fa38f1f750c894416d375ffc"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-009.txt",
+      "sha256": "9fa3ca72f0dd1e14c960e6d9cfe7a82da830811fdd797f4c136208a720ccedf8"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-010.txt",
+      "sha256": "0f7faabe7b197f1748c2fa2a85b02794c45f9836d77e04b4d2d9f67c9ea24bc1"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-011.txt",
+      "sha256": "8bf21c29b3226a54f44f1c9e5dddc868e87cb6388d566e7d4ae1b81512c08df8"
+    },
+    {
+      "path": "carbon_ledger/a5_evidence/simulated_evidence/EVD-SIM-012.txt",
+      "sha256": "7f94ff8c86c5fd3c4c56b8589f3fe5da6ddb89f645b7f36b42ecc70150cd7a48"
+    },
+    {
+      "path": "carbon_ledger/a6_verification/GIT_COMMIT_GUIDE.md",
+      "sha256": "15d0a10735338470f6cf6fb115bdae178aa64d8baf662cf2205f107f31ec8f7b"
+    },
+    {
+      "path": "carbon_ledger/a6_verification/README_使用说明.md",
+      "sha256": "75226c9b9a126e0890c866948b60396ba4206dfe099462da82bd76536b23831a"
+    },
+    {
+      "path": "carbon_ledger/a6_verification/delivery_manifest.md",
+      "sha256": "589ccbf59f376a4a6fd554a10c213fea8d45eeaa43ca455505455a6e0768a7b5"
+    },
+    {
+      "path": "carbon_ledger/a6_verification/self_audit_changes.md",
+      "sha256": "152c4232807ebd324aef2caf5b785f1396ebd231040dda2f9c8d5a5f0e27c7d8"
+    },
+    {
+      "path": "carbon_ledger/a6_verification/self_check.py",
+      "sha256": "69b1227b985e26763231c78fe46ae998460011e8262bea554683e048f7a2a2bd"
+    },
+    {
+      "path": "carbon_ledger/a6_verification/self_check_results.json",
+      "sha256": "7dd9de87025fcd501c61477047415cb1f5e6a58e84fdcd44e6cdd7e44434b8d9"
+    },
+    {
+      "path": "carbon_ledger/a6_verification/stage_status_log.md",
+      "sha256": "11fe795915fd5f6e116d97b160717c22f6f9888abf67e99d624d71b7999e8a8c"
+    },
+    {
+      "path": "carbon_ledger/a6_verification/test_record.md",
+      "sha256": "b79cad00982972b7a3e431aab30bc7459732f9ed017a3897a3373ef303c6ac50"
+    },
+    {
+      "path": "carbon_ledger/validation/碳账可行性多组数据验证改进版.xlsx",
+      "sha256": "a764c67a95acea9a922956771f9541da7a7d539c4df99b0c656f262122cc4a0a"
+    },
+    {
+      "path": "config/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "config/README.md",
+      "sha256": "6edfb0250c3c40e5529dad9de15bf3ced56ee9da641421d31762d07a7d3f4d1c"
+    },
+    {
+      "path": "config/calc_factors.json",
+      "sha256": "1fad9dfade8b96e63a13a19108620ddd4e7f404ebf6cdd8363c993f54d6b0304"
+    },
+    {
+      "path": "config/carbon_ledger_field_map.json",
+      "sha256": "d5fe57718c435e2e953cf72e57108edcb38d49a80d3eeed0d635f80955982b5a"
+    },
+    {
+      "path": "config/devices.example.json",
+      "sha256": "e2995f44d0b26f4111cf59e4c8db114a02c32edb4cd94b83d7a78a4677b8ee00"
+    },
+    {
+      "path": "config/fuel_price_history.json",
+      "sha256": "db57ff5e9000904760837a78de8b2b328de055f8e5ae731e2eaeaa4ddf029a8b"
+    },
+    {
+      "path": "config/invoice_spend_factors.json",
+      "sha256": "9c906f7f48f634e8ba7248d06dbd3a661698847b6fd0845549950eb934c79549"
+    },
+    {
+      "path": "config/obd_carbon_factors.json",
+      "sha256": "f9f728072992cddc654a5d99472d63c92fb9b2c44f36b108d3c69fb43085f1ee"
+    },
+    {
+      "path": "config/obd_gps_contract.json",
+      "sha256": "e1e83122c10800e7317aaef1f0cd35d36d512bc1115fef101585585113c0d3c7"
+    },
+    {
+      "path": "config/rl_policy.json",
+      "sha256": "dd3454ac9e8443760a2b9518a1b6a2fb939da90044bb5fe7a7763b5c0d8071a6"
+    },
+    {
+      "path": "config/rl_policy_real.json",
+      "sha256": "1ac6cc9b2d5093de5f26279bd3104d39bd899a245193caf2a3fa81b7d4ff94dd"
+    },
+    {
+      "path": "config/telemetry_contract.json",
+      "sha256": "fd42ef417f666b900e2f586c777f6d47b6f515f0d5a0a31d774694849e5b0c96"
+    },
+    {
+      "path": "data/processed/_source.json",
+      "sha256": "36c5e8eb75774089b02cd3046f28e63224b7af378e840d1466f9997c7c308655"
+    },
+    {
+      "path": "data/processed/baseline_carbon.parquet",
+      "sha256": "047ccf2e97f74873fa4146a5783217392e6056445b7926114e24dbf784ad3a14"
+    },
+    {
+      "path": "data/processed/carbon_ledger_activity_readiness.json",
+      "sha256": "a356586dfc4cbed0390cfba6fb632a4207cd9fabf3a43d336eb5f0d157060e88"
+    },
+    {
+      "path": "data/processed/carbon_ledger_evidence.json",
+      "sha256": "1613ce179825f427582c81e22630253e79b537c67e919d7af4462254847a5666"
+    },
+    {
+      "path": "data/processed/carbon_ledger_evidence.parquet",
+      "sha256": "e4b8e258376bfe72775703a09217702cd0e40e12956c6e64754971c1bdeade74"
+    },
+    {
+      "path": "data/processed/carbon_ledger_export_manifest.json",
+      "sha256": "2a4467458fc75f3e83e00828eef21d9e3df60bc0d0709536331492110df54aec"
+    },
+    {
+      "path": "data/processed/carbon_ledger_gates.json",
+      "sha256": "7eb135540fe7d2afc4f0894d792b3744e428e6af007e86d3d7fd6d07a7dd08cb"
+    },
+    {
+      "path": "data/processed/carbon_ledger_quota.json",
+      "sha256": "d77d88e0d6dba32912ee2759febf2983a8a4b3ea5ca946478e8925adcc9fc92c"
+    },
+    {
+      "path": "data/processed/carbon_ledger_rules.json",
+      "sha256": "362869aefedfa255ee3b2a37e876c772872378440620113e1cda0a5eade9210f"
+    },
+    {
+      "path": "data/processed/carbon_ledger_summary.json",
+      "sha256": "a51dc6ed0ff4c804d802534d7f885081c8365be04d7441bbe01a841e1e3f028e"
+    },
+    {
+      "path": "data/processed/carbon_ledger_trips.json",
+      "sha256": "dcdb4984d11cc687278e265b653eafac91ebd8f83d19699bb09f507d4ed1867d"
+    },
+    {
+      "path": "data/processed/carbon_ledger_trips.parquet",
+      "sha256": "1f7f8070d61473e1f4c38ae4b7387b9925d9c0a7e5bd1feb6cf9e381cf343ddc"
+    },
+    {
+      "path": "data/processed/composition.json",
+      "sha256": "5feec0472120e3c19513daef5bb6535190313106decfa1ad53c93056cabea054"
+    },
+    {
+      "path": "data/processed/data_quality.json",
+      "sha256": "4094c99f2965195b1fb9dbee4896583d051c1281f41c10be78aa8cb1459eaafd"
+    },
+    {
+      "path": "data/processed/disclosure.json",
+      "sha256": "fb1754d67ff6c1c2d69d5d6e6e16f45cfe3dfeeb7ea4c68b07f5bc658ee3e189"
+    },
+    {
+      "path": "data/processed/final_report.parquet",
+      "sha256": "dd7b3b033e3a6de9b0e1d263adbe032add84c5d945f48f444936ec1d68d80299"
+    },
+    {
+      "path": "data/processed/fleet_stats.json",
+      "sha256": "3e5e44cbc533dc382de2cbb6f44dd4d78a8519d07ac358e7bdbf8822e8bccf3e"
+    },
+    {
+      "path": "data/processed/gate_report.json",
+      "sha256": "6cda3dc967e7390a40c723c3cf2d24eb05efa8f8d36f43fcb36211eed739ac9a"
+    },
+    {
+      "path": "data/processed/hotspots.parquet",
+      "sha256": "5ea12ca5a3131ab705679683bdd3246142da8c60b6be7ac4d8ce24d72fbf656e"
+    },
+    {
+      "path": "data/processed/jd_segment_master.parquet",
+      "sha256": "0ac91673d65cc9c48859292619b575581dc0d51ff46c2e86a229da3984442cd4"
+    },
+    {
+      "path": "data/processed/jd_segment_master_audit.json",
+      "sha256": "0c138a1c9454c7ac198c81e49e2bfb1f9760df40f52f56b88b06c7bf681924c5"
+    },
+    {
+      "path": "data/processed/kpi.json",
+      "sha256": "9c87d232d1948cfa7808fd08b007316bfbf33f539624f0b4c8525036e0fcb681"
+    },
+    {
+      "path": "data/processed/lambda_curve.parquet",
+      "sha256": "4afdf71f6c23ba211c76de27d798ddcf2e04fcf9abf056637275955bcb98570b"
+    },
+    {
+      "path": "data/processed/ledger.parquet",
+      "sha256": "4aa2ad98f80a9d307bcdb9923a06514ff742632668cf81ed030875a92a275f9c"
+    },
+    {
+      "path": "data/processed/obd_points.parquet",
+      "sha256": "45a1b277c36a21bbcb9e8871943913f02c431ccbcf640c419bec7de4fae5c797"
+    },
+    {
+      "path": "data/processed/obd_summary.json",
+      "sha256": "2e637774a848e49b5a1bb10395ba328dbaf449b9fe2facd8a1471603d0e06776"
+    },
+    {
+      "path": "data/processed/obd_trips.parquet",
+      "sha256": "08b2c0a2b930c10ec1355b49cee1c358d65ef13400e46a73454ae059584a0cb6"
+    },
+    {
+      "path": "data/processed/obd_vehicle_carbon.parquet",
+      "sha256": "1aabef0c1bf75e0eeb7554457baa1c7ce4f6b28d3aafb5d93435450a69761e84"
+    },
+    {
+      "path": "data/processed/obd_vsp_crosscheck.parquet",
+      "sha256": "e7da61f3f23d2f23cf74293d55178dc90e126c6871eadfc7011a70962f071455"
+    },
+    {
+      "path": "data/processed/obd_vsp_crosscheck_points.parquet",
+      "sha256": "7ab4d55be0e770f04177a077321d42e5ebc04294b52795542d1abf311d5b4427"
+    },
+    {
+      "path": "data/processed/obd_vsp_crosscheck_summary.json",
+      "sha256": "c264192cbfc2642ca990111bd4bd9bca2dfeda367d18d8a0f57182d37e758952"
+    },
+    {
+      "path": "data/processed/od_band.parquet",
+      "sha256": "dde8285e50139d7d976d0f35119cf58d71ea5bfbce9da09059c02f171e580aa4"
+    },
+    {
+      "path": "data/processed/od_vehicle_mix.parquet",
+      "sha256": "fdcea8fd4586389681c5d7c80ac0fddd7f02c4e678896ef3c322c313bc9027bf"
+    },
+    {
+      "path": "data/processed/our_carbon_model.json",
+      "sha256": "7ba2aaddde8aecb1deffb465a5de6dcb18f0bbedb8325457adc0c87350d46fba"
+    },
+    {
+      "path": "data/processed/route_baseline_sh_bj_steps.parquet",
+      "sha256": "60824fa2deb5d1868553f98acb637859659453d44931b3bafc22da3fa0921545"
+    },
+    {
+      "path": "data/processed/route_baseline_sh_bj_summary.json",
+      "sha256": "8af715b3c397e981ba0e6dd3f0028ae7981ae80e5f6a122eacb0d55ff8541452"
+    },
+    {
+      "path": "data/processed/route_candidate_carbon.parquet",
+      "sha256": "d6a59a164cdf53b9f828926b4d6913d822500bf0838ec0347ba3771d8f3f1344"
+    },
+    {
+      "path": "data/processed/route_candidates.parquet",
+      "sha256": "30ca29b1a3e71ec52bb812130ca8fc611db50d7acaa4157d7c21a76ee44e8ed7"
+    },
+    {
+      "path": "data/processed/route_carbon.parquet",
+      "sha256": "3719f1a35ac03b55765fef1ad0fd21a53b11930fd515a7024c17410f2b5cfb5b"
+    },
+    {
+      "path": "data/processed/route_carbon_od.parquet",
+      "sha256": "f6123d88dc8fa1568378c1d90a4528c725437a5271b1b51e70a8290b098d6aa0"
+    },
+    {
+      "path": "data/processed/route_od.parquet",
+      "sha256": "edfc2117e5c3779eb6383d09e9fabb06023dcc19b19ebfd198ac90d8e0a97065"
+    },
+    {
+      "path": "data/processed/route_select.parquet",
+      "sha256": "43af178782fc2b2205b55b91a5d32061230b69aa837eea695afa6a83a74a1229"
+    },
+    {
+      "path": "data/processed/run_log.json",
+      "sha256": "00937379977b95187f6b728ede2b4b171dc9dd25b65c76188afeb3c74e705ed1"
+    },
+    {
+      "path": "data/processed/scenario_route_constraint.parquet",
+      "sha256": "40a6f273162267f1444a313f06e0e2985c4656e96aa08669619ca8a8d4efdbe0"
+    },
+    {
+      "path": "data/processed/vsp_audit.json",
+      "sha256": "1e4838889bf0c01b61352288a50020a4a9431e38571af7129d2f1b0e56f0211f"
+    },
+    {
+      "path": "data/processed/vsp_physical_trips.parquet",
+      "sha256": "d044f92096261b9d37c5fc1a9615f55a08dad9b9fe4b371fb5cec2968864f3a3"
+    },
+    {
+      "path": "data/processed/vsp_seg_audit.json",
+      "sha256": "8aeacc550835d79d44d69416edf7c63f78c7562ce6ce3fac09a345581aded073"
+    },
+    {
+      "path": "data/processed/vsp_seg_carbon.parquet",
+      "sha256": "869c2313f6ed8d6b842d7d2636f6f4cdfaeefbb75f67b5e81e56bfc99a8757cb"
+    },
+    {
+      "path": "data/processed/vsp_seg_cluster_audit.json",
+      "sha256": "4a7f9e1fd77a3ba7fa7a787c7f396f24a9794880f5bbd9b289a3aa66c0e33619"
+    },
+    {
+      "path": "data/processed/vsp_seg_cluster_profiles.parquet",
+      "sha256": "a95e35ea381bcaed942ba16368651f234d6aa059c24e63360a6ee0338b714479"
+    },
+    {
+      "path": "data/processed/vsp_seg_clusters.parquet",
+      "sha256": "c3872e7a6134a9478ea7cdabfc8731f8f640d434937d7c467cfa1a3718df8bf9"
+    },
+    {
+      "path": "data/processed/vsp_seg_factor_recon.parquet",
+      "sha256": "e9eaea4b452b6905972263e0b712d16187d6ecd6ea7d1ccda6dd8672e7512925"
+    },
+    {
+      "path": "data/processed/vsp_seg_rule_table.parquet",
+      "sha256": "24c541c2eab81a43d74e2ad15183dbbf91e66730b9a9838553c0454f7868ada7"
+    },
+    {
+      "path": "data/processed/vsp_seg_trips.parquet",
+      "sha256": "69cac00cf23df4dab58d7a3b61f97da97fd43b228736754360709635be8189e7"
+    },
+    {
+      "path": "data/processed/vsp_vehicle_groups.parquet",
+      "sha256": "412d815457c9d705850932e76138360a31887763b128cf51dceadbf961c021b8"
+    },
+    {
+      "path": "data/processed/wide_data.parquet",
+      "sha256": "31aa7289bee4020f7ab85d769287e5ce1f7b8f0f252d5e2b2e0bd6e49b4748ce"
+    },
+    {
+      "path": "data/raw/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/reference/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/sim/excel_10000/obd_board_batch_30.json",
+      "sha256": "1173a5c1c1248891187b80b30ba0a7582e98aa4ebd99b19e5eea37367b0c448f"
+    },
+    {
+      "path": "data/sim/obd_raw_sample_30.json",
+      "sha256": "8926fa806dbbe5205a4a8b8cab35c2dda2e6b6fc79d9cf70cb710e0350a7931d"
+    },
+    {
+      "path": "data/sim/obd_raw_sample_30.jsonl",
+      "sha256": "b4dbbb682dc7c0338e183964d8efd6c0b399f867890d4ad71f7edf736acbaf5b"
+    },
+    {
+      "path": "deploy/README.md",
+      "sha256": "f73093a95db29d0c82355731e2460266334da5514210dc1b063f0964c8e40777"
+    },
+    {
+      "path": "deploy/caddy/Caddyfile",
+      "sha256": "08c05c54b3d5b5ca14a7e70581a3b8a3f7be6a319be6d81e8b1c10d988b806af"
+    },
+    {
+      "path": "deploy/env.example",
+      "sha256": "34da772c09125f3f2f8b31d633fed93533014eac11bdd41c01227c490ff6f6b5"
+    },
+    {
+      "path": "deploy/install_docker.ps1",
+      "sha256": "1d0af957f00ffd60401ca266f0e49f95159daaa178216a655586335f126fdd38"
+    },
+    {
+      "path": "deploy/install_docker_wrapper.ps1",
+      "sha256": "129151963f4f2b00b4c8f2ec4f868180240b00b347744eb75b50b552968bf301"
+    },
+    {
+      "path": "deploy/setup_windows.ps1",
+      "sha256": "3f09f2231010dbbdafc5b9a04da63c342f66f0cdc961152950e87a7f28ec8832"
+    },
+    {
+      "path": "deploy/windows/README.md",
+      "sha256": "d276d182db10022a2de89edc6b6f83586c31426b2120ac276aa46df048799f7b"
+    },
+    {
+      "path": "deploy/windows/firewall.ps1",
+      "sha256": "b20c22fc954d5b73fa83a41639b207e2ba48cfafea05fefb14a118052896bedf"
+    },
+    {
+      "path": "deploy/windows/install-services.ps1",
+      "sha256": "7e5fb3f9f3d2037f43c45c7bd8297e409a16ddd55c43639822297347750f3883"
+    },
+    {
+      "path": "deploy/windows/start-native.ps1",
+      "sha256": "ac96fda0e524b4dc8aa4110dcfabf14ff92a7694c8ed4ead670aaed8edb587f4"
+    },
+    {
+      "path": "deploy/windows/stop-native.ps1",
+      "sha256": "26290c413eb6cdd977609cb37660fbdc0e333db03a94573fd8878d7873f7cb3b"
+    },
+    {
+      "path": "docker-compose.yml",
+      "sha256": "9f17136c5edf0a2a83ea6aa88608b080086c274236c7e7d7fb03311422a9bf4c"
+    },
+    {
+      "path": "docs/03_项目文件结构规范.md",
+      "sha256": "5c77be8f40f4bfbbccb2d13a9b4e80c602ea042b2bd3f198f00b2c927bc3ba20"
+    },
+    {
+      "path": "docs/06_任务权限分配与责任矩阵.md",
+      "sha256": "5321dfbccfaeb9fafb9c7652833647053fbfb187edc862545e143dcec4aa3636"
+    },
+    {
+      "path": "docs/07_数据字典.md",
+      "sha256": "53515a35893ffced5f2c7bf61cfff0632b50b74ef936b77a85c447b13aeedb5a"
+    },
+    {
+      "path": "docs/08_口径与假设清单.md",
+      "sha256": "a044be207dd87259732fd176901c1850b57b9bfbaee1549c14ec7b96cfe132f3"
+    },
+    {
+      "path": "docs/09_答辩演示脚本.md",
+      "sha256": "f713cd5cd8d0d6e783e4ca082941db262f19526c5d881f72a801a8978b678c2d"
+    },
+    {
+      "path": "docs/15_碳会计模块_v2.md",
+      "sha256": "85743ad136464826e6e6d03ac0e46a4b58a9fd2955ea2bd7226f235d7627a828"
+    },
+    {
+      "path": "docs/17_主体赛施工蓝图_v3.0.docx",
+      "sha256": "d34f133f15742bf3bc5019ecc8ee97480dac746ebfd0b80217891e8437815602"
+    },
+    {
+      "path": "docs/17_主体赛施工蓝图_v3.0.md",
+      "sha256": "d1c39c8767568be3142666b7349219816566370de8e50930a8d1432110684c84"
+    },
+    {
+      "path": "docs/20_工程落地与踩坑对照.md",
+      "sha256": "467155123cbc4982f3037a9af8ee3ad93513419b15f5bb82af16d73ec89cc514"
+    },
+    {
+      "path": "docs/21_真实数据表结构与接入记录.md",
+      "sha256": "1541e4b3e39952e42a270f0e13d21018fa04cb35c82508b7637e21abab6617b7"
+    },
+    {
+      "path": "docs/22_项目进度审计与补齐计划_20261020.md",
+      "sha256": "941995693d4a842f9a5b5f06fc71265bf2d9cada66ff9f9f0dc7d937b56c9ac4"
+    },
+    {
+      "path": "docs/23_动态路线规划与动态碳核算方案.md",
+      "sha256": "6af2273f203c81ccfc2b1b401896c958dad4aea00bd3c2e9ef7cb12895dda85f"
+    },
+    {
+      "path": "docs/24_高德JS_API_v2.0嵌入实现指南.md",
+      "sha256": "2fe573e39c504fc28d8cff6d31f5d4ba14cb0b97d2136af738c7c9cd690fb835"
+    },
+    {
+      "path": "docs/25_国赛格局与功能路线图.md",
+      "sha256": "5bb35c80117b9a3c40bed37df791c54013839a580a83ccf871361f16eefcd7e7"
+    },
+    {
+      "path": "docs/26_高德嵌入实施记录_20261020.md",
+      "sha256": "dc692f7b5e24fe25a7c792339ba46c1ef9e0be9ee1064d05e0d3ecef8a6acf24"
+    },
+    {
+      "path": "docs/27_项目运行手册.md",
+      "sha256": "480da686d16fd8f6f00a8e5bf5745d7a94012b270301e53bd3e46f6f3ee005f9"
+    },
+    {
+      "path": "docs/28_对接与缺陷审计.md",
+      "sha256": "0085a4b225936831f0327aebf7246662b6263316b9c760a9ae62581e794021e3"
+    },
+    {
+      "path": "docs/29_路线实验室_动态路线与视觉升级.md",
+      "sha256": "bc193e9aea4885160d3b8632cf1663c8f91da5de24f03b5473aa331b8341db75"
+    },
+    {
+      "path": "docs/30_前端重设计_CarbonTide.md",
+      "sha256": "6a76e13a9ee2c3df2971d6138cf248fbb1d6408e9888c2f2ec187730ce714ec7"
+    },
+    {
+      "path": "docs/35_上海北京基线_任务书.md",
+      "sha256": "1d120af336c34dae85c1b9eeb63d970dfead4f910fc8819364172f7e8ff97d24"
+    },
+    {
+      "path": "docs/36_上海北京基线_交付说明.md",
+      "sha256": "fc2239f88ef492daa55a22dd706f90329506671494828a863f8ea7e588209c4c"
+    },
+    {
+      "path": "docs/37_怎么运行_基线与第6页.md",
+      "sha256": "8b5f6628bd8cf445e938e39625d47ce06bcb489a6254c66d995ca8ba012348d1"
+    },
+    {
+      "path": "docs/39_碳账差异归因_4502_vs_2339.md",
+      "sha256": "81293292979452fb6e63da53d5e762c5560e4442cde0cf7e4e62d74f619ed7e0"
+    },
+    {
+      "path": "docs/40_我们的碳模型_v1.md",
+      "sha256": "3bc41bc963d784ee812d845a3331d9d53805dfcec431a38ecd958961ad3645c7"
+    },
+    {
+      "path": "docs/41_VSP模型现状与合并约定.md",
+      "sha256": "e082fcd113bedd20752554a71e9c50da94e9d37e25fee7288dda5d8f9fd8fd14"
+    },
+    {
+      "path": "docs/42_三人任务分配_软著与数据输入.md",
+      "sha256": "8b12c9b4c45b21a3838b1935cb1bd47876a353c9e3dbfaca0a645df0da3f324a"
+    },
+    {
+      "path": "docs/42_用户数据输入规范.md",
+      "sha256": "379fc9d9183ba192c6fe5916b804ae19d0f9cd4afb599372e80d3a5768d26f75"
+    },
+    {
+      "path": "docs/43_版本拆分与功能边界.md",
+      "sha256": "f7cd4a8c8c57f731166fcd40c3d21d79735160772d7625f6a978e99c4b0bafe8"
+    },
+    {
+      "path": "docs/44_发票智能录入_设计与接口对接.md",
+      "sha256": "a0200539d4d7899662fde33335d1d7a8c9591b37ba68dec54d1a28df368deae0"
+    },
+    {
+      "path": "docs/45_车辆路段油耗与碳核算模块.md",
+      "sha256": "4d6d92bbcd33fb4a6b402101ddf1a6a6c4862e3ed6092c7a392fb4e9704ab7fe"
+    },
+    {
+      "path": "docs/46_前端重设计_Coolors.md",
+      "sha256": "123c8adc4f01505257ebe2fdd0d63394928d06b2e0130503f7522fee459f3a49"
+    },
+    {
+      "path": "docs/46_实时监测数据接口契约.md",
+      "sha256": "351372a552e7fd620d6596159663938dacec88b31e3ec7c8eb6261ec80517f2b"
+    },
+    {
+      "path": "docs/47_前端重设计v2_暗色电影感.md",
+      "sha256": "9594e855979c4b017ad80a771d5abcb8d90c9ef929dc46c921d1f499ef97c7cb"
+    },
+    {
+      "path": "docs/48_高级滑条与联动图.md",
+      "sha256": "9b406905ca403ec2c0cf7b8f80e6f9fa428785d6b328abaa248380fb61dc49b5"
+    },
+    {
+      "path": "docs/49_企业级演进路线图.html",
+      "sha256": "c3ded30f0cd8e8b34634e3e76c9a01a9dfe5f864e6a5c6810d096c3716b1d14d"
+    },
+    {
+      "path": "docs/49_企业级演进路线图.md",
+      "sha256": "89ed0e19d70d0af3d1137c663a9bdbb8b6764868e034420d54454d5f8823f8bc"
+    },
+    {
+      "path": "docs/50_P0交付说明.md",
+      "sha256": "a9848b6ea79256bffd9a4f6aaeb009ffeab7d442e32dba22693a23109f3f356a"
+    },
+    {
+      "path": "docs/51_环境与硬件接入.md",
+      "sha256": "58eeb53019ff3144b1a45530f26bd38d03c7634e9a84220e241931778edea13c"
+    },
+    {
+      "path": "docs/52_OBD_GPS_实测碳排方向.md",
+      "sha256": "76605b6b9c9f935269c45b5dba01991b56386059f1e24c85ac012415e4370c9a"
+    },
+    {
+      "path": "docs/53_碳账交付接入与口径对齐.md",
+      "sha256": "b72e403ce28bd7fdb3d9660e0162a631b027bb3a62cab6787b8fb2b77be9ef51"
+    },
+    {
+      "path": "docs/54_碳数据输出格式与前端落地方案.md",
+      "sha256": "a97390046b3f17f4b1d8c31d59dc65b3016f728445ac8350ae3b4e698a68d2de"
+    },
+    {
+      "path": "docs/55_碳账交付修订指南.md",
+      "sha256": "1a406921605d0fb38350a46b493b7f68ee5155306ffdee0f0fa8749deacb6ccc"
+    },
+    {
+      "path": "docs/56_碳账计量方法审查.md",
+      "sha256": "ce40d69a4478841c8ceb0674f6cac5e07a891c4acb916e1362bdec69f83195db"
+    },
+    {
+      "path": "docs/57_方向调整对齐_OBD_GPS_VSP.md",
+      "sha256": "80ad6f52ae8f34e43910d4803572981bb315bfdf1490eb791558f4be515b3230"
+    },
+    {
+      "path": "docs/58_carbon_ledger_frontend_integration.md",
+      "sha256": "05a68450f6f82ee9ccec2095db863088a73d46f26be6290f97d45a99c95b71c1"
+    },
+    {
+      "path": "docs/58_论文锚定速度分段与KMeans归档.md",
+      "sha256": "0cccafbc3c65be9d4e34a83407e17f186228b6dd1f1c83fdc100a66dc36db46e"
+    },
+    {
+      "path": "docs/59_Q学习动态路径决策.md",
+      "sha256": "b9820ded9d3190e20a35e5304b9e14fa6fb99096fa483698b79efa7d7a3dc570"
+    },
+    {
+      "path": "docs/60_路段主表与聚合口径.md",
+      "sha256": "7a4e86497b589920d2d558a03434e8c0b09f2a64f8db7e962bf1e6d598ed5a1c"
+    },
+    {
+      "path": "docs/61_真实路网Q学习演示.md",
+      "sha256": "adee1cb293fcedc61547c857f05c84c083f74b232bc10c061ee123e482a6542f"
+    },
+    {
+      "path": "docs/62_OBD稀疏校准与试点方案.md",
+      "sha256": "5e4471a9dcc8a520bf804fc95b927d37ebbaec0432060f861f07d6b011aaf5f8"
+    },
+    {
+      "path": "docs/63_OBD模拟数据格式与生成口径.md",
+      "sha256": "f422e1ae7dbe1eb67d3c724dd17888618d683a04d689c2059caa62eebc00da57"
+    },
+    {
+      "path": "docs/64_数据链条与联调手册.md",
+      "sha256": "0d9de44e3e4d20611bb41a36f154d99fbad9682721ba697bbed2812e130b94b5"
+    },
+    {
+      "path": "docs/65_执行方案_可信核验试点_20261108.md",
+      "sha256": "038f6caae6494afe2e473567285950d0cdb27e9f94533dce1d8472c940477b51"
+    },
+    {
+      "path": "docs/67_联调参数单.md",
+      "sha256": "7a05cfdf09e01a772ea43329a6cd619f67c012a84a7020e94c06b93f31a571d9"
+    },
+    {
+      "path": "docs/68_Excel万条模拟数据说明.md",
+      "sha256": "80072581dbf05135b86e779bf61fddc8b025083b104f010943fb5b14caf5c7a8"
+    },
+    {
+      "path": "docs/69_PPT逻辑稿_给执行方.docx",
+      "sha256": "011218ea8e807f05027e1a75754e6d6b6fa5d40e65fcb4d9e3abbe8b7a56f409"
+    },
+    {
+      "path": "docs/69_PPT逻辑稿_给执行方.md",
+      "sha256": "088941c7359158f883f5fb088a5da364f92cbe497832941866bdf8651e66a4fa"
+    },
+    {
+      "path": "docs/70_软件端全量验收报告.md",
+      "sha256": "e37eafef65d8fbad963ab4e0d12cf4267f483358f9b2d7be7787ba43517bef4e"
+    },
+    {
+      "path": "docs/71_原始附件全链复现记录.md",
+      "sha256": "ab4a738c1ec613e7eb013110393ecbd0c2410cd686713adef9a470db126d5888"
+    },
+    {
+      "path": "docs/assets/carbon_tide/baseline.png",
+      "sha256": "f725501965ebcb8ad539f00ad196e4a91b49f9f9f75967b71848ecff17291a2e"
+    },
+    {
+      "path": "docs/assets/carbon_tide/calculator.png",
+      "sha256": "fe8015f54d35d5cdd56f0652012cb151da9701f1d24983b71d24d4c880195b37"
+    },
+    {
+      "path": "docs/assets/carbon_tide/mobile.png",
+      "sha256": "2bb8320259e67262537db4854dd7840d5d7e6e962aadb69188aa351cbfa53b79"
+    },
+    {
+      "path": "docs/assets/carbon_tide/modules.png",
+      "sha256": "14dd2be932fef7dd906fb15a118875e97e3d85cf5ac103e01b0e694639465718"
+    },
+    {
+      "path": "docs/assets/carbon_tide/overview.png",
+      "sha256": "deb5b96a43560051997f7d4ec5e9e8902624719aa6ae54ae957ef9a810aabbad"
+    },
+    {
+      "path": "docs/assets/carbon_tide/route_lab.png",
+      "sha256": "08f1eafed783bc9d11563be63000a02a07b3ba138dc78c0e014f7551fb37022e"
+    },
+    {
+      "path": "docs/assets/carbon_tide_coolors/baseline.png",
+      "sha256": "38ec6f5913fc9b6c55f17a86498abaccfb0c2a3d784bd144c9077915b1291790"
+    },
+    {
+      "path": "docs/assets/carbon_tide_coolors/ledger.png",
+      "sha256": "93c4292a523a25b16d51845cd65559a5b31d24e829aac2f1f7a78093a32abca1"
+    },
+    {
+      "path": "docs/assets/carbon_tide_coolors/modules.png",
+      "sha256": "b989437064c8c23b38d069616765cc6056b1e53ac5966d0a346a2c88456037fd"
+    },
+    {
+      "path": "docs/assets/carbon_tide_coolors/overview.png",
+      "sha256": "9686e3b38616ac5630535aaeec348fe352bbb6e64d64cf0e0a22d73a975472aa"
+    },
+    {
+      "path": "docs/assets/carbon_tide_coolors/route_lab.png",
+      "sha256": "ac6fad4db41f76b95bc3850a73cf60702cf0cbbbfdeedf1b60d36569ff15358c"
+    },
+    {
+      "path": "docs/assets/carbon_tide_coolors/tco.png",
+      "sha256": "1efa722b83d6d543dcca8f1adb95c910b8c62a3de0a6dc7897924b44ded2dedd"
+    },
+    {
+      "path": "docs/assets/route_lab/city_roads.png",
+      "sha256": "9ac534766bfc1d4058077a1951861180fb125266fbdc89d17d703996b656435e"
+    },
+    {
+      "path": "docs/assets/route_lab/overview.png",
+      "sha256": "a5e9ec5cb66266a4111db1c8214a323f2c2988efb80fa6dd4e402fa118e61591"
+    },
+    {
+      "path": "docs/assets/route_lab/strategy_carbon.png",
+      "sha256": "7c632076602f8a4775104eb0eef2a9dd47adb5a4894fe54177f09e5c3538b7cc"
+    },
+    {
+      "path": "docs/finance/finance_fields_v2.json",
+      "sha256": "009f7dd410c3c08126eb2f4cba37e711de86f67b61c14022638e39b11c6b898f"
+    },
+    {
+      "path": "docs/finance/transport_evidence_delivery.md",
+      "sha256": "6163e87f0e734a8f87d334c3c66bbce6b8a75c1f26eb5047db82cf1703c50eda"
+    },
+    {
+      "path": "docs/finance/transport_simulated_acceptance.json",
+      "sha256": "e06d33f12761eefcdd94cc28c577c719ffb0630ae8f29ec5534069fa2feda13d"
+    },
+    {
+      "path": "docs/finance/transport_simulated_acceptance_45.json",
+      "sha256": "83e7f162f409d57e1ecb3533135186e877d8892680198836e2275d8d6d864d26"
+    },
+    {
+      "path": "docs/finance/transport_tests.txt",
+      "sha256": "c55f85d8d9189a80f6890feb6fcdc98143716a154740cd06e5238a2662a87041"
+    },
+    {
+      "path": "docs/finance/verification/final_pytest.txt",
+      "sha256": "5ec4458e492f82c65caa1cacf40aaeb6f7142bcaf279ec1f793e785ca88be76b"
+    },
+    {
+      "path": "docs/finance/verification/final_pytest.xml",
+      "sha256": "5065d9e53c3d851fcbc20097af5a0131ac6c18e42d925b0b3f2e459bc74ea880"
+    },
+    {
+      "path": "docs/finance/verification/pipeline.txt",
+      "sha256": "7747efc821d4673c27e6325992073411071a6338e2e04d48203bd145c2e39469"
+    },
+    {
+      "path": "docs/finance/发票字段抽取示意.png",
+      "sha256": "dfbd17c0df0545978373a790d52278e2bca1f49680368d24d8cacc9d42da4b2d"
+    },
+    {
+      "path": "docs/finance/合并说明.md",
+      "sha256": "c60d1bf0fa29eb293fb42b8fcab8512d62c9a46b3995a9aa69e3ee0f6b707924"
+    },
+    {
+      "path": "docs/finance/接口说明.md",
+      "sha256": "5ed58d8477995721a9d6b4fed44357b7d5a2ecb5df52266943c7e2c822e9c56a"
+    },
+    {
+      "path": "docs/finance/联调报告.md",
+      "sha256": "47f8630fe614ad58989da2c4d6d0fdd39f0d6456f62ed272532fbd214e2e543d"
+    },
+    {
+      "path": "docs/finance/项目财务主表_费用明细版.xlsx",
+      "sha256": "4196b051eb5864fdc546853b5540f1ef9f97c360a04848e807c13aea5619437a"
+    },
+    {
+      "path": "docs/finance/验证记录.md",
+      "sha256": "47f8630fe614ad58989da2c4d6d0fdd39f0d6456f62ed272532fbd214e2e543d"
+    },
+    {
+      "path": "docs/用户手册21-24.docx",
+      "sha256": "0e74d55925720d96b3045c14910cff5b7d3d401d172d32677cbd55900ce1e106"
+    },
+    {
+      "path": "docs/用户手册_第21-40页_初稿.docx",
+      "sha256": "11ecf0bf65dad700e53c8a0073e083d1df900d059432483df4c12c1a61501ee3"
+    },
+    {
+      "path": "docs/软著/README.md",
+      "sha256": "88b5cdf27cabe423b16de1ac5ddb3f86f8ef5fdf20805f31676ee1c42c224d32"
+    },
+    {
+      "path": "docs/软著/任务分工.md",
+      "sha256": "83ed0dd23dae1c5e84a36997beaf7c3cbe743e94d3845f5a3b70c87f3e0476b4"
+    },
+    {
+      "path": "docs/软著/源代码/源代码_前30页.txt",
+      "sha256": "dc5ba6156e389a0cd5337e0eaa2e11868304b4b883855ba950da260160ccc439"
+    },
+    {
+      "path": "docs/软著/源代码/源代码_后30页.txt",
+      "sha256": "f402647eebf1034c5b4190e1a38d07741f628d7fe068a22f8f70f1d6e5a613cb"
+    },
+    {
+      "path": "docs/软著/源代码/源代码_完整.txt",
+      "sha256": "228285baf719ccace56d9e4a264e3f7a82a241e4eae9f57218e32ba50d39787b"
+    },
+    {
+      "path": "docs/软著/源代码/源代码_文件清单.txt",
+      "sha256": "d982e33a87a9bdf7e45721c088ae34d2b0cc88fd5cabeb6db1ff2c4e602b3da8"
+    },
+    {
+      "path": "docs/软著/申请信息.md",
+      "sha256": "21be01a282e3e69e76e06e0b9efdc786583d7bd91d6462df518d6153ceff32e9"
+    },
+    {
+      "path": "docs/软著/软著与数据输入_团队任务分配_20261025_v2.docx",
+      "sha256": "3fac8c4bb23dddd7ae400b683bd9dc982955ff3dab2339a8ebca7b31bcd46564"
+    },
+    {
+      "path": "examples/finance/invoices.json",
+      "sha256": "12a2b724cabe451bd140556d30ac658c90e76fa7a567ca888c97910a57cae50d"
+    },
+    {
+      "path": "examples/finance/transport_invoices.json",
+      "sha256": "dfba840d731a0595fce26d3a5551607a95e632501eb6e3ce34fd3ebe497b1cb6"
+    },
+    {
+      "path": "examples/finance/transport_references.json",
+      "sha256": "a988b224674321c5239673c0fbc108699251ce01e97984d6ba542b16304d159c"
+    },
+    {
+      "path": "firmware_can_test/can_test.ino",
+      "sha256": "40a55222f00ad088a1ca096a60783071b9098cd3467e774b22259728c2fc790b"
+    },
+    {
+      "path": "firmware_obd_sim/firmware_obd_sim.ino",
+      "sha256": "c04a0c707b2f6b9916bd1f5b3e773f4d1b22e813068d9ef21ceace31ab4dcf57"
+    },
+    {
+      "path": "outputs/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "outputs/README.md",
+      "sha256": "606681f8e4aa6f3760decfcc4b7b9afc3bb88a4c5907a4c5d0adb8b07883b497"
+    },
+    {
+      "path": "outputs/report/amap_route_figure.py",
+      "sha256": "fe60fc5acaf8bb96e062c1360fb3fca4065589836a3c681a963fe53d77b6bbba"
+    },
+    {
+      "path": "outputs/report/business_problem_overview.py",
+      "sha256": "feca6c2faed32ca10e38d7b571d458cbac40f28e008426cfe23133db4ab504b9"
+    },
+    {
+      "path": "outputs/report/data_flow_overview.py",
+      "sha256": "d57e54a5d4b1406e733a1489a8ca3c86b987d58833c42b22b349fde02e0328c0"
+    },
+    {
+      "path": "outputs/report/mind_map_data_chain.py",
+      "sha256": "386f18aeeddf3107af2a55856115072308570304c5dda6847e6b1d45ed70949c"
+    },
+    {
+      "path": "outputs/report/mind_map_data_chain_20261108.png",
+      "sha256": "1c1cc417f1c415858da9f067367a3e2cd745e9e2f495822f51bd6c2c43f8454e"
+    },
+    {
+      "path": "outputs/report/obd_calibration_overview.py",
+      "sha256": "cb0e0d637e604d877c2ce70acc12e2db97937cee9a7f61dfc2530197604800cf"
+    },
+    {
+      "path": "outputs/report/segment_aggregation_overview.py",
+      "sha256": "c730b54cab2fbc248d26fc6ad89c901717c8835cc2e60395ab925c6e4bccf332"
+    },
+    {
+      "path": "outputs/report/segment_handoff_map.py",
+      "sha256": "8c27e2e077ec804d871d38ea40bbf7076aee22b44693fe6467b8810565d87390"
+    },
+    {
+      "path": "package.json",
+      "sha256": "c0bab780dfe4f220330141415609de3f993534a0a06c19e01169f003c6e2eb67"
+    },
+    {
+      "path": "pytest.ini",
+      "sha256": "6c338a8ad6d953f0ade5d8fa28a9b77236c401700835620680eb73d38669a8ae"
+    },
+    {
+      "path": "requirements.txt",
+      "sha256": "a27152d5bad6897f605d2ae30d263d0ae62fd2939094c1c23fada55e93b19214"
+    },
+    {
+      "path": "server.py",
+      "sha256": "05d3c4475b7b41accc63cdc0789dff552c717b92d51259f864f94261e2c1dbf0"
+    },
+    {
+      "path": "src/carbon_ledger_export.py",
+      "sha256": "4cf77a2788570396a0954be073ea138468ae688c406a7780bcc8fe2112e470cd"
+    },
+    {
+      "path": "src/carbon_model.py",
+      "sha256": "b0162b29356578042ec978861f04d569f9c2d4d8754692c73756444c745b9054"
+    },
+    {
+      "path": "src/config.py",
+      "sha256": "945acf8c20b54ab444893cb4856cac6f5f14f3d93f6e241b5ecebe5484732614"
+    },
+    {
+      "path": "src/device_auth.py",
+      "sha256": "78e92f34e007aed2c448026551bb180f6979713f3faa98cdcc711c5b5d12b25b"
+    },
+    {
+      "path": "src/disclosure.py",
+      "sha256": "f2935f222a883e49420845620a6fa09729300691c36d94e0761bde75cecfda1e"
+    },
+    {
+      "path": "src/evaluator.py",
+      "sha256": "e1c51734cb4ffbfdacb382ff4aa53dcf45bcf36d317bc35e2dc392d95fb9b009"
+    },
+    {
+      "path": "src/factor_model.py",
+      "sha256": "ac429548664678b0eadb2450abfa00dc1f908ffdc76c0f551bc970dfe91bc750"
+    },
+    {
+      "path": "src/finance_workflow.py",
+      "sha256": "6ab04fb6ae92f034645caaefb758bc177064b8d6afcb1c2eb6c794cf2381b44a"
+    },
+    {
+      "path": "src/fleet_efficiency.py",
+      "sha256": "2ff775dcb232c6f3e6b2f768fd9eade7958bfa1d5c8eb7553a7df0ec939bb73e"
+    },
+    {
+      "path": "src/fuel_layer.py",
+      "sha256": "c2689170543b39e08e03210f0f6e3320b5c5e25f97eb23a942bf4d0e36fb4074"
+    },
+    {
+      "path": "src/invoice.py",
+      "sha256": "0a4d6813629e78b2a9e7b0aabc20792cef0c5b910a549c836460e05ea74b2d9c"
+    },
+    {
+      "path": "src/obd_calibration.py",
+      "sha256": "5881c81c6eab10447f56283eb20d01046c87885dcf37342d7346573e965e79ae"
+    },
+    {
+      "path": "src/obd_gps.py",
+      "sha256": "be3ad159bda14148f3336aabd5471e85acc816eb8a18029a1760f396c3410604"
+    },
+    {
+      "path": "src/obd_pipeline.py",
+      "sha256": "8547d0ae7b982cdb5966edc02eb2b7f75d42ab3b6bbd5f2a748cdcbc12a12c63"
+    },
+    {
+      "path": "src/obd_text.py",
+      "sha256": "89cb11e3b676769849fef518f27c25796225b037eb0419d49c591740479d6a6a"
+    },
+    {
+      "path": "src/obd_vsp_crosscheck.py",
+      "sha256": "c2f5147fc546c2050b92a39c6164555f3cb4aba2b0cf75a9c504d9e456da7fbd"
+    },
+    {
+      "path": "src/optimizer.py",
+      "sha256": "68bbc4fc4211b514a1526270391c2ae0dbdd700b0b98ba3e0e74a3071d69143a"
+    },
+    {
+      "path": "src/pipeline.py",
+      "sha256": "ef0ca45487701d46df77133d2eaf33874a97afe8b016c7ac7f5fe5edbd611a27"
+    },
+    {
+      "path": "src/preprocess.py",
+      "sha256": "96fe1efaccaecb44f947aba62a756e5232edccb9f0f5f9a1b7ff4bf60f020ac7"
+    },
+    {
+      "path": "src/rl/__init__.py",
+      "sha256": "af44348a894a7a9a833100a16476ab4c865034f129999eb1676ae7400fee85dd"
+    },
+    {
+      "path": "src/rl/agent.py",
+      "sha256": "f34b548354b54dad40643118fd2620b0b821f6244b11872bbdf1d923041b8035"
+    },
+    {
+      "path": "src/rl/amap_network.py",
+      "sha256": "f955c43e636c0e6110208be53d0fdce835ecb8b4837ff33446873e97af3677b8"
+    },
+    {
+      "path": "src/rl/clustering.py",
+      "sha256": "997678e924e47d68bf0d6b9c90d519fd4f21cce090ff94576c1acdfd553bd033"
+    },
+    {
+      "path": "src/rl/emission.py",
+      "sha256": "bb689d319f46537309c74a6aae2e85d755de026aaef9879cede6f2d0505c5701"
+    },
+    {
+      "path": "src/rl/env.py",
+      "sha256": "dd0b8e2fe10be3c82a71c3756594b4e03f41d4fb0f14567993bfea81817d80bb"
+    },
+    {
+      "path": "src/rl/forecast.py",
+      "sha256": "aca7dff073e2a26103aad7aa757f97fc274f970df075e753083f1e556bf67a51"
+    },
+    {
+      "path": "src/rl/historical.py",
+      "sha256": "96b4517687c6fd9733a85ad13bf5ab8dd157fdde3f4a4b23b4757453dc6eeaaf"
+    },
+    {
+      "path": "src/rl/kmeans_rules.py",
+      "sha256": "68e0ff92eef800062e006723501dcf9f180834232c86fc17b8bbee376593516b"
+    },
+    {
+      "path": "src/rl/live.py",
+      "sha256": "c1097f24809096996a2fe4fe58daf364dda633d8842714c6b1a1aae6ad0d6886"
+    },
+    {
+      "path": "src/rl/network.py",
+      "sha256": "5f424ae7b4c0b358faaa4811a242a1c0dc0126b0f86d4ffcc4e3a881f6fe951a"
+    },
+    {
+      "path": "src/rl/policy.py",
+      "sha256": "fb337a5a78950a6deb3f01e7ed9bf5808728968f4f10c3dd2c86f54d4ca00e7f"
+    },
+    {
+      "path": "src/rl/quota.py",
+      "sha256": "d3ed3a28b1d4e5c77e87721728aba6b24de53a4914ab8796bb5b2fb42953e057"
+    },
+    {
+      "path": "src/rl/real_policy.py",
+      "sha256": "6fca9ef999f2f29ff242ba7c7d2f696bc8256b84c42ae799fad7e048d208d899"
+    },
+    {
+      "path": "src/rl/real_world.py",
+      "sha256": "ce8de4e20af41bb358ab7d32e26de25d9824907951b7e0d7bc82446d3eb4fdc7"
+    },
+    {
+      "path": "src/rl/settings.py",
+      "sha256": "41d986788394dc8570528b3526fd95a9a32ee838047a4f96b7ca9db0e7d955b2"
+    },
+    {
+      "path": "src/rl/train.py",
+      "sha256": "25de88bb40785b7e5bbc68712df7fc5fbc4e1acb1c510c4a9e1d45d6ae5c9c93"
+    },
+    {
+      "path": "src/routing/__init__.py",
+      "sha256": "aaf23b0784e8fac5da968f2d306721fed159766bde53af1e2326cef6de4b06e8"
+    },
+    {
+      "path": "src/routing/amap_client.py",
+      "sha256": "43406cb251f18a6c90b46d8ec5ad4162c4759859695eb532e58c417f6372fdc7"
+    },
+    {
+      "path": "src/routing/amap_js.py",
+      "sha256": "6be1ad4e3a5fc2de104e9417139daca56565e4eb38a2fcb1a78ff36ba311add2"
+    },
+    {
+      "path": "src/routing/carbon_baseline.py",
+      "sha256": "3e8828f3885528da787ba9d84ba6f29244f5dffa974adbdad3f4f84cce9ef9bf"
+    },
+    {
+      "path": "src/routing/coord.py",
+      "sha256": "c87a107090f46403ca14040fb3291b1e38494a0428adf2a22c24098a83eea3f6"
+    },
+    {
+      "path": "src/routing/evolve_routes.py",
+      "sha256": "7c75c5c610a0286e654d9d591a662025ce0b5d81024a0eb49edfd960005ad0a3"
+    },
+    {
+      "path": "src/routing/geocode.py",
+      "sha256": "f4b58eccf8268dd75ffe86e3a961abbdcb16862e227fa2d686550826be6b5a80"
+    },
+    {
+      "path": "src/routing/osrm_client.py",
+      "sha256": "b4253b23aa31f8747a78f1665d6179853149cfb19bc2f830f7c1475d331da728"
+    },
+    {
+      "path": "src/routing/road_class.py",
+      "sha256": "00d37cd53c922556563b61159416272a923c30fe867f4342cb717ed8d6dde87d"
+    },
+    {
+      "path": "src/routing/route_carbon.py",
+      "sha256": "846058613ff235b9e54027c34f755a1ae5b0cb25f639f8d8ab850f0b6439bbf4"
+    },
+    {
+      "path": "src/run_manifest.py",
+      "sha256": "3dcc41b5c0a99eac27b170204d0a742b84301a345e532b7cb07f84f2d08c0703"
+    },
+    {
+      "path": "src/scenarios.py",
+      "sha256": "c1e60f5aa1be1e82d76e0b0040a7799d6c2cac4233ae98c5784518ca92d8a130"
+    },
+    {
+      "path": "src/schema.py",
+      "sha256": "beae9633c1ac2c41d6800b6640ccee950b5aba8375d824307579d7450ff63aa1"
+    },
+    {
+      "path": "src/segment_aggregate.py",
+      "sha256": "65f4358f540d8867f049e8a940f3d698b8b6992c99fe66f98dc4a01407a06b15"
+    },
+    {
+      "path": "src/segment_cluster.py",
+      "sha256": "78bf676c22b2f8812bee9d40a250687cd2bcdc9e59ea846233ded5ddcd48e23a"
+    },
+    {
+      "path": "src/segment_master.py",
+      "sha256": "8f16bf46511d1acf7211a2b356a1cc46b24bcc1e19e4b7ca23e07b2e5634d689"
+    },
+    {
+      "path": "src/telemetry.py",
+      "sha256": "eb86035b54ed3aa9e46d4f579d03e0b53b0872cc4d2b794d41bdd664ebc90cf0"
+    },
+    {
+      "path": "src/transport_checks.py",
+      "sha256": "4f44e67d4ffa515b4ac3a32eadee62ca2d202448b5512bdb72198b535fe20a8d"
+    },
+    {
+      "path": "src/transport_evidence.py",
+      "sha256": "92b59209f97c6494df7a87ccefc315818e2094927bb71ac46a451a1d2dc5535b"
+    },
+    {
+      "path": "src/vsp_segment.py",
+      "sha256": "cde2f212ef9096eed59525c047886c6c1a1dcd3beb13d5ef62ad4a40163fe78d"
+    },
+    {
+      "path": "templates/README.md",
+      "sha256": "c8606af12f10c0890e3417e83eb8b6f5ba2824b86d886ac373a086664f6c6bc9"
+    },
+    {
+      "path": "templates/数据输入模板.xlsx",
+      "sha256": "c3c1b105f820c0f5f118e25588ab139bdfbf14dc37f812f118b2096e66e6a798"
+    },
+    {
+      "path": "tests/conftest.py",
+      "sha256": "763a73bc82897183050ed22e6e2873b663d912b4b8829bb0e9fd0f1009d892b4"
+    },
+    {
+      "path": "tests/fixtures/finance_transport/.gitignore",
+      "sha256": "ca7c7a0938094dd76552329dd5ffcce5c931933689fe1ebc65c507fad9744b32"
+    },
+    {
+      "path": "tests/fixtures/finance_transport/FP-REPAIR-001.png",
+      "sha256": "97ebf502497b3a4a41b3e2c29af21e7dc23ff670557925160758b4da49d02ce2"
+    },
+    {
+      "path": "tests/fixtures/finance_transport/FP-REPAIR-003.png",
+      "sha256": "5c696a8ea387fd9de35f8e88238e17f212901a31f613dce048fa050f57c2d96b"
+    },
+    {
+      "path": "tests/fixtures/finance_transport/README.md",
+      "sha256": "5f9b61818332d09e439714421dcf01103707fc74c74e6b63ce32ae3d33ec67d8"
+    },
+    {
+      "path": "tests/fixtures/finance_transport/invoice_simulated_truth.xlsx",
+      "sha256": "648a1a558357b6342a99385c1a94fbc47dd78236d5a2eb803990535c2e0b0c95"
+    },
+    {
+      "path": "tests/fixtures/finance_transport/invoice_template.xlsx",
+      "sha256": "036a4320fd47b596f7f2358c795dc8c91672bc0e17384362c420f6402f8f4f99"
+    },
+    {
+      "path": "tests/fixtures/finance_transport/simulated_team_factors.json",
+      "sha256": "b0e4d4a9f3def69a16a3769a620276b3cbfdf5dafdb11d30f8d76a912fa5bb59"
+    },
+    {
+      "path": "tests/fixtures/finance_transport/simulated_trips.csv",
+      "sha256": "086b38e3e9138031f955c38c40c7d762606fa5cc7b73dfe5652c135a672f8c7f"
+    },
+    {
+      "path": "tests/test_backup.py",
+      "sha256": "fe16e4e6956c699b326f037d4fc6d855cdd67b52b3cc2aecb8de31c786dbcdb9"
+    },
+    {
+      "path": "tests/test_carbon_disclosure_integration.py",
+      "sha256": "42b9762fe6368e6d41202367f3b8866bd9adc5f6184d3d54aad47578468e24de"
+    },
+    {
+      "path": "tests/test_carbon_ledger.py",
+      "sha256": "fac4dcd1e72a2e1015b58b0ee84cca13a706297fac9b3e980f7852d9b32f813a"
+    },
+    {
+      "path": "tests/test_carbon_model.py",
+      "sha256": "f95ea42f9dbde0be861b89076d4e61607e9ef443ca2d7d9dfbadfe42d35ee949"
+    },
+    {
+      "path": "tests/test_data_layer.py",
+      "sha256": "c4a51045c381422525f10c4602ae8708beb99bf05ce24856eaf941fd8d428d84"
+    },
+    {
+      "path": "tests/test_deepseek_provider.py",
+      "sha256": "8c6fda8c87923afeb770c3d8d14cd9ac2724aec89088285f73cb383eb9315822"
+    },
+    {
+      "path": "tests/test_evolve_routes.py",
+      "sha256": "164344e1b1a174a7b160588287b864c2466a0d4401b490999460e4f2340e611f"
+    },
+    {
+      "path": "tests/test_finance_end_to_end.py",
+      "sha256": "d4cab84b6421803b638f40dd08445549810c94b02210483a7ec81e72dcbaa5f9"
+    },
+    {
+      "path": "tests/test_finance_ocr_contract.py",
+      "sha256": "e2504ee64db60b154c916cf409265e198e90a0989998880d5c71f3665756cdcb"
+    },
+    {
+      "path": "tests/test_finance_register_v2.py",
+      "sha256": "c53ddcd2a9ccc317ffd3f86058c81e165bec1b30bb1f3ac2ec119c36d8b68499"
+    },
+    {
+      "path": "tests/test_finance_v3.py",
+      "sha256": "0bfa2cd868ab5a9e315647064facb452324519a5379d161f10bf59643559dcef"
+    },
+    {
+      "path": "tests/test_fleet_efficiency.py",
+      "sha256": "9dc0351cfa48a00ae4052ef16b6ddbee1e9d7f3e3777170b838aa1017aa99298"
+    },
+    {
+      "path": "tests/test_frontend.py",
+      "sha256": "8b94d90c2ae1d080e6e9590575a31df4ec71354d957e0e5502ae3a931a7871ae"
+    },
+    {
+      "path": "tests/test_fuel_layer.py",
+      "sha256": "034a8eb9b4f093ecc8678d96a33e047cd4e6fb72fbc35f7f35f626f21807ea9c"
+    },
+    {
+      "path": "tests/test_geocode.py",
+      "sha256": "19eb44310f233b615c3e8eab71ba791fccb11cdd0a76ece16a0f042ec34ab5e5"
+    },
+    {
+      "path": "tests/test_invoice.py",
+      "sha256": "9455d7b24966295c20fc01cf4f8714c619292cbfa609473f6edbca4f89a481af"
+    },
+    {
+      "path": "tests/test_invoice_carbon.py",
+      "sha256": "3d179f70c7af7f8d49635afacd8291451cda10ab1be4c70337ef3e452124b9e0"
+    },
+    {
+      "path": "tests/test_invoice_ocr.py",
+      "sha256": "7e1b86e15b0f27dff8fecfc6eca86aa6de93750f974b1283b769316de8567689"
+    },
+    {
+      "path": "tests/test_invoice_workbook_transport_integration.py",
+      "sha256": "3d4f202a47250943fc3de3fd182259661b19847b9a58323f27e6949493443838"
+    },
+    {
+      "path": "tests/test_main_app.py",
+      "sha256": "f7229142e6559febc51f3fe4f413f4756a99b9fc24dae28bf2cca522f1405289"
+    },
+    {
+      "path": "tests/test_obd_calibration.py",
+      "sha256": "06e71df3ba2f61d63799664cc92465176c4edb71a6c5c83ce7ebb6c88c281f6c"
+    },
+    {
+      "path": "tests/test_obd_gps.py",
+      "sha256": "17e29a8382afe1f87e81ae4a7fab4f85573e10babdd1c5ef98e7c4837d188b73"
+    },
+    {
+      "path": "tests/test_obd_text.py",
+      "sha256": "a075a12cfa59e756783258ef03d7d4a9bbceaa93e3167aa8a3cd80f69a6f1950"
+    },
+    {
+      "path": "tests/test_obd_vsp_crosscheck.py",
+      "sha256": "c04e18289d9a97a5a6e1ab3587ffad32e6bc62365f3bcb24dfe73956f48dd3cf"
+    },
+    {
+      "path": "tests/test_pipeline.py",
+      "sha256": "01d1eb81c3f521bddc2b931cd7079a9f9aaf6e183d0bd28b3b742c42dd4c195c"
+    },
+    {
+      "path": "tests/test_rl_agent.py",
+      "sha256": "ff6b129bac8785dba128d38a2f9c46a59cfcf085f236b9ed9048be78d60ff563"
+    },
+    {
+      "path": "tests/test_rl_clustering.py",
+      "sha256": "aad576f9e9353100bd4a7480244b69e086524cb20e04479b4c868cf70326e0ff"
+    },
+    {
+      "path": "tests/test_rl_correction.py",
+      "sha256": "daaf1917da7b2b0540ee1e0200d5f3e76a8ece488d25f6459bb626a28e424fc6"
+    },
+    {
+      "path": "tests/test_rl_emission.py",
+      "sha256": "29739ecc5928d6c098796b3c605cdb883dd651fe3177679ddacf850515118807"
+    },
+    {
+      "path": "tests/test_rl_env.py",
+      "sha256": "ec1a864970569a7778d04494822197320bf5c87a61f9f81efe9950b0d61a0457"
+    },
+    {
+      "path": "tests/test_rl_kmeans_rules.py",
+      "sha256": "65ad6e66bb4eed278ac1ee9e6d81bc912de27a6e8abac8c6aefad31077cbf5d8"
+    },
+    {
+      "path": "tests/test_rl_learning.py",
+      "sha256": "19d10c4ec982ca29b7cb06e5e48965a265df88272362fc27828713251551646a"
+    },
+    {
+      "path": "tests/test_rl_live.py",
+      "sha256": "af786f77be0f3cbaeb65e629ba0a723f0b36b476d9ca29879afa6272f588795c"
+    },
+    {
+      "path": "tests/test_rl_policy.py",
+      "sha256": "cf2b92d85bcf8e7342e0f16180576c773ff0cc621dfea64809b17fb994b3526d"
+    },
+    {
+      "path": "tests/test_rl_quota_forecast.py",
+      "sha256": "3ad022eeba4bdc1f12979777f8be25c478732f1a70be3d0a7c64a22c25e84a5e"
+    },
+    {
+      "path": "tests/test_rl_real_world.py",
+      "sha256": "d6b0c50927fcdb022665298cadd24416dc798f82b585487a610d74dafdd5b295"
+    },
+    {
+      "path": "tests/test_route_baseline.py",
+      "sha256": "fdc5cbefa139df47db98a207569fc0cd4469325c760bd8de268d7f591fb46ba8"
+    },
+    {
+      "path": "tests/test_route_evolution_ui.py",
+      "sha256": "47de5d20524732681aea551d00f631572ac8c0c09011a88838c978b764a87aeb"
+    },
+    {
+      "path": "tests/test_route_map_js.py",
+      "sha256": "085c49b1bb81679d0f7ea642faad945c9d9ad13f0604e8c9acb339df521f29e7"
+    },
+    {
+      "path": "tests/test_route_sandbox.py",
+      "sha256": "6982cd651e7271062665348673bd1f985358e7a0f8b1a79b018a4b17566549c6"
+    },
+    {
+      "path": "tests/test_run_manifest.py",
+      "sha256": "31a8fa6c24ea8831118640d51a5a3836fe18e83eb6850a172f82d641020addff"
+    },
+    {
+      "path": "tests/test_segment_aggregate.py",
+      "sha256": "afb3a670ce51b2e0c6e6823cb4e9d55664542b5834aec8b8fd319b028056a39a"
+    },
+    {
+      "path": "tests/test_segment_cluster.py",
+      "sha256": "d482b9c2f241a8f119accacf8d881fbadb5bdf6ce444c712c75f66aa36d117ae"
+    },
+    {
+      "path": "tests/test_segment_master.py",
+      "sha256": "07eaee7b21924a871cb9e00eeaca5a07339142e8abf0c19062841e5672cc0025"
+    },
+    {
+      "path": "tests/test_server_auth.py",
+      "sha256": "0b3d945dccae01f744c9bf1c2990de461664d2dba891b455e8d63c0ae9b7e85e"
+    },
+    {
+      "path": "tests/test_slider_kit.py",
+      "sha256": "153c4d5a65b9f4a71570592e2499fa30189034e24a8b3642a548c87d0766dede"
+    },
+    {
+      "path": "tests/test_telemetry.py",
+      "sha256": "c1319754215b134d416a17b0fa558d210666c0bc741d5894af26abd82d647629"
+    },
+    {
+      "path": "tests/test_transport_evidence.py",
+      "sha256": "d22fff7abe62914d8aae8e66358ff9c31d912b93bccaf3d3f7fc5feace5fc5ad"
+    },
+    {
+      "path": "tests/test_transport_scope_factors_replay.py",
+      "sha256": "a67e34469b0712b06b2ba7c341e92f4a2d97822cb4b94632fcbf649052c25a3c"
+    },
+    {
+      "path": "tests/test_unified_launcher.py",
+      "sha256": "019d9643c9c1d2e753040ace549c8c9a0a60a51e1374501cc1823533f5c0c110"
+    },
+    {
+      "path": "tests/test_vsp_audit.py",
+      "sha256": "ba5af4917731e8f23e9f3785c742c91c975daab9a294c922da66c3d79f557bdf"
+    },
+    {
+      "path": "tests/test_vsp_segment.py",
+      "sha256": "e5012296595cbdb64af7dbf03a76c3125436e263793c53e6ec9da256815fe3c5"
+    },
+    {
+      "path": "tools/amap_setup.py",
+      "sha256": "c97011a9b4e653c3764062c993f4e168f9a1399f91cec92dfd334590153b602f"
+    },
+    {
+      "path": "tools/backup.py",
+      "sha256": "8ccb2c4c2b1515b74e2f44af1cc4bfb7a786120e195c0f5a8bcfe36709c43f82"
+    },
+    {
+      "path": "tools/build_copyright_source.py",
+      "sha256": "5853ca5c910c0dc942389deb2c5017fbab57f07e2a0b48b7e522bd26eeb470d5"
+    },
+    {
+      "path": "tools/build_handoff_bundle.py",
+      "sha256": "1c3a33d2aefae1eaa8f81d5fff2a97b1ec7abcd0bed2d80eaaec72bd7bd675a6"
+    },
+    {
+      "path": "tools/build_ppt_logic_doc.py",
+      "sha256": "903261bfb795f531e85ada7af07c6113ca78f65c5ccf55884f45b10fc849395e"
+    },
+    {
+      "path": "tools/build_vsp_audit.py",
+      "sha256": "4524210f3fe0da92919fc51a08e3f73313b8349f090994f290551d4de6660741"
+    },
+    {
+      "path": "tools/coord_truth.py",
+      "sha256": "97fda78e13294c50062b77efad6137602af0f5a4cde718e1deb1c77718e6fac7"
+    },
+    {
+      "path": "tools/demo_evolution.py",
+      "sha256": "9dd16128dad51f6588284de9852d70d99e1c812c80181b8e947672fcc8f260af"
+    },
+    {
+      "path": "tools/device_tokens.py",
+      "sha256": "fecba5672dbc221ef48370f7039802769630db30fd3e4ce7f90ce4eeab84b0be"
+    },
+    {
+      "path": "tools/doctor.py",
+      "sha256": "9ba50b7bb8d7fe6dc33d7b212aaf4898077d4336714f280fe8d37136f2136d11"
+    },
+    {
+      "path": "tools/export_segment_carbon.py",
+      "sha256": "caadd60a7b1c0f3a32e8208837274d35ffbfee9a3ac7c7f619c46864cb32ef59"
+    },
+    {
+      "path": "tools/finance_master_interface.py",
+      "sha256": "7a6580bb85d1efed85adacad7fdf0496eeab5892ae2d8e1c91f3d35b283d0a84"
+    },
+    {
+      "path": "tools/finance_register_v3.py",
+      "sha256": "bb26e6fffdb7a9f5da46ffdee191384ebdef3178675bef3251b4b57c9168f778"
+    },
+    {
+      "path": "tools/fleet_efficiency_report.py",
+      "sha256": "5bce5a0c9004574c127c9110a293a90129e502cfa9d61671ef0f4bcc7a29fcb3"
+    },
+    {
+      "path": "tools/gen_disclosure_handoff.py",
+      "sha256": "74443afec82c0391d28f9e5332ede485263655670e5f5b659928d4ee3dfcd8b6"
+    },
+    {
+      "path": "tools/gen_disclosure_testset.py",
+      "sha256": "42b21b91a737af4f6baef96d935c702a136ba23c1267c40ba3fc344d52df6752"
+    },
+    {
+      "path": "tools/gen_invoice_samples.py",
+      "sha256": "c107d9d6b41385ce1b39321aac743a850018ea92d85b020e1a519e8842a06f3d"
+    },
+    {
+      "path": "tools/gen_obd_excel.py",
+      "sha256": "c9d57a9eb8a7b42b34a98b304c26ff73a9a61dca15fcf19cac817c3caacde57e"
+    },
+    {
+      "path": "tools/gen_obd_sim.py",
+      "sha256": "03873b9031ff0ce36b25e1d72b9bd4c7997b8596f9727f9ce239b267d8fe7f7a"
+    },
+    {
+      "path": "tools/git_push_api.py",
+      "sha256": "c90eaf6a8571f8e0319ce7fa06b6ff968c22ee8d7ca2e653824da0ffc202fa7a"
+    },
+    {
+      "path": "tools/ingest_pm.py",
+      "sha256": "39eef51d02bf79bc4d0010864149d585b0a0b4c55ed141539c54d140c721a26c"
+    },
+    {
+      "path": "tools/invoice_ocr.py",
+      "sha256": "7bd07a0c41a28d886fa170bab48af4603d38bf423dac82c8587f28172b1bee13"
+    },
+    {
+      "path": "tools/invoice_to_master.py",
+      "sha256": "b5f1c5f99aea5959c57e858c4435f0888a52f30087745da835faf9e872cec0d0"
+    },
+    {
+      "path": "tools/invoice_workbook.py",
+      "sha256": "f048ff52a1e9829b99ee868bd69f290744cb4d8bdb80d127224b3c0aa08089b8"
+    },
+    {
+      "path": "tools/launch.py",
+      "sha256": "91f0c86ea307aaf8d61c89f9d1a5014106f8d79f3cd2b76b88cb16e636374b58"
+    },
+    {
+      "path": "tools/make_07_docs.py",
+      "sha256": "eb4b319f3414cdf019de06f93fd75d2384ef44e479542d106ae94be7d0ca447b"
+    },
+    {
+      "path": "tools/make_finance_sim_fixture.py",
+      "sha256": "647e8158f9d2296ea35733486351574828ad27fa58763d0f2622e83a45581084"
+    },
+    {
+      "path": "tools/obd_serial_probe.py",
+      "sha256": "e248f9fb647f1e2c5929a7619be3266e0fcafe8f4657b1f73eee4e890ef04eb8"
+    },
+    {
+      "path": "tools/restore_drill.py",
+      "sha256": "33933dbd7a394c148d8666a71d3798c9db48c8c56f03e0601321571bf2fb91c6"
+    },
+    {
+      "path": "tools/rl_demo.py",
+      "sha256": "87a55d0db934cc1208ce5266f6f140cc9840a78eaa4de9d14517558e3a356468"
+    },
+    {
+      "path": "tools/rl_fit_emission.py",
+      "sha256": "a0b8227528a2902739c356f24f958413496ae93f41bb17420fe01519c6b44279"
+    },
+    {
+      "path": "tools/route_baseline.py",
+      "sha256": "e73beab6c1af05fc32c8159f5332e8f5c47bba8e482c3e7824a1ec46c10b0c17"
+    },
+    {
+      "path": "tools/route_candidates.py",
+      "sha256": "da5fd8389bd3d76b135da45ee5a932593569fdd80470151c98e7c4d1d4c97402"
+    },
+    {
+      "path": "tools/route_fetch.py",
+      "sha256": "11c71e92f0bd86053020f256d9d0764fa98327044526822ee445c631df22c08d"
+    },
+    {
+      "path": "tools/scenarios_smoke_test.py",
+      "sha256": "73b2d006f425fca5ce7227e25b6c6ac4a08714e365ddc7f9dcd954eebecae597"
+    },
+    {
+      "path": "tools/transport_evidence_report.py",
+      "sha256": "34a5ea22200eea235b9a2017a41f12a82ebeb05573fcd6ba7a3f96f958a897b0"
+    },
+    {
+      "path": "tools/verify_bai2026_figure_model.py",
+      "sha256": "93ed98f7ff3f0984242bd09bf59b2e501ded83cb1413f42091c81579d2851e41"
+    },
+    {
+      "path": "tools/verify_carbon_ledger_delivery.py",
+      "sha256": "fd2fd62ed996030537177e161dd0afde3a443dbec38d22f37a265899c33f1055"
+    },
+    {
+      "path": "tools/verify_carbon_ledger_tab.js",
+      "sha256": "4a4864670a88dc74e354a23e8c5d5ebdd1ec34e4dd0173bf87eadc0cc2657d47"
+    },
+    {
+      "path": "tools/verify_dashboard_layout.js",
+      "sha256": "efcc1706056471b28c8afffaae7a08d9a1c6f5c09005b9a76986a4920eff4177"
+    },
+    {
+      "path": "tools/verify_docs58_numbers.py",
+      "sha256": "2b424ad8cd28231f1fcaf9f7fe4d13c3361512cbf885683e74350f9f75872e84"
+    },
+    {
+      "path": "tools/verify_lowspeed_carbon.py",
+      "sha256": "ac06c5bf23a64c81ee912ba2c59c4f87fd8e79febf9df0801b4ed8524dd87b3d"
+    },
+    {
+      "path": "tools/verify_nav.js",
+      "sha256": "60df7a4da30e081dc939be4552366d98ec1acabc9ffeb7fad338f3c396e7fc72"
+    },
+    {
+      "path": "tools/verify_obd_tab.js",
+      "sha256": "abaac6ecf720d1e87b8c2742c9e0f616935b55b1e267f18a50c81f190864e41b"
+    },
+    {
+      "path": "tools/verify_p0.py",
+      "sha256": "53c508d3347bc7e1ccdca8c13ede96f925951ce0f863066a89b93e278f276d8a"
+    },
+    {
+      "path": "tools/verify_pages.js",
+      "sha256": "17a22ed5267d378899f013850724d23a63a258f71fb57061d800fa854dbab679"
+    },
+    {
+      "path": "tools/verify_sliders.js",
+      "sha256": "4889b07fdedc35eb2217bdbbc218e5c0d490012681c2d95d081d442f36cf61ae"
+    },
+    {
+      "path": "从主前端进入碳账_v0.7.md",
+      "sha256": "4f4533372feb6ea3d394732dd6c64b1ae998dfe7f688aa6d99caba023698cf00"
+    },
+    {
+      "path": "启动.bat",
+      "sha256": "678101aec2dd44bf7f3f6f81ac82d8cb588085c9e217cc37309780a603777a58"
+    },
+    {
+      "path": "启动.command",
+      "sha256": "9555c1ee078c48b3d6d331218b1425cf41acb627ba2acfe5d424d94e890338d3"
+    },
+    {
+      "path": "打开碳账.html",
+      "sha256": "da283a1abd464ff1a5aedcb9b3e4e808d28933ab10cffe94bc376247aeca7506"
+    },
+    {
+      "path": "碳账交付验收.md",
+      "sha256": "bf791a6b580240470607d96b1bf9dc1d8e8a078d52d05c914f52d5d109903006"
+    },
+    {
+      "path": "碳账实测数据更新说明.md",
+      "sha256": "58a8a860c3a3e7014e90832ffb1d870e8a569f5c06c20f7b31ece7f74eaa95f7"
+    },
+    {
+      "path": "碳账快速开始.md",
+      "sha256": "0c57d75a35772dbfd2cccd2e9c0d349294b5de338efae7795ba0a03a591ea94a"
+    },
+    {
+      "path": "碳账接入与交付说明.md",
+      "sha256": "0c57d75a35772dbfd2cccd2e9c0d349294b5de338efae7795ba0a03a591ea94a"
+    },
+    {
+      "path": "统一启动更新说明.md",
+      "sha256": "a1d86e9baed15c030f6aabce6cc48c54a106118e8f8189b456847888dc34c165"
+    },
+    {
+      "path": "范围一二三划分依据.md",
+      "sha256": "7ac9d31a2b7f59b58c9bb843462ad031bcffac8d27e0d5f3df4162b16e267410"
+    }
+  ],
+  "repair_note": "Applied missing subdirectories and current-page navigation fix to the actual Desktop project. Verified on the user runtime at port 8501. Real uploaded CSV, browser data, QA exports and local environment are excluded."
 }

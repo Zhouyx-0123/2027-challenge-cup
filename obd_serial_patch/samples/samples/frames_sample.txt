@@ -1,0 +1,7 @@
+[   10 s] RPM=   650.0 SPD=     0.0 TQ=    0/    0 FA=  1.20L/h FB=  0.000km/L(=  0.0) FC=    1000.0L T=  35.0/  30.0/  40.0 ODO=  128430.5 HRS=     912.0 DTC=  0 MIL=  0 BUS=RUN TEC=  0 REC=  0 RX=   4211 ERR=  0 LINK=OK
+[   11 s] RPM=   640.0 SPD=     0.0 TQ=    0/    0 FA=  1.18L/h FB=  0.000km/L(=  0.0) FC=    1000.0L T=  36.0/  30.0/  41.0 ODO=  128430.5 HRS=     912.0 DTC=  0 MIL=  0 BUS=RUN TEC=  0 REC=  0 RX=   4233 ERR=  0 LINK=OK
+[   12 s] RPM=   820.0 SPD=    45.3 TQ=   30/   28 FA=  4.51L/h FB= 10.020km/L(=  4.5) FC=    1000.2L T=  88.0/  45.0/  90.0 ODO=  128430.9 HRS=     912.0 DTC=  0 MIL=  0 BUS=RUN TEC=  0 REC=  0 RX=   4255 ERR=  0 LINK=OK
+[   13 s] RPM=   910.0 SPD=    62.8 TQ=   35/   33 FA=  7.86L/h FB=  7.990km/L(=  7.9) FC=    1000.5L T=  89.0/  46.0/  91.0 ODO=  128431.4 HRS=     912.1 DTC=  0 MIL=  0 BUS=RUN TEC=  0 REC=  0 RX=   4277 ERR=  0 LINK=OK
+[   14 s] RPM=   --- SPD=   --- TQ=  ---/  --- FA=    ---L/h FB=    ---km/L(=  ---) FC=      ---L T=   ---/   ---/   --- ODO=       --- HRS=     --- DTC=  1 MIL=  1 BUS=BOFF TEC=  4 REC=  0 RX=   4277 ERR= 12 LINK=LOST
+[   15 s] RPM=   700.0 SPD=    12.0 TQ=   12/   10 FA=  9.90L/h FB=  1.212km/L(=  9.9) FC=    1001.2L T=  90.0/  47.0/  92.0 ODO=  128431.8 HRS=     912.1 DTC=  0 MIL=  0 BUS=RUN TEC=  0 REC=  0 RX=   4299 ERR=  0 LINK=OK
+OBD-II Gateway v3.2 booting...

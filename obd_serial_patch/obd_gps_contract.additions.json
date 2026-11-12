@@ -1,0 +1,111 @@
+{
+  "_apply_to": "config/obd_gps_contract.json",
+  "_instruction": "把下面四段分别并入对应顶层键：fields / aliases / qc_flags / delivery，并新增 serial_frame 顶层段。已有字段与别名一个都不删、不改，只做增量。",
+  "_version_after_merge": "obd-gps-contract-v2",
+  "_reason": "设备侧改为 J1939 网关的定宽文本行输出（PGN 61444/65265/65276/65266/65257/65262/65248/65253/65226），原契约只覆盖 JSON 上报。",
+
+  "serial_frame": {
+    "version": "j1939-gateway-text-v1",
+    "mode": "serial_text_line",
+    "desc": "设备以文本行持续输出工况帧；由 tools/obd_serial_bridge.py 解析成契约记录后走 HTTP 上报，接收端不感知文本格式。",
+    "header": "[%5lu s]",
+    "header_meaning": "运行时长（秒，相对开机时间）。**设备不提供绝对时间戳**，绝对时刻由桥接端锚定：boot_wall = 到达时刻 - uptime，之后 ts = boot_wall + uptime；检测到 uptime 回退超过 5 s 视为设备重启并重新锚定。",
+    "missing_token": "---",
+    "missing_rule": "`---` 一律映射为 null；禁止以 0 代替（0 有物理含义：怠速油耗、停车、液位空）。",
+    "split_rule": "按 1~4 位大写键名 + '=' 切分区间。**禁止定宽切片**：`%5lu` 是最小宽度，运行到 100000 s（约 27.8 h）后括号变成 6 位，定宽偏移会整体错列；设备值里也含空格与斜杠（`TQ= 30/ 28`、`T= 88.0/ 45.0/ 90.0`、`FB= 10.020km/L(= 4.5)`）。",
+    "fields": {
+      "RPM": {"maps_to": "engine_rpm", "format": "%8.1f", "pgn": "61444 EEC1", "unit": "rpm"},
+      "SPD": {"maps_to": "vehicle_speed_kmh", "format": "%7.1f", "pgn": "65265 CCV1", "unit": "km/h"},
+      "TQ": {"maps_to": ["torque_req_nm", "torque_actual_nm"], "format": "%5.0f/%5.0f", "pgn": "61444", "spn": "SPN512 / SPN513", "unit": "N·m", "order": "需求 / 实际"},
+      "FA": {"maps_to": "instant_fuel_lph", "format": "%6.2fL/h", "pgn": "65276 Dash Display", "unit": "L/h", "caveat": "仪表显示报文，**不是** ECM 真实燃油率（真实燃油率在 65266）。只能作旁证，主口径走 FC 差分。"},
+      "FB": {"maps_to": ["fuel_economy_km_per_l", "fuel_lph_from_economy"], "format": "%.3fkm/L(=%.1f)", "pgn": "65266 LFE", "unit": "km/L", "caveat": "括号内是「车速÷油耗」反算的 L/h，专门用于反证 FA 口径；两者偏差 > 5% 置 fuel_rate_mismatch。"},
+      "FC": {"maps_to": "total_fuel_l", "format": "%9.1fL", "pgn": "65257 LFC", "unit": "L", "note": "**守恒法主输入**：区间油耗 = 本值差分。仪表累计比瞬时值稳。"},
+      "T": {"maps_to": ["engine_temp_c", "fuel_temp_c", "oil_temp_c"], "format": "各%5.1f", "pgn": "65262 ET1", "unit": "°C", "order": "标准顺序为 冷却液(SPN110) / 燃油(SPN174) / 机油(SPN175)", "caveat": "设备文档的「水·油·柴」与表头「冷却液/燃油/机油」互相矛盾，首次接入必须实测确认第 2、3 位。"},
+      "ODO": {"maps_to": "odo_km", "format": "%10.1f", "pgn": "65248 VD", "unit": "km", "note": "里程最优来源，优先于 GPS 积分。"},
+      "HRS": {"maps_to": "engine_hours", "format": "%8.1f", "pgn": "65253 HOURS", "unit": "h"},
+      "DTC": {"maps_to": "dtc_count", "format": "%u", "pgn": "65226 DM1", "note": "是**故障码数量**，不是码表；>0 置 ecu_fault 并写入 fault_codes。"},
+      "MIL": {"maps_to": "mil_on", "format": "%u", "pgn": "65226 DM1", "note": "故障灯状态，>=1 视同 ecu_fault。"},
+      "BUS": {"maps_to": "bus_state", "format": "混合", "domain": ["STOP", "RUN", "BOFF", "RECV"], "note": "非 RUN（尤其 BOFF=bus-off）置 bus_off。"},
+      "TEC": {"maps_to": "bus_tec", "format": "%u", "note": "发送错误计数，仅诊断，不进主字段。"},
+      "REC": {"maps_to": "bus_rec", "format": "%u", "note": "接收错误计数。"},
+      "RX": {"maps_to": "bus_rx", "format": "%u", "note": "累计接收帧数。"},
+      "ERR": {"maps_to": "bus_err", "format": "%u", "note": "错误计数。"},
+      "LINK": {"maps_to": "link_state", "format": "OK/LOST", "note": "**不得作为数据有效性判据**：只代表总线上有 29 位帧，不代表有关键数据。有效性只看逐字段的 `---`。"}
+    },
+    "not_provided": {
+      "gps": "本帧格式**完全不含 GPS**（无 lat/lng/heading/satellites/fix_quality）。若该终端不带 GPS 模块，本通道降级为「纯 OBD 实测碳排」，前端轨迹区块不渲染，并恒置 no_gps_source。",
+      "others": ["throttle_pos_pct", "engine_load_pct", "fuel_level_pct", "intake_press_kpa", "atm_press_kpa", "load_kg", "ignition"]
+    },
+    "consumer": "src/obd_line.py（解析 + 锚定 + 质控），旁路 tools/obd_serial_bridge.py（串口 -> HTTP）"
+  },
+
+  "fields_add": {
+    "engine_hours": {
+      "type": "number >= 0", "required": false,
+      "desc": "发动机运行小时（主键 HRS，PGN 65253）。用于按发动机小时核对油耗率，也用于区分「怠速长驻」与「行驶」。",
+      "example": 1234.5
+    },
+    "torque_req_nm": {
+      "type": "number", "required": false,
+      "desc": "需求扭矩（主键 TQ 前段，PGN 61444 SPN512）。工况识别辅助量，不参与碳排计算。",
+      "example": 30
+    },
+    "torque_actual_nm": {
+      "type": "number", "required": false,
+      "desc": "实际扭矩（主键 TQ 后段，SPN513）。与需求扭矩的差反映动力链损耗。",
+      "example": 28
+    },
+    "fuel_temp_c": {
+      "type": "number -60..250", "required": false,
+      "desc": "燃油温度（主键 T 第 2 位，PGN 65262 SPN174）。柴油密度随温度变化，**用于体积校正的旁证**，当前版本不参与出账。",
+      "example": 45.0
+    },
+    "oil_temp_c": {
+      "type": "number -60..250", "required": false,
+      "desc": "机油温度（主键 T 第 3 位，PGN 65262 SPN175）。",
+      "example": 90.0
+    }
+  },
+
+  "aliases_add": {
+    "engine_rpm": ["rpm"],
+    "vehicle_speed_kmh": ["spd"],
+    "instant_fuel_lph": ["fa"],
+    "total_fuel_l": ["fc"],
+    "odo_km": ["odo"],
+    "engine_hours": ["hrs", "enginehours"],
+    "torque_req_nm": ["tq_req"],
+    "torque_actual_nm": ["tq_act"],
+    "fuel_temp_c": ["t_fuel"],
+    "oil_temp_c": ["t_oil"],
+    "fault_codes": ["dtc"],
+    "_note_added": "FB（km/L 经济性）不映射到任何既有规范字段，单独作为 fuel_economy_km_per_l 只读旁证，避免与 instantaneous 油耗混用。"
+  },
+
+  "qc_flags_add": {
+    "link_lost": "设备报 LINK=LOST（链路层失联）。仅提示，不否决已解析到的字段。",
+    "bus_off": "CAN 控制器非 RUN 状态（BOFF/STOP/RECV），数据可能成片缺失。",
+    "no_gps_source": "本帧格式不含 GPS，该记录没有位置信息；轨迹与 gps_speed 旁证不可用。",
+    "ts_from_uptime": "时间戳由桥接端用「到达时刻 - 开机时长」锚定推出，不是设备自带的绝对时钟。",
+    "fuel_rate_mismatch": "FA（仪表显示燃油率）与设备自带反算 L/h 偏差超过 5%，提示 FA 口径不可直接采信。",
+    "no_fuel_value": "instant_fuel_lph 与 total_fuel_l 同时缺失，记录无碳可算，应进 rejects。"
+  },
+
+  "delivery_add": {
+    "serial_bridge": {
+      "mode": "serial_text_line_via_tool",
+      "desc": "设备串口直连主机时使用。桥接进程读 COM 口 -> 解析成契约记录 -> POST 到既有端点，**不新增免鉴权入口**。",
+      "entry": "python -m tools.obd_serial_bridge --port COM5 --baud 115200 --vehicle-id TRK-GZ-001",
+      "replay": "python -m tools.obd_serial_bridge --replay <frames.txt> --vehicle-id TRK-GZ-001 --dry-run",
+      "auth": "X-Device-Token 头，沿用 device_auth；无令牌时服务端按 fail-closed 整批 401",
+      "batching": "默认 20 条或 5 秒先到者触发一次上报"
+    }
+  },
+
+  "open_questions": [
+    "车辆标识（vehicle_id）不在帧里，必须由桥接端命令行/配置给定；一台车一根串口还是多车共用一根总线？",
+    "本终端是否带 GPS？不带则本通道只出碳不出轨迹，前端 obd_panel 的轨迹图需按 no_gps_source 隐藏。",
+    "T=a/b/c 的第 2、3 位到底是燃油/机油还是机油/燃油（设备文档与 PGN 标准冲突），需实测一次确证。",
+    "FA 是仪表显示报文：正式出账是否禁用 FA、只允许 FC 差分？（建议：是）"
+  ]
+}

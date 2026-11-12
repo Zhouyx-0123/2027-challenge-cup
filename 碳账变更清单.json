@@ -1,6 +1,6 @@
 {
-  "version": "0.5.0",
-  "date": "2026-11-11",
+  "version": "0.6.0",
+  "date": "2026-11-12",
   "baseline_zip": "2027-challenge-cup-main (1).zip",
   "baseline_zip_sha256": "9d8e02a3525c1f920d509a1b56501fab6dc0dc9b79cd246eab97db762b4ceb6b",
   "original_files": 435,
@@ -24,11 +24,11 @@
     },
     {
       "path": "carbon_disclosure/README.md",
-      "sha256": "4736103ff0bd4f75a92d9aded2894976ac7cf26a6c4644c3051c8076ee16bacf"
+      "sha256": "e262603132c661e8abcaaa6e1bef5d31bd7539eaaadf367d7273eca9d77f757e"
     },
     {
       "path": "carbon_disclosure/__init__.py",
-      "sha256": "ed458810ecfeab0cf0d37e8c676738d724bc0680ab09048881ca598d9a297770"
+      "sha256": "eeb9c8d96c3444bf7d3d7bc37dfab67e5908298d6efd6cde9afda80ae2ffc1db"
     },
     {
       "path": "carbon_disclosure/__main__.py",
@@ -36,7 +36,7 @@
     },
     {
       "path": "carbon_disclosure/dist/app.js",
-      "sha256": "4da6aa6c27d4508ea718751e7bbf4bcffc9e841561937c4511b1670c99616d7c"
+      "sha256": "a51582a8a17bcfd3885e5af61030e08204aab059e64b79a785e3bb1400bceba5"
     },
     {
       "path": "carbon_disclosure/dist/appendix-ui.js",
@@ -44,15 +44,15 @@
     },
     {
       "path": "carbon_disclosure/dist/appendix.js",
-      "sha256": "150b78553b3c9c22dae678fdb45df3fcb00beb18a54c9a45a993be9e2f6b5d91"
+      "sha256": "35e1dc471088fb7cd2569bb2a85744f4ffe4fe54498999463999bcb3d89f4086"
     },
     {
       "path": "carbon_disclosure/dist/core.js",
-      "sha256": "374065f2ba2bcc0a93f546db6ef57727e077cd012717d6b1fbc5605efb211430"
+      "sha256": "36ed23d1307cf08a166e32fac0091afbd07f01b0f30e8cb32cbcfc3d49524c9b"
     },
     {
       "path": "carbon_disclosure/dist/disclosure.js",
-      "sha256": "71722ad4df11491580c825eda95d22925793e4974dcf7b12ff40de8a36bfebbf"
+      "sha256": "67c1a0f9fb16eb2875774f345ccf2cc10af185e9cd84b7ea0ba271996ebb9a7f"
     },
     {
       "path": "carbon_disclosure/dist/downloads.js",
@@ -60,15 +60,15 @@
     },
     {
       "path": "carbon_disclosure/dist/index.html",
-      "sha256": "bf245557059e45a54b086b75914c51cb0b317ad34574613bcb5e6e95a2acccf6"
+      "sha256": "6dca0db594eedfd0c167295d0c683cbe57d325044c6c25f61c152f524899ce60"
     },
     {
       "path": "carbon_disclosure/dist/manual-pdf.js",
-      "sha256": "30a7649a9c70fb39ebda18f53f2c0156b4d78b3bd8e7ba066da12a49904ad8fd"
+      "sha256": "160e8d228cafb70baf2883b51601e1ea1d6a0e1986ea10307e09e8b9ec410968"
     },
     {
       "path": "carbon_disclosure/dist/methodology.pdf",
-      "sha256": "5f3f1032ccf56e2ec4a876c1b24e22a399c80cb43382cccca23f2cd144c42b1e"
+      "sha256": "d3e9bb62317e4659a3bf19bed3b760e047d98545ad40399b5f01cfcde409f677"
     },
     {
       "path": "carbon_disclosure/dist/sample.csv",
@@ -80,7 +80,7 @@
     },
     {
       "path": "carbon_disclosure/dist/styles.css",
-      "sha256": "0d00a2cf973bec97d4e43d6c97bee426300b9c0baacaff0a3bb6d55240014b65"
+      "sha256": "b6458b4fa0d028b70bd4a68247ad1ff25de0378b399d9c56f5c636bc558f75d5"
     },
     {
       "path": "carbon_disclosure/dist/xlsx.js",
@@ -88,7 +88,7 @@
     },
     {
       "path": "carbon_disclosure/package.json",
-      "sha256": "611d3e154faedadf44a85ab44693252580d39db249ddb48a1e18e44f0fac70b6"
+      "sha256": "c0bab780dfe4f220330141415609de3f993534a0a06c19e01169f003c6e2eb67"
     },
     {
       "path": "carbon_disclosure/server.cjs",
@@ -104,11 +104,11 @@
     },
     {
       "path": "carbon_disclosure/tests/core.test.cjs",
-      "sha256": "bb8dca8d6c8205e164ec7d87fc46abcab250e8ee60665180d050fbde885edb5b"
+      "sha256": "0fa49358aebdc96f4295469ef824499b59f7064f284cc577c90c5afa216e9f49"
     },
     {
       "path": "carbon_disclosure/tests/disclosure.test.cjs",
-      "sha256": "1c6e11280459f25434a78c7898e62c38f944fcb6fd941a9376dfcf3788a963f2"
+      "sha256": "b39ccdf1c90f5c0827435e19b07b6081e89f548fecebce8a6a6c25b7623182a3"
     },
     {
       "path": "carbon_disclosure/tests/downloads.test.cjs",
@@ -116,7 +116,7 @@
     },
     {
       "path": "carbon_disclosure/tests/server.test.cjs",
-      "sha256": "bfdda14c947a306c3adab932c8188a3a9a858ba33a2c64934c9295728b534071"
+      "sha256": "5eae1ad0ed3f70dd8f849574d8d3697c4d497cebc49bf5ecea3a9b6a7f713ecf"
     },
     {
       "path": "carbon_disclosure/tests/test_runtime.py",
@@ -124,7 +124,7 @@
     },
     {
       "path": "carbon_disclosure/范围一二三划分依据.md",
-      "sha256": "fc49d9ad5b40d79141292434eeb515c65809708b449e82208fd05621ac41e4c1"
+      "sha256": "7ac9d31a2b7f59b58c9bb843462ad031bcffac8d27e0d5f3df4162b16e267410"
     },
     {
       "path": "carbon_disclosure/附录怎么填.md",
@@ -136,7 +136,7 @@
     },
     {
       "path": "docs/碳账接入与交付说明.md",
-      "sha256": "36a540a0b1351ce5e02cbca1a937cbbe4f7efb82d699ee9eb9989117023f3c64"
+      "sha256": "618393b6eadbead7c4378dd1e568efa2f628b48688f9ec9f3ed447fb2554cff9"
     },
     {
       "path": "tests/test_carbon_disclosure_integration.py",
@@ -148,15 +148,19 @@
     },
     {
       "path": "打开碳账.html",
-      "sha256": "af0ab3be75a9b7812aeca5af570a1fe86bb9a00401be8d2e9b8e1826b4e8a602"
+      "sha256": "1d3cd78681ee0280310f6a1860876b6f78d38ce24c814298e95d833049c0b715"
     },
     {
       "path": "碳账交付验收.md",
-      "sha256": "f535a4edb8ab1260920baf7a02cf30cb429b8bc7c13e266aa8637910564e9d0f"
+      "sha256": "eb89b68e699b6c761a1c8f146aa9d2c05e98c5241de2746994c97e8250d129c9"
+    },
+    {
+      "path": "碳账实测数据更新说明.md",
+      "sha256": "58a8a860c3a3e7014e90832ffb1d870e8a569f5c06c20f7b31ece7f74eaa95f7"
     },
     {
       "path": "碳账快速开始.md",
-      "sha256": "9bb04f09c1966e1a81605289d52fbbbcf72e706223123eb3fed8516ef6b2621f"
+      "sha256": "458b3f44c5ea3a3c2d09c1b1dfdf9b96ab49be6253e01483db2d203281271094"
     },
     {
       "path": "统一启动更新说明.md",
@@ -182,7 +186,7 @@
     {
       "path": "README.md",
       "before_sha256": "b186cc67d11bf87ee2a29e149a564cf794139c780324feb0b6d13d272d9e0eda",
-      "after_sha256": "fd2016f35e6c9039f685a12b3e41ae54809c9ccafb24177c54298b48b771dcb4"
+      "after_sha256": "40686db313952ec3bc34bdff26637bfb2d880551e7cad989cd89046b2acfa6d1"
     },
     {
       "path": "app/main_views.py",
@@ -210,5 +214,5 @@
     "启动碳账.bat",
     "启动碳账.command"
   ],
-  "manifest_note": "Hashes cover project files other than this manifest. Runtime caches, local dependencies and Git history are excluded."
+  "manifest_note": "Hashes exclude this manifest. v0.6 patch applies to v0.5 and contains only changed project files; real CSV and browser exports are not included."
 }

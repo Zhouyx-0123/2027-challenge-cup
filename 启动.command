@@ -22,7 +22,9 @@ if [ -z "$CARBONTIDE_PYTHON" ]; then
     exit 1
 fi
 
-printf '%s\n' '主系统统一启动，包含披露碳账。' '碳账入口：碳核算与台账 - 披露碳账（范围一二三）'
+"$CARBONTIDE_PYTHON" -c "import pathlib,sys; r=pathlib.Path.cwd(); needed=['carbon_disclosure/dist/core.js','carbon_disclosure/dist/platform.css','app/components/carbon_disclosure_panel.py','app/main_views.py']; missing=[n for n in needed if not (r/n).is_file()]; v=r/'app/main_views.py'; view=v.read_text(encoding='utf-8-sig') if v.is_file() else ''; connected='carbon_disclosure_panel.render_carbon_disclosure_panel()' in view and 'def _render_ledger_e0' not in view and not (r/'app/components/carbon_ledger_panel.py').exists(); ok=not missing and connected; print('[X] Incomplete project or obsolete ledger: replace app/, tools/, carbon_disclosure/ and remove carbon_ledger_panel.py.') if not ok else None; sys.exit(0 if ok else 1)" || exit 1
+
+printf '%s\n' '主系统统一启动，包含披露碳账。' '碳账入口：主导航 - 碳台账（直接进入）'
 "$CARBONTIDE_PYTHON" -m tools.launch --open --no-recalc "$@"
 CARBONTIDE_EXIT=$?
 if [ "$#" -eq 0 ] && [ -t 0 ]; then

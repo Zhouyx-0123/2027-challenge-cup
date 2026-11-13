@@ -1,7 +1,8 @@
 {
-  "version": "0.7.1",
+  "version": "0.8.1",
   "date": "2026-11-13",
-  "baseline_zip_sha256": "8be060288b7c2ce694fa3d03dbb69b1b8181a85830a332023af6f438d3d481db",
+  "mode": "replace abandoned ledger page, do not retain old tabs",
+  "baseline": "actual Desktop project snapshot",
   "added": [
     {
       "path": ".github/workflows/carbon-disclosure.yml",
@@ -9,7 +10,7 @@
     },
     {
       "path": "app/components/carbon_disclosure_panel.py",
-      "sha256": "ff7de5f2b6d62dbb0a09ba04b0f55f0fd4f01ee2043868db76821736cc47e622"
+      "sha256": "4cc87fd6b5401d6512dcb3139b77ea5e3f519a96aa6a9b995271ececbcb920dc"
     },
     {
       "path": "carbon_disclosure/.gitignore",
@@ -17,11 +18,11 @@
     },
     {
       "path": "carbon_disclosure/README.md",
-      "sha256": "ed507857896f51c27b0556eb459b36e80617437ba7dbac9f3e6e6ed1da4cb86f"
+      "sha256": "40499b78c9d67810e8dc66c23a3254d76b828dc90ecef376a1490a2d768706cb"
     },
     {
       "path": "carbon_disclosure/__init__.py",
-      "sha256": "b3c993edcbab1916e7df06b4c3a8dd033e7064138722e885ef0088849565d45c"
+      "sha256": "578c3268fa3d0f45d7677004e8c55e2874c27d05fd7a97cab0f8a2b47094e98a"
     },
     {
       "path": "carbon_disclosure/__main__.py",
@@ -33,7 +34,7 @@
     },
     {
       "path": "carbon_disclosure/dist/appendix-ui.js",
-      "sha256": "93eb512e781815087fecce4840e1bc85d2b4bba69ecdd4a37dbecae6739f77a9"
+      "sha256": "b04f2cf42800633d640a1d426b15229bdb770d480a976d0b657d648cb907faea"
     },
     {
       "path": "carbon_disclosure/dist/appendix.js",
@@ -53,7 +54,7 @@
     },
     {
       "path": "carbon_disclosure/dist/index.html",
-      "sha256": "0642853bff3882b1a4b1f5edfa0a3f0f1780352699210a1e94fb24c9b65a353f"
+      "sha256": "9f806b42a41baa2a0c9fd123b41183e719993de244897ae978dcb26cb757a58f"
     },
     {
       "path": "carbon_disclosure/dist/manual-pdf.js",
@@ -77,7 +78,7 @@
     },
     {
       "path": "carbon_disclosure/dist/styles.css",
-      "sha256": "b6458b4fa0d028b70bd4a68247ad1ff25de0378b399d9c56f5c636bc558f75d5"
+      "sha256": "ca6ee3269353f59b8b4dcee4bc38fefe3f0d83ac84065cf2cf4e6a70d797b51e"
     },
     {
       "path": "carbon_disclosure/dist/xlsx.js",
@@ -85,7 +86,7 @@
     },
     {
       "path": "carbon_disclosure/package.json",
-      "sha256": "e6ec6cf8b959bb58e9c6634794273710b21fd4088c75ca70c390af6ade8841d3"
+      "sha256": "ed894565c6a37c24e6b87449b8a1475bc70d77bc352821ea940f6e1d2f55e212"
     },
     {
       "path": "carbon_disclosure/server.cjs",
@@ -132,16 +133,24 @@
       "sha256": "1569db2264eb5ec697b7f1c30d6dbf07cb7255613ada131cf5673a54885490b0"
     },
     {
+      "path": "docs/碳账接入与交付说明.md",
+      "sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
+    },
+    {
       "path": "tests/test_carbon_disclosure_integration.py",
-      "sha256": "42b9762fe6368e6d41202367f3b8866bd9adc5f6184d3d54aad47578468e24de"
+      "sha256": "8f7941ade5be32edc2001c24ab128fbe00f22ce18c752bea8155cfcf59c83f6b"
     },
     {
       "path": "tests/test_unified_launcher.py",
-      "sha256": "019d9643c9c1d2e753040ace549c8c9a0a60a51e1374501cc1823533f5c0c110"
+      "sha256": "9d26d64ffb2f4562dc3ce6c37a4be960f833413ab30bcf1e151d1db7dff5e559"
     },
     {
-      "path": "从主前端进入碳账_v0.7.md",
-      "sha256": "4f4533372feb6ea3d394732dd6c64b1ae998dfe7f688aa6d99caba023698cf00"
+      "path": "使用说明_碳台账.md",
+      "sha256": "ef68bc362adaaa158a64d2f219fa2d1610e12f9aa5673f973b296fde330e109e"
+    },
+    {
+      "path": "本次更新_详情说明.md",
+      "sha256": "5492bafef392600406a1a4422e1daeca50f990d5ee7c8604b46a743471dbafaf"
     }
   ],
   "modified": [
@@ -152,8 +161,8 @@
     },
     {
       "path": "README.md",
-      "before_sha256": "e262603132c661e8abcaaa6e1bef5d31bd7539eaaadf367d7273eca9d77f757e",
-      "after_sha256": "2b36e7e8f89aea5a7f360ba2025bb90c516655d1da47b0daf2cd13464076cbf4"
+      "before_sha256": "d265545d4733b77fab82a2f95844b75005bcb6445c97f22fd08f91988f18fbcf",
+      "after_sha256": "96f8add598cf8cd958e4cf281951dce134b8a68dfdb11fe61914bff105d721bb"
     },
     {
       "path": "app/components/main_nav.py",
@@ -161,49 +170,72 @@
       "after_sha256": "c3717c6c9f38d913187966faaea3ddb5cc52ad3086741f6f772bf43552ba3da6"
     },
     {
+      "path": "app/demo_state.py",
+      "before_sha256": "6d018c756a7864dcb1dfde3e17168a7f381713fd431c10fcab397b079a54bd87",
+      "after_sha256": "718bf7e173e7759e789cabe9bd22b5f20d09c144aff93d4a8ae3262863e15e76"
+    },
+    {
       "path": "app/main_views.py",
       "before_sha256": "fcaac5363d23a631c660cb08ceb4276d366f21fe4f3a70fdab3611e89079796f",
-      "after_sha256": "fa625b15c8e95a4eca93540a72d36bf2b3e8a0d1f4ac35683e880bdeab1be115"
+      "after_sha256": "af8501d5afe376d3faef6634ff98c6910a28e5f5ee22c606266ef2b3935ea78f"
+    },
+    {
+      "path": "docs/58_carbon_ledger_frontend_integration.md",
+      "before_sha256": "05a68450f6f82ee9ccec2095db863088a73d46f26be6290f97d45a99c95b71c1",
+      "after_sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
+    },
+    {
+      "path": "tests/test_carbon_ledger.py",
+      "before_sha256": "fac4dcd1e72a2e1015b58b0ee84cca13a706297fac9b3e980f7852d9b32f813a",
+      "after_sha256": "0249733e75c931a0e6a937074714f7fcc8a0dde38ea0f6f90aff2d366824c54d"
+    },
+    {
+      "path": "tests/test_main_app.py",
+      "before_sha256": "f7229142e6559febc51f3fe4f413f4756a99b9fc24dae28bf2cca522f1405289",
+      "after_sha256": "b3c20d6d54e282ae4af6418b6e1f428b7d902ae7b636f065d4b2930a6c81dd91"
     },
     {
       "path": "tools/launch.py",
       "before_sha256": "aa79931767c92851933eed3e45138d41dd46d28fcb3a03c672b1e1ccb4d9a631",
-      "after_sha256": "91f0c86ea307aaf8d61c89f9d1a5014106f8d79f3cd2b76b88cb16e636374b58"
+      "after_sha256": "ab01725c5e35eb4d60ff5662cd6514f158bfcf69496bbe5067d735216c434b75"
     },
     {
       "path": "启动.bat",
       "before_sha256": "49b69024a2d55f18f6ac108f1462706578b0b2fe407bfb70bea45414cc282b03",
-      "after_sha256": "678101aec2dd44bf7f3f6f81ac82d8cb588085c9e217cc37309780a603777a58"
+      "after_sha256": "a400eb5f07243378441beedc992179a2482f304c67f1bfdb189a26dcce31d9d0"
     },
     {
       "path": "启动.command",
       "before_sha256": "f4ddd7f52e27f9b7036c9abb2390f5bcb93de096342c47b55e62347f04c56460",
-      "after_sha256": "9555c1ee078c48b3d6d331218b1425cf41acb627ba2acfe5d424d94e890338d3"
+      "after_sha256": "9be7deb996edc42ca23a613e663bd861cf138f986e5bf111bdfbecf3f187317f"
     },
     {
       "path": "打开碳账.html",
-      "before_sha256": "1d3cd78681ee0280310f6a1860876b6f78d38ce24c814298e95d833049c0b715",
-      "after_sha256": "da283a1abd464ff1a5aedcb9b3e4e808d28933ab10cffe94bc376247aeca7506"
+      "before_sha256": "0c4bd557c01322d4948812a4d7f630fa642931067e2820190e72a4736d7ffb72",
+      "after_sha256": "659bc9549618c2273db8cd3ca7a15b8025c091b68c46f4b2a435cc424326e755"
     },
     {
       "path": "碳账交付验收.md",
-      "before_sha256": "eb89b68e699b6c761a1c8f146aa9d2c05e98c5241de2746994c97e8250d129c9",
-      "after_sha256": "bf791a6b580240470607d96b1bf9dc1d8e8a078d52d05c914f52d5d109903006"
+      "before_sha256": "820c2ef6025125abe69320ff3df86db877f2a4e681908b353a0be0940cd37d0e",
+      "after_sha256": "d944ca5035a5b2f7925f9009f00f046cc0e25f36302125f355b4e9a5187af84a"
     },
     {
       "path": "碳账快速开始.md",
-      "before_sha256": "458b3f44c5ea3a3c2d09c1b1dfdf9b96ab49be6253e01483db2d203281271094",
-      "after_sha256": "0c57d75a35772dbfd2cccd2e9c0d349294b5de338efae7795ba0a03a591ea94a"
+      "before_sha256": "a4c757afe205c6b92ad524bbe6b81f24a8166de880d8aa88cc4102504f30384c",
+      "after_sha256": "ef68bc362adaaa158a64d2f219fa2d1610e12f9aa5673f973b296fde330e109e"
     },
     {
       "path": "碳账接入与交付说明.md",
-      "before_sha256": "618393b6eadbead7c4378dd1e568efa2f628b48688f9ec9f3ed447fb2554cff9",
-      "after_sha256": "0c57d75a35772dbfd2cccd2e9c0d349294b5de338efae7795ba0a03a591ea94a"
+      "before_sha256": "a4c757afe205c6b92ad524bbe6b81f24a8166de880d8aa88cc4102504f30384c",
+      "after_sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
     }
   ],
   "removed": [
-    "启动碳账.bat",
-    "启动碳账.command"
+    "app/components/carbon_ledger_panel.py",
+    "tools/verify_carbon_ledger_tab.js",
+    "从主前端进入碳账_v0.7.md",
+    "碳账实测数据更新说明.md",
+    "统一启动更新说明.md"
   ],
   "delivery_files": [
     {
@@ -244,7 +276,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "2b36e7e8f89aea5a7f360ba2025bb90c516655d1da47b0daf2cd13464076cbf4"
+      "sha256": "96f8add598cf8cd958e4cf281951dce134b8a68dfdb11fe61914bff105d721bb"
     },
     {
       "path": "__init__.py",
@@ -260,11 +292,7 @@
     },
     {
       "path": "app/components/carbon_disclosure_panel.py",
-      "sha256": "ff7de5f2b6d62dbb0a09ba04b0f55f0fd4f01ee2043868db76821736cc47e622"
-    },
-    {
-      "path": "app/components/carbon_ledger_panel.py",
-      "sha256": "ac91ad1c1045120590d7586023393f1fa749b12ec1e7a8cd69a8b142ae1fa9aa"
+      "sha256": "4cc87fd6b5401d6512dcb3139b77ea5e3f519a96aa6a9b995271ececbcb920dc"
     },
     {
       "path": "app/components/dashboard_home.py",
@@ -304,7 +332,7 @@
     },
     {
       "path": "app/demo_state.py",
-      "sha256": "6d018c756a7864dcb1dfde3e17168a7f381713fd431c10fcab397b079a54bd87"
+      "sha256": "718bf7e173e7759e789cabe9bd22b5f20d09c144aff93d4a8ae3262863e15e76"
     },
     {
       "path": "app/finance_panel.py",
@@ -316,7 +344,7 @@
     },
     {
       "path": "app/main_views.py",
-      "sha256": "fa625b15c8e95a4eca93540a72d36bf2b3e8a0d1f4ac35683e880bdeab1be115"
+      "sha256": "af8501d5afe376d3faef6634ff98c6910a28e5f5ee22c606266ef2b3935ea78f"
     },
     {
       "path": "app/services.py",
@@ -352,11 +380,11 @@
     },
     {
       "path": "carbon_disclosure/README.md",
-      "sha256": "ed507857896f51c27b0556eb459b36e80617437ba7dbac9f3e6e6ed1da4cb86f"
+      "sha256": "40499b78c9d67810e8dc66c23a3254d76b828dc90ecef376a1490a2d768706cb"
     },
     {
       "path": "carbon_disclosure/__init__.py",
-      "sha256": "b3c993edcbab1916e7df06b4c3a8dd033e7064138722e885ef0088849565d45c"
+      "sha256": "578c3268fa3d0f45d7677004e8c55e2874c27d05fd7a97cab0f8a2b47094e98a"
     },
     {
       "path": "carbon_disclosure/__main__.py",
@@ -368,7 +396,7 @@
     },
     {
       "path": "carbon_disclosure/dist/appendix-ui.js",
-      "sha256": "93eb512e781815087fecce4840e1bc85d2b4bba69ecdd4a37dbecae6739f77a9"
+      "sha256": "b04f2cf42800633d640a1d426b15229bdb770d480a976d0b657d648cb907faea"
     },
     {
       "path": "carbon_disclosure/dist/appendix.js",
@@ -388,7 +416,7 @@
     },
     {
       "path": "carbon_disclosure/dist/index.html",
-      "sha256": "0642853bff3882b1a4b1f5edfa0a3f0f1780352699210a1e94fb24c9b65a353f"
+      "sha256": "9f806b42a41baa2a0c9fd123b41183e719993de244897ae978dcb26cb757a58f"
     },
     {
       "path": "carbon_disclosure/dist/manual-pdf.js",
@@ -412,7 +440,7 @@
     },
     {
       "path": "carbon_disclosure/dist/styles.css",
-      "sha256": "b6458b4fa0d028b70bd4a68247ad1ff25de0378b399d9c56f5c636bc558f75d5"
+      "sha256": "ca6ee3269353f59b8b4dcee4bc38fefe3f0d83ac84065cf2cf4e6a70d797b51e"
     },
     {
       "path": "carbon_disclosure/dist/xlsx.js",
@@ -420,7 +448,7 @@
     },
     {
       "path": "carbon_disclosure/package.json",
-      "sha256": "e6ec6cf8b959bb58e9c6634794273710b21fd4088c75ca70c390af6ade8841d3"
+      "sha256": "ed894565c6a37c24e6b87449b8a1475bc70d77bc352821ea940f6e1d2f55e212"
     },
     {
       "path": "carbon_disclosure/server.cjs",
@@ -1132,7 +1160,7 @@
     },
     {
       "path": "docs/58_carbon_ledger_frontend_integration.md",
-      "sha256": "05a68450f6f82ee9ccec2095db863088a73d46f26be6290f97d45a99c95b71c1"
+      "sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
     },
     {
       "path": "docs/58_论文锚定速度分段与KMeans归档.md",
@@ -1313,6 +1341,10 @@
     {
       "path": "docs/用户手册_第21-40页_初稿.docx",
       "sha256": "11ecf0bf65dad700e53c8a0073e083d1df900d059432483df4c12c1a61501ee3"
+    },
+    {
+      "path": "docs/碳账接入与交付说明.md",
+      "sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
     },
     {
       "path": "docs/软著/README.md",
@@ -1696,11 +1728,11 @@
     },
     {
       "path": "tests/test_carbon_disclosure_integration.py",
-      "sha256": "42b9762fe6368e6d41202367f3b8866bd9adc5f6184d3d54aad47578468e24de"
+      "sha256": "8f7941ade5be32edc2001c24ab128fbe00f22ce18c752bea8155cfcf59c83f6b"
     },
     {
       "path": "tests/test_carbon_ledger.py",
-      "sha256": "fac4dcd1e72a2e1015b58b0ee84cca13a706297fac9b3e980f7852d9b32f813a"
+      "sha256": "0249733e75c931a0e6a937074714f7fcc8a0dde38ea0f6f90aff2d366824c54d"
     },
     {
       "path": "tests/test_carbon_model.py",
@@ -1768,7 +1800,7 @@
     },
     {
       "path": "tests/test_main_app.py",
-      "sha256": "f7229142e6559febc51f3fe4f413f4756a99b9fc24dae28bf2cca522f1405289"
+      "sha256": "b3c20d6d54e282ae4af6418b6e1f428b7d902ae7b636f065d4b2930a6c81dd91"
     },
     {
       "path": "tests/test_obd_calibration.py",
@@ -1888,7 +1920,7 @@
     },
     {
       "path": "tests/test_unified_launcher.py",
-      "sha256": "019d9643c9c1d2e753040ace549c8c9a0a60a51e1374501cc1823533f5c0c110"
+      "sha256": "9d26d64ffb2f4562dc3ce6c37a4be960f833413ab30bcf1e151d1db7dff5e559"
     },
     {
       "path": "tests/test_vsp_audit.py",
@@ -1996,7 +2028,7 @@
     },
     {
       "path": "tools/launch.py",
-      "sha256": "91f0c86ea307aaf8d61c89f9d1a5014106f8d79f3cd2b76b88cb16e636374b58"
+      "sha256": "ab01725c5e35eb4d60ff5662cd6514f158bfcf69496bbe5067d735216c434b75"
     },
     {
       "path": "tools/make_07_docs.py",
@@ -2051,10 +2083,6 @@
       "sha256": "fd2fd62ed996030537177e161dd0afde3a443dbec38d22f37a265899c33f1055"
     },
     {
-      "path": "tools/verify_carbon_ledger_tab.js",
-      "sha256": "4a4864670a88dc74e354a23e8c5d5ebdd1ec34e4dd0173bf87eadc0cc2657d47"
-    },
-    {
       "path": "tools/verify_dashboard_layout.js",
       "sha256": "efcc1706056471b28c8afffaae7a08d9a1c6f5c09005b9a76986a4920eff4177"
     },
@@ -2087,45 +2115,42 @@
       "sha256": "4889b07fdedc35eb2217bdbbc218e5c0d490012681c2d95d081d442f36cf61ae"
     },
     {
-      "path": "从主前端进入碳账_v0.7.md",
-      "sha256": "4f4533372feb6ea3d394732dd6c64b1ae998dfe7f688aa6d99caba023698cf00"
+      "path": "使用说明_碳台账.md",
+      "sha256": "ef68bc362adaaa158a64d2f219fa2d1610e12f9aa5673f973b296fde330e109e"
     },
     {
       "path": "启动.bat",
-      "sha256": "678101aec2dd44bf7f3f6f81ac82d8cb588085c9e217cc37309780a603777a58"
+      "sha256": "a400eb5f07243378441beedc992179a2482f304c67f1bfdb189a26dcce31d9d0"
     },
     {
       "path": "启动.command",
-      "sha256": "9555c1ee078c48b3d6d331218b1425cf41acb627ba2acfe5d424d94e890338d3"
+      "sha256": "9be7deb996edc42ca23a613e663bd861cf138f986e5bf111bdfbecf3f187317f"
     },
     {
       "path": "打开碳账.html",
-      "sha256": "da283a1abd464ff1a5aedcb9b3e4e808d28933ab10cffe94bc376247aeca7506"
+      "sha256": "659bc9549618c2273db8cd3ca7a15b8025c091b68c46f4b2a435cc424326e755"
+    },
+    {
+      "path": "本次更新_详情说明.md",
+      "sha256": "5492bafef392600406a1a4422e1daeca50f990d5ee7c8604b46a743471dbafaf"
     },
     {
       "path": "碳账交付验收.md",
-      "sha256": "bf791a6b580240470607d96b1bf9dc1d8e8a078d52d05c914f52d5d109903006"
-    },
-    {
-      "path": "碳账实测数据更新说明.md",
-      "sha256": "58a8a860c3a3e7014e90832ffb1d870e8a569f5c06c20f7b31ece7f74eaa95f7"
+      "sha256": "d944ca5035a5b2f7925f9009f00f046cc0e25f36302125f355b4e9a5187af84a"
     },
     {
       "path": "碳账快速开始.md",
-      "sha256": "0c57d75a35772dbfd2cccd2e9c0d349294b5de338efae7795ba0a03a591ea94a"
+      "sha256": "ef68bc362adaaa158a64d2f219fa2d1610e12f9aa5673f973b296fde330e109e"
     },
     {
       "path": "碳账接入与交付说明.md",
-      "sha256": "0c57d75a35772dbfd2cccd2e9c0d349294b5de338efae7795ba0a03a591ea94a"
-    },
-    {
-      "path": "统一启动更新说明.md",
-      "sha256": "a1d86e9baed15c030f6aabce6cc48c54a106118e8f8189b456847888dc34c165"
+      "sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
     },
     {
       "path": "范围一二三划分依据.md",
       "sha256": "7ac9d31a2b7f59b58c9bb843462ad031bcffac8d27e0d5f3df4162b16e267410"
     }
   ],
-  "repair_note": "Applied missing subdirectories and current-page navigation fix to the actual Desktop project. Verified on the user runtime at port 8501. Real uploaded CSV, browser data, QA exports and local environment are excluded."
+  "note": "Original source algorithms, data and shared backend artifacts retained. Old UI page and component removed. Uploaded real CSV, QA exports, runtime environments and browser data are excluded.",
+  "latest_update": "Remove only the calculation/evidence title in record details; retain all fields, editing and missing-information placeholders."
 }

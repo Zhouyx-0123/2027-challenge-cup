@@ -1,8 +1,8 @@
 {
-  "version": "0.8.1",
+  "version": "0.9.0",
   "date": "2026-11-13",
-  "mode": "replace abandoned ledger page, do not retain old tabs",
-  "baseline": "actual Desktop project snapshot",
+  "mode": "sole disclosure ledger, source-count and scope-emission pies, vehicle aggregation",
+  "baseline": "original user-provided Desktop snapshot",
   "added": [
     {
       "path": ".github/workflows/carbon-disclosure.yml",
@@ -10,7 +10,7 @@
     },
     {
       "path": "app/components/carbon_disclosure_panel.py",
-      "sha256": "4cc87fd6b5401d6512dcb3139b77ea5e3f519a96aa6a9b995271ececbcb920dc"
+      "sha256": "74e111f7bfea426a648c6fa6e35020b778c2707b7ffc3e29aeb1c242db554552"
     },
     {
       "path": "carbon_disclosure/.gitignore",
@@ -18,11 +18,11 @@
     },
     {
       "path": "carbon_disclosure/README.md",
-      "sha256": "40499b78c9d67810e8dc66c23a3254d76b828dc90ecef376a1490a2d768706cb"
+      "sha256": "6ad4d4929abfe742f4f9864561c245c900743231e692dcd590e5387303d5b295"
     },
     {
       "path": "carbon_disclosure/__init__.py",
-      "sha256": "578c3268fa3d0f45d7677004e8c55e2874c27d05fd7a97cab0f8a2b47094e98a"
+      "sha256": "ab2c500cb3976d92224b31b0d2235713c5ebac9242b686acdc663f6c2398345e"
     },
     {
       "path": "carbon_disclosure/__main__.py",
@@ -30,7 +30,7 @@
     },
     {
       "path": "carbon_disclosure/dist/app.js",
-      "sha256": "f331cd6c2e3b00b9fccd6209780b4a13a7c09a80b5c9a33af41db8407d67dcc2"
+      "sha256": "371af3a388308139961ad64842ab1716c5943d04e79df0c8d1cb59c509a440bd"
     },
     {
       "path": "carbon_disclosure/dist/appendix-ui.js",
@@ -42,7 +42,7 @@
     },
     {
       "path": "carbon_disclosure/dist/core.js",
-      "sha256": "36ed23d1307cf08a166e32fac0091afbd07f01b0f30e8cb32cbcfc3d49524c9b"
+      "sha256": "98578e5161a6e63f32edac04346364c294862adc5c2bc7ec3392e4b1d29e35bf"
     },
     {
       "path": "carbon_disclosure/dist/disclosure.js",
@@ -54,7 +54,7 @@
     },
     {
       "path": "carbon_disclosure/dist/index.html",
-      "sha256": "9f806b42a41baa2a0c9fd123b41183e719993de244897ae978dcb26cb757a58f"
+      "sha256": "4ce0fae408331f20e9d465ff46269f733b1b3bd2782f70e3db3812929deb04e3"
     },
     {
       "path": "carbon_disclosure/dist/manual-pdf.js",
@@ -66,7 +66,7 @@
     },
     {
       "path": "carbon_disclosure/dist/platform.css",
-      "sha256": "7ef0a04331a8069b9546a07f8eaa8d637aad8e5083131d18f2a94b62e46a47ff"
+      "sha256": "247aa8c1e8235d34bd9228262407a866bd57b6cc3b3be7257e3fa419f8edd04b"
     },
     {
       "path": "carbon_disclosure/dist/sample.csv",
@@ -86,7 +86,7 @@
     },
     {
       "path": "carbon_disclosure/package.json",
-      "sha256": "ed894565c6a37c24e6b87449b8a1475bc70d77bc352821ea940f6e1d2f55e212"
+      "sha256": "f29ca7058ce3b14e6ee8bacc5dbafb75349a17e79df84c006d9454cc5b0fa29b"
     },
     {
       "path": "carbon_disclosure/server.cjs",
@@ -121,6 +121,10 @@
       "sha256": "d3c137acb99baa28271a9f2e8f4800f2e6bdf8b6e7a44fba5e13bc419f024491"
     },
     {
+      "path": "carbon_disclosure/tests/vehicle-summary.test.cjs",
+      "sha256": "03c380651655dbe946d575cf01a3f43c2d8df8ffbe47f0da0112402c449de003"
+    },
+    {
       "path": "carbon_disclosure/范围一二三划分依据.md",
       "sha256": "7ac9d31a2b7f59b58c9bb843462ad031bcffac8d27e0d5f3df4162b16e267410"
     },
@@ -134,19 +138,23 @@
     },
     {
       "path": "docs/碳账接入与交付说明.md",
-      "sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
+      "sha256": "2905b8358e9aab8357e3ca5bf405b231be5bb0a18687363ac0760e3eaa43dbbb"
     },
     {
       "path": "tests/test_carbon_disclosure_integration.py",
-      "sha256": "8f7941ade5be32edc2001c24ab128fbe00f22ce18c752bea8155cfcf59c83f6b"
+      "sha256": "3ec81d81581a139022f7077bb581e4be3beba52ef7c6aad01ad918f5091f9a62"
     },
     {
       "path": "tests/test_unified_launcher.py",
       "sha256": "9d26d64ffb2f4562dc3ce6c37a4be960f833413ab30bcf1e151d1db7dff5e559"
     },
     {
+      "path": "v0.9使用说明.md",
+      "sha256": "9f5d9ded3a02b801b9c03848b59116a2dbb7daa5a89e3a790ccd4781f168892f"
+    },
+    {
       "path": "使用说明_碳台账.md",
-      "sha256": "ef68bc362adaaa158a64d2f219fa2d1610e12f9aa5673f973b296fde330e109e"
+      "sha256": "be8c3b71ffd6522b577a55d7c36e33a503c915bd6850ad8b89abdfb40aa7c16f"
     },
     {
       "path": "本次更新_详情说明.md",
@@ -162,7 +170,7 @@
     {
       "path": "README.md",
       "before_sha256": "d265545d4733b77fab82a2f95844b75005bcb6445c97f22fd08f91988f18fbcf",
-      "after_sha256": "96f8add598cf8cd958e4cf281951dce134b8a68dfdb11fe61914bff105d721bb"
+      "after_sha256": "951234bf9818c10309bc7085aec05ca2d8ef3157def2af932c358ad880506959"
     },
     {
       "path": "app/components/main_nav.py",
@@ -182,7 +190,12 @@
     {
       "path": "docs/58_carbon_ledger_frontend_integration.md",
       "before_sha256": "05a68450f6f82ee9ccec2095db863088a73d46f26be6290f97d45a99c95b71c1",
-      "after_sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
+      "after_sha256": "2905b8358e9aab8357e3ca5bf405b231be5bb0a18687363ac0760e3eaa43dbbb"
+    },
+    {
+      "path": "package.json",
+      "before_sha256": "c0bab780dfe4f220330141415609de3f993534a0a06c19e01169f003c6e2eb67",
+      "after_sha256": "f29ca7058ce3b14e6ee8bacc5dbafb75349a17e79df84c006d9454cc5b0fa29b"
     },
     {
       "path": "tests/test_carbon_ledger.py",
@@ -212,22 +225,22 @@
     {
       "path": "打开碳账.html",
       "before_sha256": "0c4bd557c01322d4948812a4d7f630fa642931067e2820190e72a4736d7ffb72",
-      "after_sha256": "659bc9549618c2273db8cd3ca7a15b8025c091b68c46f4b2a435cc424326e755"
+      "after_sha256": "a26444f3337012247c582c44be04273cc01a5a28ff4dd4461992e389494740b3"
     },
     {
       "path": "碳账交付验收.md",
       "before_sha256": "820c2ef6025125abe69320ff3df86db877f2a4e681908b353a0be0940cd37d0e",
-      "after_sha256": "d944ca5035a5b2f7925f9009f00f046cc0e25f36302125f355b4e9a5187af84a"
+      "after_sha256": "847b8812a85aa99cb2786c8822afccf2c658dc8b7571e99f576f4c31be7fadfd"
     },
     {
       "path": "碳账快速开始.md",
       "before_sha256": "a4c757afe205c6b92ad524bbe6b81f24a8166de880d8aa88cc4102504f30384c",
-      "after_sha256": "ef68bc362adaaa158a64d2f219fa2d1610e12f9aa5673f973b296fde330e109e"
+      "after_sha256": "be8c3b71ffd6522b577a55d7c36e33a503c915bd6850ad8b89abdfb40aa7c16f"
     },
     {
       "path": "碳账接入与交付说明.md",
       "before_sha256": "a4c757afe205c6b92ad524bbe6b81f24a8166de880d8aa88cc4102504f30384c",
-      "after_sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
+      "after_sha256": "2905b8358e9aab8357e3ca5bf405b231be5bb0a18687363ac0760e3eaa43dbbb"
     }
   ],
   "removed": [
@@ -276,7 +289,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "96f8add598cf8cd958e4cf281951dce134b8a68dfdb11fe61914bff105d721bb"
+      "sha256": "951234bf9818c10309bc7085aec05ca2d8ef3157def2af932c358ad880506959"
     },
     {
       "path": "__init__.py",
@@ -292,7 +305,7 @@
     },
     {
       "path": "app/components/carbon_disclosure_panel.py",
-      "sha256": "4cc87fd6b5401d6512dcb3139b77ea5e3f519a96aa6a9b995271ececbcb920dc"
+      "sha256": "74e111f7bfea426a648c6fa6e35020b778c2707b7ffc3e29aeb1c242db554552"
     },
     {
       "path": "app/components/dashboard_home.py",
@@ -380,11 +393,11 @@
     },
     {
       "path": "carbon_disclosure/README.md",
-      "sha256": "40499b78c9d67810e8dc66c23a3254d76b828dc90ecef376a1490a2d768706cb"
+      "sha256": "6ad4d4929abfe742f4f9864561c245c900743231e692dcd590e5387303d5b295"
     },
     {
       "path": "carbon_disclosure/__init__.py",
-      "sha256": "578c3268fa3d0f45d7677004e8c55e2874c27d05fd7a97cab0f8a2b47094e98a"
+      "sha256": "ab2c500cb3976d92224b31b0d2235713c5ebac9242b686acdc663f6c2398345e"
     },
     {
       "path": "carbon_disclosure/__main__.py",
@@ -392,7 +405,7 @@
     },
     {
       "path": "carbon_disclosure/dist/app.js",
-      "sha256": "f331cd6c2e3b00b9fccd6209780b4a13a7c09a80b5c9a33af41db8407d67dcc2"
+      "sha256": "371af3a388308139961ad64842ab1716c5943d04e79df0c8d1cb59c509a440bd"
     },
     {
       "path": "carbon_disclosure/dist/appendix-ui.js",
@@ -404,7 +417,7 @@
     },
     {
       "path": "carbon_disclosure/dist/core.js",
-      "sha256": "36ed23d1307cf08a166e32fac0091afbd07f01b0f30e8cb32cbcfc3d49524c9b"
+      "sha256": "98578e5161a6e63f32edac04346364c294862adc5c2bc7ec3392e4b1d29e35bf"
     },
     {
       "path": "carbon_disclosure/dist/disclosure.js",
@@ -416,7 +429,7 @@
     },
     {
       "path": "carbon_disclosure/dist/index.html",
-      "sha256": "9f806b42a41baa2a0c9fd123b41183e719993de244897ae978dcb26cb757a58f"
+      "sha256": "4ce0fae408331f20e9d465ff46269f733b1b3bd2782f70e3db3812929deb04e3"
     },
     {
       "path": "carbon_disclosure/dist/manual-pdf.js",
@@ -428,7 +441,7 @@
     },
     {
       "path": "carbon_disclosure/dist/platform.css",
-      "sha256": "7ef0a04331a8069b9546a07f8eaa8d637aad8e5083131d18f2a94b62e46a47ff"
+      "sha256": "247aa8c1e8235d34bd9228262407a866bd57b6cc3b3be7257e3fa419f8edd04b"
     },
     {
       "path": "carbon_disclosure/dist/sample.csv",
@@ -448,7 +461,7 @@
     },
     {
       "path": "carbon_disclosure/package.json",
-      "sha256": "ed894565c6a37c24e6b87449b8a1475bc70d77bc352821ea940f6e1d2f55e212"
+      "sha256": "f29ca7058ce3b14e6ee8bacc5dbafb75349a17e79df84c006d9454cc5b0fa29b"
     },
     {
       "path": "carbon_disclosure/server.cjs",
@@ -481,6 +494,10 @@
     {
       "path": "carbon_disclosure/tests/test_runtime.py",
       "sha256": "d3c137acb99baa28271a9f2e8f4800f2e6bdf8b6e7a44fba5e13bc419f024491"
+    },
+    {
+      "path": "carbon_disclosure/tests/vehicle-summary.test.cjs",
+      "sha256": "03c380651655dbe946d575cf01a3f43c2d8df8ffbe47f0da0112402c449de003"
     },
     {
       "path": "carbon_disclosure/范围一二三划分依据.md",
@@ -1160,7 +1177,7 @@
     },
     {
       "path": "docs/58_carbon_ledger_frontend_integration.md",
-      "sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
+      "sha256": "2905b8358e9aab8357e3ca5bf405b231be5bb0a18687363ac0760e3eaa43dbbb"
     },
     {
       "path": "docs/58_论文锚定速度分段与KMeans归档.md",
@@ -1344,7 +1361,7 @@
     },
     {
       "path": "docs/碳账接入与交付说明.md",
-      "sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
+      "sha256": "2905b8358e9aab8357e3ca5bf405b231be5bb0a18687363ac0760e3eaa43dbbb"
     },
     {
       "path": "docs/软著/README.md",
@@ -1440,7 +1457,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "c0bab780dfe4f220330141415609de3f993534a0a06c19e01169f003c6e2eb67"
+      "sha256": "f29ca7058ce3b14e6ee8bacc5dbafb75349a17e79df84c006d9454cc5b0fa29b"
     },
     {
       "path": "pytest.ini",
@@ -1728,7 +1745,7 @@
     },
     {
       "path": "tests/test_carbon_disclosure_integration.py",
-      "sha256": "8f7941ade5be32edc2001c24ab128fbe00f22ce18c752bea8155cfcf59c83f6b"
+      "sha256": "3ec81d81581a139022f7077bb581e4be3beba52ef7c6aad01ad918f5091f9a62"
     },
     {
       "path": "tests/test_carbon_ledger.py",
@@ -2115,8 +2132,12 @@
       "sha256": "4889b07fdedc35eb2217bdbbc218e5c0d490012681c2d95d081d442f36cf61ae"
     },
     {
+      "path": "v0.9使用说明.md",
+      "sha256": "9f5d9ded3a02b801b9c03848b59116a2dbb7daa5a89e3a790ccd4781f168892f"
+    },
+    {
       "path": "使用说明_碳台账.md",
-      "sha256": "ef68bc362adaaa158a64d2f219fa2d1610e12f9aa5673f973b296fde330e109e"
+      "sha256": "be8c3b71ffd6522b577a55d7c36e33a503c915bd6850ad8b89abdfb40aa7c16f"
     },
     {
       "path": "启动.bat",
@@ -2128,7 +2149,7 @@
     },
     {
       "path": "打开碳账.html",
-      "sha256": "659bc9549618c2273db8cd3ca7a15b8025c091b68c46f4b2a435cc424326e755"
+      "sha256": "a26444f3337012247c582c44be04273cc01a5a28ff4dd4461992e389494740b3"
     },
     {
       "path": "本次更新_详情说明.md",
@@ -2136,21 +2157,20 @@
     },
     {
       "path": "碳账交付验收.md",
-      "sha256": "d944ca5035a5b2f7925f9009f00f046cc0e25f36302125f355b4e9a5187af84a"
+      "sha256": "847b8812a85aa99cb2786c8822afccf2c658dc8b7571e99f576f4c31be7fadfd"
     },
     {
       "path": "碳账快速开始.md",
-      "sha256": "ef68bc362adaaa158a64d2f219fa2d1610e12f9aa5673f973b296fde330e109e"
+      "sha256": "be8c3b71ffd6522b577a55d7c36e33a503c915bd6850ad8b89abdfb40aa7c16f"
     },
     {
       "path": "碳账接入与交付说明.md",
-      "sha256": "42251e5a7efdc476b67aa90ca901d34ff01709947f7638b9ced3a8a58279ed47"
+      "sha256": "2905b8358e9aab8357e3ca5bf405b231be5bb0a18687363ac0760e3eaa43dbbb"
     },
     {
       "path": "范围一二三划分依据.md",
       "sha256": "7ac9d31a2b7f59b58c9bb843462ad031bcffac8d27e0d5f3df4162b16e267410"
     }
   ],
-  "note": "Original source algorithms, data and shared backend artifacts retained. Old UI page and component removed. Uploaded real CSV, QA exports, runtime environments and browser data are excluded.",
-  "latest_update": "Remove only the calculation/evidence title in record details; retain all fields, editing and missing-information placeholders."
+  "note": "Source chart counts accepted unique main and side records; scope chart and vehicle totals use main emissions. Original source data, standards and launchers retained. Real CSV, exports and runtime environments excluded."
 }

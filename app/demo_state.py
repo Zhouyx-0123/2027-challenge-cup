@@ -75,13 +75,3 @@ def carbon_snapshot() -> Dict[str, float]:
     }
 
 
-def fallback_disclosure(snapshot: Dict[str, float]) -> str:
-    return (
-        "本期基准碳排放为 %.2f tCO2e。发票感知新增 %.6f tCO2e，"
-        "合并后当期总碳排放为 %.6f tCO2e。"
-        "按当前配额 %.2f tCO2e 计算，配额缺口为 %.6f tCO2e；"
-        "相关财务风险合计 %.2f 元。估算数据已保留标记，正式披露前需人工复核。"
-        % (snapshot["base_t"], snapshot["invoice_t"],
-           snapshot["total_t"], snapshot["quota_t"], snapshot["gap_t"],
-           snapshot["financial_risk_yuan"])
-    )

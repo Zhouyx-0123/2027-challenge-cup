@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""碳会计 A0–A6 审计轨的适配器与前端守卫测试（docs/54）。
+"""历史适配数据与服务层回归检查；旧审计页面已移除。
 
 覆盖五条线：
   1. **适配器** —— 从交付工作簿导出结果表，不重算排放量、不改交付方文件；
@@ -296,45 +296,8 @@ def test_quota_raw_notes_are_preserved_not_rewritten():
 # 7. 前端守卫
 # ---------------------------------------------------------------------------
 
-def _code_only(path: Path) -> str:
-    """去掉注释与文档字符串后的源码（避免断言撞上说明文字）。"""
-    import io
-    import tokenize
-
-    source = path.read_text(encoding="utf-8")
-    tokens = []
-    for token in tokenize.generate_tokens(io.StringIO(source).readline):
-        if token.type == tokenize.COMMENT:
-            continue
-        tokens.append(token)
-    text = tokenize.untokenize(tokens)
-    tree = ast.parse(text)
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
-                             ast.ClassDef)):
-            body = node.body
-            if (body and isinstance(body[0], ast.Expr)
-                    and isinstance(body[0].value, ast.Constant)
-                    and isinstance(body[0].value.value, str)):
-                body[0].value.value = ""
-    return ast.unparse(tree)
 
 
-def test_panel_does_not_import_the_adapter():
-    """前端只读结果表，不 import 适配器、不重算判定。"""
-    tree = ast.parse(PANEL_PATH.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                assert not alias.name.startswith("src"), \
-                    "前端组件不许 import src：%s" % alias.name
-        if isinstance(node, ast.ImportFrom):
-            assert not (node.module or "").startswith("src"), \
-                "前端组件不许 import src：%s" % node.module
-    assert "carbon_ledger_export" not in [
-        node.id for node in ast.walk(tree) if isinstance(node, ast.Name)]
-    assert "carbon_ledger_export" not in [
-        node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)]
 
 
 def test_service_exposes_carbon_integration_provenance():
@@ -407,42 +370,17 @@ def test_services_has_no_arithmetic_on_ledger_totals():
     assert not offenders, "只读层出现了乘除运算：%s" % offenders
 
 
-def test_panel_offers_no_write_or_approval_control():
-    """页面不提供审批/写入控件 —— 审批载体是 Excel。"""
-    source = PANEL_PATH.read_text(encoding="utf-8")
-    for banned in ("st.button", "st.form", "st.form_submit_button",
-                   "st.data_editor", "st.download_button"):
-        assert banned not in source, "审计轨面板出现写控件：%s" % banned
 
 
-def test_ledger_page_has_two_tabs_not_a_ledger_only_page():
-    """碳账进的是「碳台账」页的第二个 tab，不为它单开一页。
 
-    第六页是「数据链总览」（app/views_chain.py，只读状态盘点），
-    与碳账无关；此处只守住「碳账没有独立页」这件事。
-    """
+
+
+
+
+
+def test_abandoned_ledger_panel_and_route_are_removed():
+    assert not PANEL_PATH.exists()
     source = MAIN_VIEWS_PATH.read_text(encoding="utf-8")
-    assert "碳会计口径 A0–A6（审计轨）" in source
-    assert "carbon_ledger_panel.render_carbon_ledger_panel()" in source
-    nav = (APP_DIR / "components" / "main_nav.py").read_text(encoding="utf-8")
-    assert nav.count('{"id":') == 6, "主导航应为六页（业务五页 + 数据链总览）"
-    assert "ledger" in nav and "chain" in nav
-
-
-def test_panel_states_the_boundary_and_simulation():
-    """页面必须同时给出「口径不混算」与「模拟数据」两条声明。"""
-    source = PANEL_PATH.read_text(encoding="utf-8")
-    assert "不合并" in source and "不相减" in source
-    assert "simulated" in source
-    assert "proxy_pending_verification" in source
-    assert "不可用于对外披露" in source
-
-
-def test_panel_never_claims_zero_emissions():
-    """「0 行正式汇总」不能被写成「排放为零」（注释与文档字符串不算数）。"""
-    code = _code_only(PANEL_PATH)
-    assert "排放为零" not in code
-    # 正确的表述来自数据（适配器写进 formal.meaning），面板原样引用
-    summary = cle.build_summary(cle.build_trips(), cle.build_gates(cle.build_trips()))
-    assert "不等于实际排放为零" in summary["formal"]["meaning"]
-    assert re.search(r"formal\.get\(\s*['\"]meaning['\"]\s*\)", code)
+    assert "carbon_disclosure_panel.render_carbon_disclosure_panel()" in source
+    assert "carbon_ledger_panel" not in source
+    assert "_render_ledger_e0" not in source

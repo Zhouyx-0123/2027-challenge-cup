@@ -139,7 +139,7 @@ def test_only_six_visible_pages_remain():
     assert "showSidebarNavigation = false" in config
 
 
-def test_ledger_parameters_sync_to_shared_state():
+def test_replaced_ledger_has_no_old_price_or_quota_controls():
     def script():
         from demo_state import init_state
         from main_views import render_ledger
@@ -147,13 +147,9 @@ def test_ledger_parameters_sync_to_shared_state():
         render_ledger()
 
     at = _run(script)
-    price = next(n for n in at.number_input if n.label == "碳价（元/tCO2）")
-    price.set_value(180.0).run()
-    assert not at.exception
-    assert at.session_state["carbon_price"] == 180.0
-    quota = next(n for n in at.number_input if n.label == "当期碳配额（tCO2）")
-    quota.set_value(4600.0).run()
-    assert at.session_state["carbon_quota_t"] == 4600.0
+    assert not at.number_input
+    assert not at.tabs
+    assert len(at.get("iframe")) == 1
 
 
 def test_dashboard_uses_light_narrative_home():

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="独立碳账试算工作台：导入排放事实、校验去重、分类汇总、查询台账并导出Excel。">
+  <title>碳账 · 试算工作台</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="platform.css">
+</head>
+<body>
+  <svg class="icon-defs" aria-hidden="true"><defs>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m10.3 4-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 17v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  </defs></svg>
+  <aside class="sidebar">
+    <a class="brand" href="#overview" aria-label="碳账首页"><span class="brand-mark">碳</span><span>碳账<small>排放试算工作台</small></span></a>
+    <div class="nav-caption">工作空间</div>
+    <nav aria-label="主要功能">
+      <button class="nav-item active" data-view="overview"><svg><use href="#i-grid"/></svg>排放总览</button>
+      <button class="nav-item" data-view="ledger"><svg><use href="#i-list"/></svg>排放台账<span id="nav-count"></span></button>
+      <button class="nav-item" data-view="issues"><svg><use href="#i-alert"/></svg>处理清单<span id="nav-issues"></span></button>
+      <button class="nav-item" data-view="appendix"><svg><use href="#i-list"/></svg>披露附录</button>
+      <button class="nav-item" data-view="rules"><svg><use href="#i-info"/></svg>本期口径</button>
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span>披露碳账 · v0.9<p>数据在当前浏览器处理<br>当前输出为试算结果</p></div>
+  </aside>
+  <main>
+    <header class="topbar"><span class="breadcrumb">碳账工作空间 <span>/</span> <strong id="breadcrumb-title">排放总览</strong></span><span class="trial-label">试算 · 未经人工业务审核</span></header>
+    <div class="workspace">
+      <section class="page-heading"><div><div class="eyebrow">EMISSIONS LEDGER</div><h1 id="page-title">排放总览</h1><p id="page-subtitle">接收排放结果，查看本期构成与数据处理情况。</p></div><div class="heading-actions"><button class="button secondary" id="sample-button">载入模拟样例</button><button class="button primary" id="export-button" disabled><svg><use href="#i-download"/></svg>导出 Excel</button></div></section>
+      <div id="error" class="error-box" role="alert" hidden></div>
+      <section class="import-card" id="dropzone" aria-label="CSV导入">
+        <div class="upload-symbol"><svg><use href="#i-upload"/></svg></div><div class="import-copy"><h2 id="source-name">导入排放事实 CSV</h2><p id="source-description">拖入文件，或点击右侧选择。使用已确定的14字段输入格式。</p><div id="batch-note" class="batch-note">也可以先载入负责人提供的模拟样例。</div></div>
+        <div class="import-actions"><select id="batch-history" aria-label="已保存在本机的批次"><option value="">历史批次</option></select><button class="button secondary" id="upload-button"><svg><use href="#i-upload"/></svg>选择 CSV</button><input id="file-input" type="file" accept=".csv,text/csv" hidden></div>
+      </section>
+      <div id="import-result" class="import-result" role="status" aria-live="polite" hidden></div>
+      <div class="batch-options" id="batch-options" hidden><label>数据性质<select id="nature"><option>未注明</option><option>模拟</option><option>真实</option></select></label><label>排放口径<select id="unit"><option value="pending">kg · 气体口径待确认</option><option value="co2e">kgCO₂e</option><option value="co2">kgCO₂</option></select></label><span>来源文件保留；调整标签不修改排放量。</span><button class="button secondary" id="reprocess-button">重新生成汇总</button></div>
+      <div id="empty-state" class="empty-state"><div class="empty-orbit"><span>CO₂</span></div><h2>从一批排放记录开始</h2><p>导入后自动校验、去重，形成范围与月度汇总。<br>有效主账、旁证和异常分别保留。</p><button class="button primary" id="empty-sample">查看模拟数据效果<svg><use href="#i-arrow"/></svg></button><div class="empty-steps"><span>01 导入结果</span><span>02 校验归集</span><span>03 查看与导出</span></div></div>
+      <div id="loaded-content" hidden>
+        <section class="filters" aria-label="当前数据筛选"><span class="filter-title">当前视图</span><label class="sr-only" for="period-filter">月份</label><select id="period-filter"><option value="">全部月份</option></select><label class="sr-only" for="scope-filter">范围</label><select id="scope-filter"><option value="">全部范围</option><option value="1">范围一</option><option value="2">范围二</option><option value="3">范围三</option></select><input id="search" type="search" aria-label="查询车牌或记录" placeholder="查询车牌、车辆、趟次或记录编号"><button id="reset-filters" class="text-button">重置</button><span id="filtered-note"></span></section>
+        <section id="view-overview" class="view-panel">
+          <div id="metrics" class="metrics"></div>
+          <div class="disclosure-charts">
+            <section class="panel disclosure-chart-panel"><div class="panel-heading"><div><h2>数据来源条数占比</h2><p>OBD / legal / VSP · 当前筛选</p></div><span class="mini-tag">按条数</span></div><div id="source-chart"></div><p id="source-chart-note" class="chart-note"></p></section>
+            <section class="panel disclosure-chart-panel"><div class="panel-heading"><div><h2>总排放量的范围构成</h2><p>范围一 / 二 / 三 · 当前有效主账</p></div><span class="mini-tag">按排放量</span></div><div id="scope-chart"></div><p id="scope-chart-note" class="chart-note"></p></section>
+          </div>
+          <div class="overview-grid esg-overview-grid"><section class="panel monthly-panel esg-report-panel"><div class="report-kicker">ESG 关键绩效汇编 <span>按实际月份展示</span></div><div class="panel-heading"><div><h2>温室气体排放</h2><p id="monthly-unit">有效主账 · 按上游归属月份</p></div><div class="report-actions"><button class="text-button" data-manual="read">阅读完整说明册</button><button class="button secondary" data-manual="download">下载说明册 PDF</button></div></div><div class="table-scroll"><table><thead id="monthly-head"></thead><tbody id="monthly-body"></tbody><tfoot id="monthly-foot"></tfoot></table></div><div id="report-footnotes" class="report-footnotes"></div></section><section class="panel composition-panel"><div class="panel-heading"><div><h2>活动构成</h2><p>主账排放来源</p></div></div><div id="composition"></div><p class="panel-footnote">范围三仅包含本批已提供的活动类别。</p></section></div>
+          <section class="panel quality-panel"><div class="panel-heading"><div><h2>本批处理概况</h2><p>全批记录数，不随上方筛选缩减</p></div><button class="text-button" id="see-issues">查看处理清单 →</button></div><div id="quality" class="quality-grid"></div></section>
+          <div class="scope-note"><svg><use href="#i-info"/></svg><p><span id="booking-rule"></span> 系统直接接收上游排放量，入账不代表已经完成人工审核。</p></div>
+        </section>
+        <section id="view-ledger" class="view-panel" hidden><section class="panel"><div class="panel-heading vehicle-table-heading"><div><h2>车辆排放汇总</h2><p id="ledger-description"></p></div><div class="ledger-table-actions"><label class="ledger-mode-label">展示方式<select id="ledger-view-mode"><option value="vehicles">按车辆汇总</option><option value="records">按原始记录</option></select></label><div class="segmented"><button class="selected" data-rail="main">有效主账</button><button data-rail="side">旁证记录</button></div></div></div><p class="vehicle-grouping-note">同一车辆跨当前所选月份合并，范围一、二、三分别列示。优先按车辆编号识别，缺编号时使用车牌；非车辆用能对象按原对象编号列示，无标识记录单独保留。</p><div class="table-scroll"><table class="ledger-table"><thead id="ledger-head"></thead><tbody id="ledger-body"></tbody></table></div><div id="pagination" class="pagination"></div><div id="ledger-footnotes" class="report-footnotes ledger-footnotes"></div></section></section>
+        <section id="view-issues" class="view-panel" hidden><section class="panel"><div class="panel-heading"><div><h2>全批处理清单</h2><p>保留原始记录与原因；此列表不随主账筛选缩减。</p></div><div class="segmented issue-tabs"><button class="selected" data-issue="rejected">被拒</button><button data-issue="duplicates">重投</button><button data-issue="conflicts">内容冲突</button></div></div><div class="table-scroll"><table><thead><tr><th>CSV行</th><th>事实编号</th><th>原始排放量</th><th>处理原因</th><th></th></tr></thead><tbody id="issues-body"></tbody></table></div></section></section>
+        <section id="view-appendix" class="view-panel" hidden>
+          <div class="appendix-intro"><div><strong>把排放数字的依据补清楚</strong><p>先写本期说明，再补因子出处与逐条计算记录。填写附录不会改变主账排放量。</p></div><div class="appendix-tools"><button class="button secondary" id="appendix-backup">备份附录</button><button class="button secondary" id="appendix-restore">恢复附录</button><input type="file" id="appendix-file" accept=".json,application/json" hidden></div></div>
+          <div id="appendix-status" class="appendix-status"></div>
+          <div class="appendix-tabs" role="group" aria-label="附录内容"><button class="selected" data-appendix-tab="notes">01 本期附注</button><button data-appendix-tab="references">02 标准依据</button><button data-appendix-tab="factors">03 方法与因子</button><button data-appendix-tab="trace">04 逐条追溯</button></div>
+          <section id="appendix-notes" class="panel appendix-panel"><div class="panel-heading"><div><h2>本期披露附注 · 草稿</h2><p>可填写报告主体、边界和覆盖说明；内容保存在当前批次并随Excel导出。</p></div><span class="mini-tag" id="appendix-save-status">保存在当前浏览器</span></div><form id="appendix-notes-form"><div id="appendix-note-fields" class="appendix-form-grid"></div><div class="appendix-form-footer"><button class="button primary" type="submit">保存附注</button><span>这是资料登记，不是业务审核。</span></div></form></section>
+          <section id="appendix-references" class="panel appendix-panel" hidden><div class="panel-heading"><div><h2>标准与章节参考</h2><p>用于解释分类和披露要求。本项目已按参考截图选定文件组合，版本与适用差异见完整说明册。</p></div></div><div id="appendix-reference-list"></div></section>
+          <section id="appendix-factors" class="panel appendix-panel" hidden><div class="panel-heading"><div><h2>本批方法与因子目录</h2><p>按因子编号与版本关联。项目指定数值与正式出处分开记录，参考公式不替代实际计算快照。</p></div></div><div id="appendix-factor-list" class="appendix-factor-grid"></div></section>
+          <section id="appendix-trace" class="panel appendix-panel" hidden><div class="panel-heading"><div><h2>逐条计算与证据附表</h2><p>跟随上方筛选，包含有效主账与旁证。没有原始资料的字段保持待补。</p></div></div><div class="table-scroll"><table><thead><tr><th>事实编号 / 期间</th><th>活动 / 排放（kg）</th><th>证据索引</th><th>资料状态</th><th></th></tr></thead><tbody id="appendix-trace-body"></tbody></table></div><div id="appendix-pagination" class="pagination"></div></section>
+        </section>
+        <section id="view-rules" class="view-panel" hidden><section class="panel rules-panel"><div class="panel-heading"><div><h2>本期试算口径</h2><p>基于负责人提供的测试规则；正式版本可独立配置。</p></div><span class="mini-tag">主线 v0.6</span></div><div id="rules-content"></div></section></section>
+      </div>
+      <footer class="page-footer"><span>碳账 · 独立主线</span><span>已算排放接入 / 规则归集 / 试算披露</span></footer>
+    </div>
+  </main>
+  <dialog id="vehicle-dialog"><div class="dialog-header"><div><span class="eyebrow">VEHICLE DISCLOSURE</span><h2 id="vehicle-dialog-title">车辆排放明细</h2><p id="vehicle-dialog-description"></p></div><button id="close-vehicle" class="icon-button" aria-label="关闭车辆明细">×</button></div><div id="vehicle-dialog-totals" class="vehicle-dialog-totals"></div><div class="table-scroll"><table><thead><tr><th>月份 / 事实编号</th><th>关联趟次</th><th>范围 / 活动</th><th class="number">排放量（kg）</th><th>来源</th><th></th></tr></thead><tbody id="vehicle-record-body"></tbody></table></div><div id="vehicle-pagination" class="pagination"></div></dialog>
+  <dialog id="detail-dialog"><div class="dialog-header"><div><span class="eyebrow">RECORD DETAIL</span><h2>排放记录详情</h2></div><button id="close-detail" class="icon-button" aria-label="关闭详情">×</button></div><div id="detail-content"></div></dialog>
+  <dialog id="appendix-dialog"><div class="dialog-header"><div><span class="eyebrow">DISCLOSURE APPENDIX</span><h2 id="appendix-dialog-title">补充依据</h2></div><button id="close-appendix" class="icon-button" aria-label="关闭附录编辑">×</button></div><form id="appendix-edit-form"><div id="appendix-dialog-fields"></div><div class="appendix-dialog-footer"><p id="appendix-dialog-error" class="inline-error" role="alert"></p><button class="button primary" type="submit">保存资料</button></div></form></dialog>
+  <dialog id="methodology-dialog" class="methodology-dialog"><div class="dialog-header"><div><span class="eyebrow">METHODS AND SOURCES</span><h2>碳账核算与披露说明册</h2></div><button id="close-methodology" class="icon-button" aria-label="关闭说明册">×</button></div><div class="manual-toolbar"><span>参考文件与主表附注一致 · v0.6</span><button class="button primary" data-manual="download">下载说明册 PDF</button></div><div id="methodology-content" class="methodology-content"></div></dialog>
+  <div id="toast" role="status" hidden></div>
+  <script src="downloads.js"></script><script src="core.js"></script><script src="xlsx.js"></script><script src="disclosure.js"></script><script src="appendix.js"></script><script src="appendix-ui.js"></script><script src="sample.js"></script><script src="manual-pdf.js"></script><script src="app.js"></script>
+</body>
+</html>

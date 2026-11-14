@@ -1,0 +1,13 @@
+{
+  "name": "carbon-ledger-mainline",
+  "version": "0.9.0",
+  "private": true,
+  "description": "独立碳账主线：接收已计算排放，规则归集与Excel试算导出",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

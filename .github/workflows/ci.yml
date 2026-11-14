@@ -44,6 +44,8 @@ jobs:
   docker-smoke:
     name: docker · 构建 + 前端冒烟
     runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ secrets.REGISTRY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -107,7 +109,7 @@ jobs:
         run: docker compose down -v
 
       - name: 登录镜像仓库（可选）
-        if: ${{ secrets.REGISTRY != '' }}
+        if: ${{ env.REGISTRY != '' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.REGISTRY }}
@@ -115,7 +117,7 @@ jobs:
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: 推送镜像（可选，需配置 REGISTRY secret）
-        if: ${{ secrets.REGISTRY != '' }}
+        if: ${{ env.REGISTRY != '' }}
         run: |
           docker tag carbontide:ci ${{ secrets.REGISTRY }}/carbontide:${{ github.sha }}
           docker push ${{ secrets.REGISTRY }}/carbontide:${{ github.sha }}

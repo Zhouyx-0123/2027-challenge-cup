@@ -10,9 +10,9 @@ import streamlit as st
 
 import live_services
 import services
-from components import (carbon_ledger_panel, dashboard_home, flags, obd_panel,
+from components import (carbon_disclosure_panel, dashboard_home, flags, obd_panel,
                         qlearning_panel, route_sandbox, theme)
-from demo_state import carbon_snapshot, fallback_disclosure
+from demo_state import carbon_snapshot
 
 
 def render_dashboard() -> None:
@@ -175,110 +175,14 @@ def render_routes() -> None:
         qlearning_panel.render(float(st.session_state["carbon_price"]))
 
 
-def _sync_ledger_carbon_params() -> None:
-    """控件键 page-scoped；规范状态键跨页面保留。"""
-    st.session_state["carbon_price"] = float(st.session_state["ledger_carbon_price_input"])
-    st.session_state["carbon_quota_t"] = float(st.session_state["ledger_carbon_quota_input"])
-    st.session_state["disclosure_note"] = ""
-
-
 def render_ledger() -> None:
-    """碳台账页：两条并行的口径轨道。
-
-    · Tab 1「工程口径 E₀」—— 主链路的实时成账（原有内容，一行未改）；
-    · Tab 2「碳会计 A0–A6 审计轨」—— 碳会计交付物的**只读**判定视图。
-
-    两者口径不同（E₀ = TTW 尾管燃烧；碳账 = WTW 全生命周期），**不合并、不相减**。
-    """
+    """主导航碳台账的唯一页面：排放接收、范围归集与披露依据。"""
     theme.hero_compact(
-        "碳核算与台账",
-        "工程口径 E₀ 实时成账，与碳会计 A0–A6 审计轨并列呈现；两套口径互不换算。",
+        "碳台账",
+        "接收排放结果，归集范围一、二、三；每一笔排放都能追溯来源、方法和披露依据。",
         kicker="04 / CARBON LEDGER",
-        badges=["统一快照", "配额缺口", "碳会计审计轨", "只读判定链"])
-    tab_e0, tab_audit = st.tabs([
-        "⚙️ 工程口径 E₀（主账）",
-        "📋 碳会计口径 A0–A6（审计轨）",
-    ])
-    with tab_e0:
-        _render_ledger_e0()
-    with tab_audit:
-        carbon_ledger_panel.render_carbon_ledger_panel()
-
-
-def _e0_disclosure_text() -> str:
-    """对外披露口径 E0 的显示文本：只读 kpi.json（total_kg / 1000），不改任何算术。
-
-    读不到就明说“暂不可读”，不拿 0 或毛口径数字冒充 E0。
-    """
-    e0_t = float(services.kpis().get("total_kg") or 0.0) / 1000.0
-    if e0_t <= 0:
-        return "E0（kpi.json 暂不可读）"
-    return f"{e0_t:,.4f} t"
-
-
-def _render_ledger_e0() -> None:
-    with st.expander("碳账参数设置", expanded=True):
-        param_a, param_b = st.columns(2)
-        with param_a:
-            st.number_input(
-                "碳价（元/tCO2）", min_value=0.0, max_value=10000.0,
-                value=float(st.session_state["carbon_price"]), step=10.0,
-                key="ledger_carbon_price_input", on_change=_sync_ledger_carbon_params)
-        with param_b:
-            st.number_input(
-                "当期碳配额（tCO2）", min_value=0.0, max_value=1000000.0,
-                value=float(st.session_state["carbon_quota_t"]), step=10.0,
-                key="ledger_carbon_quota_input", on_change=_sync_ledger_carbon_params)
-    snap = carbon_snapshot()
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("当期总碳排（毛口径）", f"{snap['total_t']:.4f} t")
-    c2.metric("碳配额缺口（毛口径）", f"{snap['gap_t']:.4f} t")
-    c3.metric("财务罚单/风险", f"¥{snap['financial_risk_yuan']:.2f}")
-    c4.metric("配额余额（毛口径）", f"{snap['balance_t']:.4f} t")
-    if snap["gap_t"] > 0:
-        st.error("综合发票新增与当期配额，本期需购买 %.4f 吨碳配额。" % snap["gap_t"])
-    else:
-        st.success("当前配额充足，无需新增购买。")
-
-    breakdown = pd.DataFrame([
-        {"项目": "基准总碳排（毛口径）", "排放量(tCO2e)": snap["base_t"], "财务影响(元)": 0.0},
-        {"项目": "当前发票新增", "排放量(tCO2e)": snap["invoice_t"],
-         "财务影响(元)": snap["invoice_cost_yuan"]},
-        {"项目": "合计", "排放量(tCO2e)": snap["total_t"],
-         "财务影响(元)": snap["financial_risk_yuan"]},
-    ])
-    st.dataframe(breakdown, width="stretch", hide_index=True)
-    flags.render_estimate_audit()
-    st.caption(
-        "财务风险 = 发票新增排放 × 全局碳价。基准总碳排只读 kpi 结果表，"
-        "结果缺失时才显示静态演示快照。"
-        f"本页总碳排 / 缺口 / 余额均为毛口径：按运单明细行累加（同一趟的多张运单重复计入），"
-        f"是配额情景的保守上界；对外披露口径为 E0 {_e0_disclosure_text()}"
-        "（kpi.json total_kg / 1000），两口径可关联、不可相减。")
-
-    if st.button("生成智能披露附注", width="stretch"):
-        try:
-            if live_services.invoice_api_key():
-                with st.spinner("DeepSeek 正在生成披露附注…"):
-                    st.session_state["disclosure_note"] = live_services.generate_disclosure_note(snap)
-                st.session_state["disclosure_source"] = "deepseek-flash"
-            else:
-                st.session_state["disclosure_note"] = fallback_disclosure(snap)
-                st.session_state["disclosure_source"] = "本地模板（未配置 DeepSeek Key）"
-        except Exception as exc:
-            st.session_state["disclosure_note"] = fallback_disclosure(snap)
-            st.session_state["disclosure_source"] = "本地模板（DeepSeek 调用失败：%s）" % exc
-    if st.session_state.get("disclosure_note"):
-        st.info(st.session_state["disclosure_note"])
-        st.caption("来源：" + st.session_state.get("disclosure_source", ""))
-    st.download_button(
-        "下载当期联动台账 CSV", data=breakdown.to_csv(index=False).encode("utf-8-sig"),
-        file_name="current_carbon_ledger.csv", mime="text/csv", width="stretch")
-    with st.expander("查看共享 State"):
-        st.json({
-            "current_invoice_carbon": st.session_state["current_invoice_carbon"],
-            "snapshot": snap,
-        })
+        badges=["CSV 自动归集", "范围一二三", "披露依据", "逐条追溯"])
+    carbon_disclosure_panel.render_carbon_disclosure_panel()
 
 
 def _render_transport_records():

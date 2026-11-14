@@ -157,6 +157,14 @@ div[class*="st-key-main_nav_"] [data-testid="stPageLink-NavLink"] p *{
 @media (prefers-reduced-motion:reduce){
   div[class*="st-key-main_nav_"] [data-testid="stPageLink-NavLink"]{ transition:none; }
 }
+/* Active pages remain usable links; highlighting must not disable navigation. */
+:is(.st-key-main_nav_dashboard_active,.st-key-main_nav_chain_active,
+    .st-key-main_nav_invoice_active,.st-key-main_nav_sensor_active,
+    .st-key-main_nav_routes_active,.st-key-main_nav_ledger_active) a{
+  background:rgba(70,183,255,.16) !important;
+  color:var(--ct-ink) !important;
+  cursor:pointer !important;
+}
 </style>
 """
 
@@ -178,10 +186,10 @@ def render_main_nav(current: str, pages: List[Any]) -> None:
                 nav_columns = st.columns(len(NAV_ITEMS), gap="small")
                 for item, page, column in zip(NAV_ITEMS, pages, nav_columns):
                     with column:
-                        with st.container(key="main_nav_" + item["id"]):
-                            # 唯一事件源：原生 page_link。当前页 disabled，只做视觉标识。
-                            st.page_link(page, label=item["label"],
-                                         disabled=(item["id"] == current))
+                        suffix = "_active" if item["id"] == current else ""
+                        with st.container(key="main_nav_" + item["id"] + suffix):
+                            # Keep the selected page clickable, with no forbidden cursor.
+                            st.page_link(page, label=item["label"], disabled=False)
             with status_col:
                 st.markdown(
                     "<div class='cm-head-status'>"

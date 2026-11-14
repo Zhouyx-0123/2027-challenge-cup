@@ -1,0 +1,11 @@
+{
+  "driving_segments": 11,
+  "l_per_count_median": 0.0214,
+  "l_per_count_mean": 0.0229,
+  "l_per_count_cv": 0.204,
+  "kmh_if_km_p50": 60.6,
+  "kmh_if_km_max": 123.1,
+  "kmh_if_km_over_130": 0,
+  "note": "若 0x0199 是里程，kmh_if_km 应处处 = 实际车速（16 t 卡车不可能 130+ km/h）；若 0x0199 是累计油耗，l_per_count 应跨段恒定（实测行驶段集中在 0.019–0.021）。两个假设都有反例（纯怠速段 0x0199 不增），故只能加油定标（CAL-1）收口。",
+  "counter_scale_in_map": 0.02
+}

@@ -199,6 +199,10 @@ def build_alias_map(contract: Optional[Dict[str, Any]] = None) -> Dict[str, str]
                 lookup.setdefault(_norm_key(alias), canonical)
     for canonical in CANONICAL_FIELDS:
         lookup[_norm_key(canonical)] = canonical
+    # qc_flags 不是 CANONICAL_FIELDS 里的物理列，但 normalize_records 需要把设备端
+    # 上送的标记位并进来（否则 clock_unknown / <channel>_absent 这类标记会被静默丢掉）。
+    lookup[_norm_key("qc_flags")] = "qc_flags"
+    lookup[_norm_key("qc")] = "qc_flags"
     return lookup
 
 

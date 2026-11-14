@@ -1,0 +1,16 @@
+{
+  "frames": 39645,
+  "segments": 695,
+  "responses": 18619,
+  "dids": 83,
+  "points": 1370,
+  "fuel_l_total": 13.309,
+  "fuel_lph": {
+    "mean": 8.809,
+    "p50": 2.667,
+    "p95": 31.565,
+    "max": 55.455
+  },
+  "segments_with_fuel": 82,
+  "max_gap_breaks": 1
+}

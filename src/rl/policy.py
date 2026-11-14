@@ -310,6 +310,10 @@ class RoutePolicy:
             forecast_time = self.forecaster.travel_time_min(plan.path, env.snapshot(),
                                                             env.minute)
         weights = self.predictor_weights()
+        if prediction["visits"] == 0:
+            # 冷启动：TD 还没有任何样本，V(s)=0 不能让它在平均里占一半，
+            # 否则首次预测的 ETA 会被硬生生砍半。没数据就只信模型。
+            weights = {"model": 1.0, "td": 0.0, "forecast": 0.0}
         blended = weights["td"] * learned_time + weights["model"] * model_time
         if forecast_time is not None:
             blended += weights.get("forecast", 0.0) * forecast_time
@@ -318,7 +322,12 @@ class RoutePolicy:
         state_spread = max(prediction.get("time_abs_err_min", prediction["time_std_min"]), 0.0)
         pool = (weights["model"] * (self.model_abs_err or state_spread)
                 + weights["td"] * (self.td_abs_err or state_spread))
-        spread = max(state_spread, float(pool))
+        if prediction["visits"] < 10:
+            # 小样本时 TD 的 |残差| 只是噪声：一单跑偏就能把"保守上界"撑到 ETA 两倍。
+            # 样本不足按模型经验的 10% 给缓冲，攒够 10 次再交给实测。
+            spread = 0.10 * max(float(blended), 1.0)
+        else:
+            spread = max(state_spread, float(pool))
         eta = {
             "eta_min": round(float(blended), 2),
             "eta_p90_min": round(float(blended + 2.5 * spread), 2),

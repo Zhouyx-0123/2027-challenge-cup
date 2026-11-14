@@ -1,8 +1,8 @@
 {
-  "version": "rl-policy-v1",
-  "updated": "2026-11-03",
+  "version": "rl-policy-v2",
+  "updated": "2026-11-15",
   "owner": "算法层；排放因子与价格只引用 config/calc_factors.json 的同源数值，不另立口径",
-  "notes": "Q-learning 动态路径决策的全部超参、因子与场景默认值。代码里不再硬编码任何系数；改这里的值必须 bump version 并重跑 tools/rl_fit_emission.py 与 pytest tests/test_rl_*.py。",
+  "notes": "Q-learning 动态路径决策的全部超参、因子与场景默认值。代码里不再硬编码任何系数；改这里的值必须 bump version 并重跑 tools/rl_fit_emission.py 与 pytest tests/test_rl_*.py。v2 新增 congestion（速度概率/CVaR/拥堵权重/事件阈值）与 lastmile（最后一公里排单）两段，见 docs/69。",
   "emission": {
     "model": "EF(g/km) = [A + a·(P/v) + B + b·P + (C + c·P)·v + (D + d·P)·v²] · k_{i,j}",
     "units": {
@@ -300,5 +300,36 @@
     "_note": "15 分钟路段速度预报（BPR 反解 + 需求曲线外推），作为 ETA 的第三路预测；不改路由。",
     "enabled": true,
     "horizon_min": 15.0
+  },
+  "congestion": {
+    "_note": "速度概率分布：ln v ~ N(μ, σ²)，E[T]=(L/v)·exp(σ²)，CVaR90=μ+1.755σ；拥堵程度 d=1−v/v_free。CV 默认值来自 2023 路网级模拟数据集标定（docs/69 §2），没有实测时用它并在报告里标注。",
+    "cv_by_road_class": {
+      "1": 0.248,
+      "2": 0.289,
+      "3": 0.235,
+      "4": 0.289
+    },
+    "correlation_rho": 0.0,
+    "incident_per_km": 0.0,
+    "incident_mean_min": 25.0,
+    "incident_cv": 0.8,
+    "congestion_weight": 8.0,
+    "risk_weight": 0.3,
+    "event_drop": 0.3,
+    "mask_degree_max": 0.8
+  },
+  "lastmile": {
+    "_note": "最后一公里：GA+爬山排单（专利 CN112580865A 思路），时间窗 + 顺序约束 + 电动车碳口径；扰动后用剩余子问题重排。",
+    "speed_kmh": 25.0,
+    "service_min": 8.0,
+    "late_penalty": 100.0,
+    "wait_weight": 0.5,
+    "carbon_weight": 1.0,
+    "ev_kwh_per_km": 0.25,
+    "grid_kg_per_kwh": 0.5568,
+    "diesel_l_per_km": 0.12,
+    "diesel_kg_per_l": 2.63,
+    "ga_pop": 60,
+    "ga_gens": 250
   }
 }

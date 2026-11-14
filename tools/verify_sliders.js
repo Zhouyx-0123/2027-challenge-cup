@@ -33,7 +33,8 @@ const outDir = process.argv[3] || '_shots';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const CASES = [
-  { name: 'sensor', route: '/sensor', key: 'sensor_window_n', ratio: 0.72 },
+// sensor 页在 f237f2d 移除 CO₂ 通道后不再有自绘滑条（原 sensor_window_n 随之删除），
+// 这里只保留仍有实验室滑条的 routes 页；其它页面若再加滑条，请补回用例。
   { name: 'routes', route: '/routes', key: 'route_carbon_price', ratio: 0.35 },
 ];
 
